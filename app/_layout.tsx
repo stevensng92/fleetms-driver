@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, useTokens, useThemeControls } from '../theme/ThemeProvider';
 import { queryClient } from '../lib/queryClient';
 import { ensureDevSession, DevSessionResult } from '../lib/devSession';
+import { ensurePushNotifications } from '../lib/push';
 
 export default function RootLayout() {
   const [session, setSession] = useState<DevSessionResult | null>(null);
@@ -36,9 +37,22 @@ export default function RootLayout() {
 function ThemedShell({ session }: { session: DevSessionResult | null }) {
   const T = useTokens();
   const { resolvedTheme } = useThemeControls();
+  const router = useRouter();
   // Expose session status on a global for screens that want to nudge the user.
   // Not a state container — just a one-shot diagnostic.
   (globalThis as any).__FLEETMS_DEV_SESSION__ = session;
+
+  // Register push notifications once the session is up. Idempotent — the
+  // helper short-circuits if the token hasn't changed across cold starts.
+  useEffect(() => {
+    if (session?.kind !== 'ok') return;
+    let alive = true;
+    ensurePushNotifications(router).then(r => {
+      if (!alive) return;
+      (globalThis as any).__FLEETMS_PUSH__ = r;
+    });
+    return () => { alive = false; };
+  }, [session?.kind, router]);
 
   return (
     <>
