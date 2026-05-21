@@ -8,6 +8,9 @@ import type { StatusKind } from '../../components/StatusPill';
 // Stops live in their own `job_stops` table (added in pr_ms3). The driver app
 // keeps the timeline read-only; the stops table is the source of truth.
 
+// See lib/queries/jobs.ts:mapStatus for the rationale on the default branch —
+// unknown values land in 'voided' (gray) and surface a Sentry warning, never
+// silently mislabeled as Confirmed.
 function mapStatus(s: string): StatusKind {
   switch (s) {
     case 'pending':     return 'pending';
@@ -16,7 +19,9 @@ function mapStatus(s: string): StatusKind {
     case 'done':        return 'done';
     case 'rejected':
     case 'cancelled':   return 'voided';
-    default:            return 'confirmed';
+    default:
+      try { require('@sentry/react-native').captureMessage(`Unknown job_status: ${s}`, 'warning'); } catch {}
+      return 'voided';
   }
 }
 
@@ -32,8 +37,17 @@ export type JobDetail = {
   dropoffLocation: string;
   dropoffDetail: string | null;
   client: string;
+  /** Name of the actual person the driver is picking up — populated for
+   *  corporate + platform-client jobs where the booker isn't the rider. */
+  passengerName: string | null;
+  /** Tap-to-call number for the passenger; format may be local or international. */
+  passengerPhone: string | null;
   pax: number | null;
+  /** Type the dispatcher requested (sedan/mpv/etc.) — fallback when no vehicle is assigned yet. */
   vehicleType: string | null;
+  /** Actual assigned vehicle on the current assignment. Null when none assigned. */
+  vehiclePlate: string | null;
+  vehicleModel: string | null;
   amount: number | null;
   specialInstructions: string | null;
   stops: Array<{
@@ -42,30 +56,76 @@ export type JobDetail = {
     location: string;
     detail: string | null;
     scheduledAt: string | null;
+    lat: number | null;
+    lng: number | null;
   }>;
 };
 
 async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
   // Pull the job + the current assignment + stops in a single round-trip.
+  //
+  // job_stops disambiguator: there's both a plain FK on job_id AND a composite
+  // FK on (org_id, job_id) — PostgREST refuses ambiguous embeds (PGRST201) so
+  // we spell the FK by name. Same trick the dispatcher uses in assignments.ts.
+  //
+  // Current schema (post pr_ms3): position / area / scheduled_arrival_at —
+  // the old seq / kind / location / scheduled_at column names from the
+  // initial migration were renamed.
   const { data: job, error: jobErr } = await supabase
     .from('jobs')
     .select(`
       id, job_number, status,
-      pickup_datetime, pickup_location, pickup_detail,
-      dropoff_location, dropoff_detail,
-      client_name, pax, vehicle_type_required, amount, special_instructions,
-      assignments!inner ( id, is_current ),
-      job_stops ( seq, kind, location, detail, scheduled_at )
+      pickup_datetime, pickup_location, pickup_detail, pickup_lat, pickup_lng,
+      dropoff_location, dropoff_detail, dropoff_lat, dropoff_lng,
+      client_name, passenger_name, passenger_phone,
+      pax, vehicle_type_required, amount, special_instructions,
+      assignments!assignments_job_id_fkey!inner (
+        id, is_current,
+        vehicle:vehicles!assignments_vehicle_id_fkey ( plate_number, type, model )
+      ),
+      job_stops!job_stops_job_id_fkey ( position, area, detail, scheduled_arrival_at, lat, lng )
     `)
     .eq('id', jobUuid)
     .eq('assignments.is_current', true)
-    .order('seq', { foreignTable: 'job_stops', ascending: true })
+    .order('position', { foreignTable: 'job_stops', ascending: true })
     .single();
 
   if (jobErr) throw jobErr;
   if (!job) throw new Error('Job not found');
 
   const assignment = (job.assignments as any[] | undefined)?.find((a: any) => a.is_current) ?? null;
+  const assignedVehicle = (() => {
+    if (!assignment) return null;
+    const v = Array.isArray((assignment as any).vehicle)
+      ? (assignment as any).vehicle[0]
+      : (assignment as any).vehicle;
+    return v ? { plate: v.plate_number as string, type: v.type as string, model: (v.model as string | null) ?? null } : null;
+  })();
+
+  // job_stops rows describe the route AFTER pickup. We always synthesize a
+  // Pickup at index 0 from the job row itself so the timeline UI gets a
+  // consistent [Pickup, …, Dropoff] sequence regardless of stop count.
+  const realStops = ((job.job_stops as any[]) ?? []);
+  const maxPos = realStops.reduce((m, s) => Math.max(m, s.position ?? 0), 0);
+  const dbStops = realStops.map((s) => ({
+    seq:         s.position as number,
+    kind:        s.position === maxPos ? 'Dropoff' : `Stop ${s.position}`,
+    location:    s.area as string,
+    detail:      (s.detail as string | null) ?? null,
+    scheduledAt: (s.scheduled_arrival_at as string | null) ?? null,
+    lat:         (s.lat as number | null) ?? null,
+    lng:         (s.lng as number | null) ?? null,
+  }));
+
+  const pickup = {
+    seq: 0,
+    kind: 'Pickup',
+    location: job.pickup_location,
+    detail: job.pickup_detail,
+    scheduledAt: job.pickup_datetime,
+    lat: (job.pickup_lat as number | null) ?? null,
+    lng: (job.pickup_lng as number | null) ?? null,
+  };
 
   return {
     jobUuid: job.id,
@@ -79,17 +139,15 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
     dropoffLocation: job.dropoff_location,
     dropoffDetail: job.dropoff_detail,
     client: job.client_name,
+    passengerName: (job.passenger_name as string | null) ?? null,
+    passengerPhone: (job.passenger_phone as string | null) ?? null,
     pax: job.pax,
     vehicleType: job.vehicle_type_required,
+    vehiclePlate: assignedVehicle?.plate ?? null,
+    vehicleModel: assignedVehicle?.model ?? null,
     amount: job.amount === null ? null : Number(job.amount),
     specialInstructions: job.special_instructions,
-    stops: ((job.job_stops as any[]) ?? []).map(s => ({
-      seq: s.seq,
-      kind: s.kind,
-      location: s.location,
-      detail: s.detail,
-      scheduledAt: s.scheduled_at,
-    })),
+    stops: [pickup, ...dbStops],
   };
 }
 
