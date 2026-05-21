@@ -2,7 +2,7 @@
   "expo": {
     "name": "FleetMS Driver",
     "slug": "fleetms-driver",
-    "version": "0.2.3",
+    "version": "0.3.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fleetmsdriver",
@@ -51,6 +51,12 @@
         "projectId": "40998b1c-c29e-4497-a3b3-3033ee640d29"
       }
     },
-    "owner": "stevie2k"
+    "owner": "stevie2k",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/40998b1c-c29e-4497-a3b3-3033ee640d29"
+    }
   }
 }

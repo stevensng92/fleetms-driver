@@ -2,6 +2,14 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-05-21
+
+First external-cohort release. The version-tag jump marks the line between "scaffold + Steven dogfooding" and "real drivers installing this off a download link." No new features over 0.2.3 — this is purely about cutting a build that goes on Continental drivers' phones.
+
+### Operational
+
+- Tagged for distribution via EAS `preview` profile (signed APK, internal distribution). Bundle id `my.fleetms.driver` is the keystore identity going forward — preserving the EAS-managed keystore is what lets future builds install over this one without uninstall.
+
 ## [0.2.3] - 2026-05-21
 
 ### Changed
