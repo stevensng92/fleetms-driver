@@ -25,12 +25,12 @@ function mapStatus(s: string): StatusKind {
   }
 }
 
-// Human "09:00" time label, MY locale.
+// Human "9:00 AM" time label, MY locale. 12-hour with AM/PM marker — drivers
+// shouldn't have to do the 24h math glancing at the card.
 function timeOf(iso: string): string {
-  const d = new Date(iso);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
+  return new Date(iso).toLocaleTimeString('en-MY', {
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  });
 }
 
 function startOfLocalDay(d: Date) {

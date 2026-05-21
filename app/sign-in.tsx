@@ -1,11 +1,14 @@
 import React from 'react';
 import { View, Text, TextInput, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
+import Constants from 'expo-constants';
 import { AppFrame } from '../components/AppFrame';
 import { Logo, Wordmark } from '../components/Logo';
 import { Button } from '../components/Button';
 import { useTokens } from '../theme/ThemeProvider';
 import { signInWithPin, fetchDriverProfile } from '../lib/auth';
+
+const APP_VERSION = Constants.expoConfig?.version ?? '';
 
 // S1 — Sign In (phone + PIN). Replaces the WhatsApp OTP plan which was
 // blocked on Meta WABA verification. See docs/driver-pin-auth.md in fleetms.
@@ -164,7 +167,7 @@ export default function SignIn() {
 
         <View style={{ alignItems: 'center' }}>
           <Text style={{ fontSize: 11, color: T.mutedLight, letterSpacing: 0.4 }}>
-            v0.1.0 · Continental Limo Services
+            v{APP_VERSION}
           </Text>
         </View>
       </View>

@@ -2,6 +2,13 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.3] - 2026-05-21
+
+### Changed
+
+- **Sign-in + set-PIN footer.** Removed the hardcoded "Continental Limo Services" tag — drivers from any tenant see this screen before signing in, so we couldn't truthfully name a specific operator. The version now comes from `expo-constants` (pulled from `app.json`) instead of being hardcoded, so it'll stay accurate across releases.
+- **Job time formatting.** `timeOf` in the Jobs query now formats as `9:00 AM` / `2:00 PM` instead of `09:00` / `14:00`. Same data, friendlier glance for drivers who don't want to do 24h math.
+
 ## [0.2.2] - 2026-05-21
 
 ### Fixed
