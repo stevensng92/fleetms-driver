@@ -39,7 +39,13 @@
           }
         }
       ],
-      "@sentry/react-native"
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "stevensnglabs",
+          "project": "fleetms-driver"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
