@@ -1,7 +1,28 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, Linking, Alert } from 'react-native';
 import { Icon } from './Icon';
 import { useTokens } from '../theme/ThemeProvider';
+
+// Build navigation deeplinks for a stop. When we have coords we use them
+// (most accurate); falling back to the place text means the user lands at a
+// search result, which is still useful when seed data has no coords.
+function buildWazeUrl(place: string, lat?: number, lng?: number): string {
+  if (lat != null && lng != null) {
+    return `https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+  }
+  return `https://www.waze.com/ul?q=${encodeURIComponent(place)}&navigate=yes`;
+}
+function buildMapsUrl(place: string, lat?: number, lng?: number): string {
+  if (lat != null && lng != null) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`;
+}
+
+async function openUrl(url: string) {
+  try { await Linking.openURL(url); }
+  catch { Alert.alert('Could not open', `No app available to handle:\n${url}`); }
+}
 
 const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
 
@@ -11,6 +32,10 @@ export type Stop = {
   arrive: string;
   place: string;
   depart?: string | null;
+  /** Optional coords for accurate nav. When absent, Waze/Maps fall back to
+   *  searching `place` as a text query. */
+  lat?: number | null;
+  lng?: number | null;
 };
 
 type State = 'upcoming' | 'current' | 'done';
@@ -92,8 +117,14 @@ export function TimelineStop({ stop, isLast, state = 'upcoming' }: {
 
           {!done && (
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              <NavBtn icon="waze"  label="Waze" tint="#33CCFF"/>
-              <NavBtn icon="maps"  label="Maps" tint={T.confirmDot}/>
+              <NavBtn
+                icon="waze" label="Waze" tint="#33CCFF"
+                onPress={() => openUrl(buildWazeUrl(stop.place, stop.lat ?? undefined, stop.lng ?? undefined))}
+              />
+              <NavBtn
+                icon="maps" label="Maps" tint={T.confirmDot}
+                onPress={() => openUrl(buildMapsUrl(stop.place, stop.lat ?? undefined, stop.lng ?? undefined))}
+              />
             </View>
           )}
         </View>
@@ -102,16 +133,20 @@ export function TimelineStop({ stop, isLast, state = 'upcoming' }: {
   );
 }
 
-function NavBtn({ icon, label, tint }: { icon: 'waze' | 'maps'; label: string; tint: string }) {
+function NavBtn({ icon, label, tint, onPress }: {
+  icon: 'waze' | 'maps'; label: string; tint: string; onPress: () => void;
+}) {
   const T = useTokens();
   return (
     <Pressable
-      style={{
+      onPress={onPress}
+      style={({ pressed }) => ({
         paddingHorizontal: 12, paddingVertical: 7,
         borderRadius: 6, backgroundColor: T.surface,
         borderWidth: 1, borderColor: T.border,
         flexDirection: 'row', alignItems: 'center', gap: 6,
-      }}
+        opacity: pressed ? 0.7 : 1,
+      })}
     >
       <Icon name={icon} size={14} color={tint}/>
       <Text style={{ fontSize: 12.5, fontWeight: '600', color: T.text }}>{label}</Text>

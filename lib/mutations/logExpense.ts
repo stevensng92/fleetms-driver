@@ -1,5 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import * as FileSystem from 'expo-file-system';
+// expo-file-system v54 deprecated the top-level readAsStringAsync; the legacy
+// submodule keeps the old signature working. Migration to the new File/Directory
+// API is on the backlog.
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase } from '../supabase';
 import type { ExpenseCategory } from '../queries/expenses';

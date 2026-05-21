@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, Alert, Linking } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppFrame } from '../../components/AppFrame';
 import { AppHeader, SectionLabel } from '../../components/AppHeader';
 import { StatusPill } from '../../components/StatusPill';
 import { Button } from '../../components/Button';
 import { TimelineStop, Stop } from '../../components/TimelineStop';
+import { ClientCard } from '../../components/ClientCard';
+import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
@@ -43,6 +45,8 @@ export default function JobDetail() {
     arrive: s.scheduledAt ? new Date(s.scheduledAt).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' }) : '—',
     place: s.location + (s.detail ? `, ${s.detail}` : ''),
     depart: undefined,
+    lat: s.lat,
+    lng: s.lng,
   }));
 
   // Fallback to a 2-stop pickup+dropoff if no job_stops rows exist.
@@ -77,29 +81,19 @@ export default function JobDetail() {
       />
 
       <View style={{ paddingHorizontal: 20, paddingBottom: 20 }}>
-        {/* Trip meta */}
-        <View style={{
-          backgroundColor: T.surface, borderRadius: 12,
-          paddingHorizontal: 16, paddingVertical: 14, marginBottom: 18,
-          flexDirection: 'row', flexWrap: 'wrap',
-          shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-          elevation: 2,
-        }}>
-          {[
-            ['Client',  job.client],
-            ['Vehicle', job.vehicleType ?? '—'],
-            ['Pax',     String(job.pax ?? '—')],
-            ['Pickup',  new Date(job.pickupAt).toLocaleString('en-MY', { dateStyle: 'medium', timeStyle: 'short' })],
-          ].map(([k, v]) => (
-            <View key={k} style={{ width: '50%', paddingVertical: 6 }}>
-              <Text style={{
-                fontSize: 11, color: T.mutedLight, fontWeight: '600',
-                letterSpacing: 0.5, textTransform: 'uppercase',
-              }}>{k}</Text>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: T.text, marginTop: 2 }}>{v}</Text>
-            </View>
-          ))}
-        </View>
+        <ClientCard
+          clientName={job.client}
+          passengerName={job.passengerName}
+          passengerPhone={job.passengerPhone}
+          pax={job.pax}
+          vehicleType={job.vehicleType}
+          vehicleModel={job.vehicleModel}
+          vehiclePlate={job.vehiclePlate}
+        />
+
+        {job.specialInstructions && (
+          <SpecialInstructionsCard text={job.specialInstructions}/>
+        )}
 
         <SectionLabel>Route · {stopsForUi.length} stops</SectionLabel>
         <View style={{
@@ -112,22 +106,6 @@ export default function JobDetail() {
             <TimelineStop key={i} stop={s} isLast={i === stopsForUi.length - 1}/>
           ))}
         </View>
-
-        {job.specialInstructions && (
-          <>
-            <SectionLabel>Special instructions</SectionLabel>
-            <View style={{
-              backgroundColor: T.amberSoft, borderColor: T.amber, borderWidth: 1,
-              borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 18,
-              flexDirection: 'row', gap: 10, alignItems: 'flex-start',
-            }}>
-              <Icon name="bell" size={18} color={T.amber}/>
-              <Text style={{ flex: 1, fontSize: 14, color: T.amberFg, fontWeight: '500', lineHeight: 20 }}>
-                {job.specialInstructions}
-              </Text>
-            </View>
-          </>
-        )}
 
         {job.amount !== null && (
           <View style={{

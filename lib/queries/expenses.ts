@@ -36,7 +36,7 @@ async function fetchMyExpenses(): Promise<ExpensesSummary> {
     .from('expenses')
     .select(`
       id, category, amount, expense_date, receipt_path, notes, voided_at,
-      vehicle:vehicle_id ( plate_number )
+      vehicle:vehicles!expenses_org_vehicle_fkey ( plate_number )
     `)
     .gte('expense_date', startOfMonthIso())
     .lt('expense_date',  startOfNextMonthIso())

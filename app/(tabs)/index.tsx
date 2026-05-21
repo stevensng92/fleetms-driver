@@ -8,16 +8,33 @@ import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
-import { DRIVER } from '../../data/mock';
+import { useUnreadCount } from '../../lib/queries/notifications';
+import { useDriverProfile } from '../../lib/queries/driverProfile';
+import { useJobsRealtime } from '../../lib/realtime/jobsRealtime';
+
+// Time-of-day greeting that matches the device's local hour. Saturated to the
+// 3 standard buckets so we don't say "Good afternoon" at 1pm and "Good evening"
+// at 5pm — drivers travel a lot and the language stays steady.
+function timeOfDayGreeting(date = new Date()): string {
+  const h = date.getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
 export default function JobsToday() {
   const T = useTokens();
+  useJobsRealtime();
   const { data, isLoading, isError, error, refetch, isRefetching } = useTodaysJobs();
+  const { data: profile } = useDriverProfile();
   const confirmAsg = useConfirmAssignment();
   const rejectAsg = useRejectAssignment();
+  const firstName = profile?.name.split(/\s+/)[0] ?? 'driver';
 
   const today = data?.today ?? [];
   const tomorrow = data?.tomorrow ?? [];
+  const upcoming = data?.upcoming ?? [];
+  const upcomingTotal = upcoming.reduce((sum, g) => sum + g.jobs.length, 0);
 
   // Friday · 9 May 2026 — formatted locally
   const headerSubtitle = new Date().toLocaleDateString('en-MY', {
@@ -42,9 +59,9 @@ export default function JobsToday() {
         }
       >
         <AppHeader
-          title={`Good morning, ${DRIVER.name.split(' ')[0]}`}
+          title={`${timeOfDayGreeting()}, ${firstName}`}
           subtitle={headerSubtitle}
-          right={<BellButton hasUnread/>}
+          right={<BellButton/>}
         />
 
         {isLoading && <LoadingState/>}
@@ -93,7 +110,71 @@ export default function JobsToday() {
                 {tomorrow.length} {tomorrow.length === 1 ? 'job' : 'jobs'}
               </Text>}
             >Tomorrow</SectionLabel>
-            {tomorrow.map(j => <JobCard key={j.id} job={j} dim/>)}
+            {tomorrow.map(j => (
+              <JobCard
+                key={j.id}
+                job={j}
+                dim
+                onPress={() => router.push(
+                  j.status === 'progress'
+                    ? { pathname: '/jobs/active', params: { id: j.id } }
+                    : `/jobs/${j.id}`,
+                )}
+                onView={() => router.push(`/jobs/${j.id}`)}
+                onAccept={async () => {
+                  if (!j.assignmentId) return;
+                  try { await confirmAsg.mutateAsync(j.assignmentId); }
+                  catch (e: any) { Alert.alert('Could not accept', e?.message ?? 'Unknown error'); }
+                }}
+                onReject={async () => {
+                  if (!j.assignmentId) return;
+                  try { await rejectAsg.mutateAsync({ assignmentId: j.assignmentId }); }
+                  catch (e: any) { Alert.alert('Could not reject', e?.message ?? 'Unknown error'); }
+                }}
+              />
+            ))}
+          </>
+        )}
+
+        {!isLoading && !isError && upcoming.length > 0 && (
+          <>
+            <View style={{ height: 8 }}/>
+            <SectionLabel
+              right={<Text style={{ fontSize: 12, color: T.muted, fontWeight: '600' }}>
+                {upcomingTotal} {upcomingTotal === 1 ? 'job' : 'jobs'}
+              </Text>}
+            >Upcoming</SectionLabel>
+            {upcoming.map(group => (
+              <React.Fragment key={group.dateKey}>
+                <View style={{
+                  paddingHorizontal: 20, paddingTop: 6, paddingBottom: 8,
+                }}>
+                  <Text style={{
+                    fontSize: 11, fontWeight: '700', color: T.mutedLight,
+                    letterSpacing: 0.4, textTransform: 'uppercase',
+                  }}>{group.label}</Text>
+                </View>
+                {group.jobs.map(j => (
+                  <JobCard
+                    key={j.id}
+                    job={j}
+                    dim
+                    onPress={() => router.push(`/jobs/${j.id}`)}
+                    onView={() => router.push(`/jobs/${j.id}`)}
+                    onAccept={async () => {
+                      if (!j.assignmentId) return;
+                      try { await confirmAsg.mutateAsync(j.assignmentId); }
+                      catch (e: any) { Alert.alert('Could not accept', e?.message ?? 'Unknown error'); }
+                    }}
+                    onReject={async () => {
+                      if (!j.assignmentId) return;
+                      try { await rejectAsg.mutateAsync({ assignmentId: j.assignmentId }); }
+                      catch (e: any) { Alert.alert('Could not reject', e?.message ?? 'Unknown error'); }
+                    }}
+                  />
+                ))}
+              </React.Fragment>
+            ))}
           </>
         )}
       </ScrollView>
@@ -101,22 +182,28 @@ export default function JobsToday() {
   );
 }
 
-function BellButton({ hasUnread }: { hasUnread?: boolean }) {
+function BellButton() {
   const T = useTokens();
+  const unread = useUnreadCount();
   return (
     <Pressable
-      style={{
+      onPress={() => router.push('/notifications' as '/')}
+      // Icon-only — no fill, no border. The previous chrome (T.surface bg +
+      // T.border) sat awkwardly on top of T.page in light mode where surface
+      // and page are close-but-not-equal off-whites. Cleaner without it.
+      style={({ pressed }) => ({
         width: 42, height: 42, borderRadius: 21,
-        backgroundColor: T.surface, borderWidth: 1, borderColor: T.border,
         alignItems: 'center', justifyContent: 'center',
-      }}
+        opacity: pressed ? 0.6 : 1,
+      })}
+      hitSlop={8}
     >
-      <Icon name="bell" size={18} color={T.text}/>
-      {hasUnread && (
+      <Icon name="bell" size={20} color={T.text}/>
+      {unread > 0 && (
         <View style={{
-          position: 'absolute', top: 9, right: 11,
+          position: 'absolute', top: 8, right: 9,
           width: 10, height: 10, borderRadius: 5,
-          backgroundColor: T.red, borderWidth: 2, borderColor: T.surface,
+          backgroundColor: T.red, borderWidth: 2, borderColor: T.page,
         }}/>
       )}
     </Pressable>

@@ -56,7 +56,10 @@ export function SectionLabel({ children, right }: { children: React.ReactNode; r
   const T = useTokens();
   return (
     <View style={{
-      flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between',
+      // 'center' (not 'baseline'): the right slot may contain a Pressable with
+      // an Icon, which has no text baseline — RN can't align properly and the
+      // action sits visibly above the label otherwise.
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingHorizontal: 20, paddingTop: 4, paddingBottom: 10,
     }}>
       <Text style={{

@@ -28,7 +28,7 @@ async function fetchExpenseDetail(id: string): Promise<ExpenseDetail> {
     .from('expenses')
     .select(`
       id, category, amount, expense_date, receipt_path, notes, voided_at,
-      vehicle:vehicle_id ( plate_number )
+      vehicle:vehicles!expenses_org_vehicle_fkey ( plate_number )
     `)
     .eq('id', id)
     .single();

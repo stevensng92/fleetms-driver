@@ -1,11 +1,13 @@
-import React from 'react';
-import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Pressable, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppFrame } from '../../components/AppFrame';
 import { AppHeader, SectionLabel } from '../../components/AppHeader';
 import { StatusPill } from '../../components/StatusPill';
 import { Button } from '../../components/Button';
 import { TimelineStop, Stop } from '../../components/TimelineStop';
+import { ClientCard } from '../../components/ClientCard';
+import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
@@ -44,6 +46,8 @@ export default function ActiveJob() {
       : '—',
     place: s.location + (s.detail ? `, ${s.detail}` : ''),
     depart: undefined,
+    lat: s.lat,
+    lng: s.lng,
   }));
   if (stopsForUi.length === 0) {
     stopsForUi.push(
@@ -108,7 +112,21 @@ export default function ActiveJob() {
         </View>
       )}
 
-      <View style={{ paddingHorizontal: 20, paddingBottom: 20 }}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}>
+        <ClientCard
+          clientName={job.client}
+          passengerName={job.passengerName}
+          passengerPhone={job.passengerPhone}
+          pax={job.pax}
+          vehicleType={job.vehicleType}
+          vehicleModel={job.vehicleModel}
+          vehiclePlate={job.vehiclePlate}
+        />
+
+        {job.specialInstructions && (
+          <SpecialInstructionsCard text={job.specialInstructions}/>
+        )}
+
         <SectionLabel>Route</SectionLabel>
         <View style={{
           backgroundColor: T.surface, borderRadius: 12,
@@ -116,9 +134,7 @@ export default function ActiveJob() {
           shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
           elevation: 2,
         }}>
-          {stopsForUi.map((s, i) => (
-            <TimelineStop key={i} stop={s} isLast={i === stopsForUi.length - 1} state={states[i]}/>
-          ))}
+          <RouteWithCollapsedDoneStops stops={stopsForUi} states={states}/>
         </View>
 
         {job.amount !== null && (
@@ -140,7 +156,7 @@ export default function ActiveJob() {
             </Text>
           </View>
         )}
-      </View>
+      </ScrollView>
 
       <View style={{
         position: 'absolute', left: 0, right: 0, bottom: 0,
@@ -168,6 +184,100 @@ export default function ActiveJob() {
         </View>
       </View>
     </AppFrame>
+  );
+}
+
+// Renders the route timeline with completed stops collapsed into a single
+// summary row by default. Tap to expand the group and show each completed
+// stop normally; tap again to re-collapse.
+type StopState = 'done' | 'current' | 'upcoming';
+function RouteWithCollapsedDoneStops({
+  stops, states,
+}: { stops: Stop[]; states: StopState[] }) {
+  const T = useTokens();
+  const [expanded, setExpanded] = useState(false);
+
+  const doneCount = states.filter(s => s === 'done').length;
+  // No completed stops yet → render the full timeline normally.
+  if (doneCount === 0) {
+    return (
+      <>
+        {stops.map((s, i) => (
+          <TimelineStop key={i} stop={s} isLast={i === stops.length - 1} state={states[i]}/>
+        ))}
+      </>
+    );
+  }
+
+  // Completed stops are always at the start (states transition done → current → upcoming
+  // in order). Find the split index.
+  const firstNonDone = states.findIndex(s => s !== 'done');
+  const doneStops = stops.slice(0, firstNonDone === -1 ? stops.length : firstNonDone);
+  const restStops = stops.slice(firstNonDone === -1 ? stops.length : firstNonDone);
+  const restStates = states.slice(firstNonDone === -1 ? stops.length : firstNonDone);
+
+  // Build the summary text: time range + place chain abbreviated.
+  const firstDone = doneStops[0];
+  const lastDone = doneStops[doneStops.length - 1];
+  const timeRange = `${firstDone.arrive} – ${lastDone.arrive}`;
+  const placeChain = doneStops.map(s => s.place.split(',')[0]).join(' · ');
+
+  return (
+    <>
+      {expanded ? (
+        <>
+          {doneStops.map((s, i) => (
+            <TimelineStop key={`done-${i}`} stop={s} isLast={false} state="done"/>
+          ))}
+          <Pressable
+            onPress={() => setExpanded(false)}
+            style={({ pressed }) => ({
+              paddingVertical: 8, marginBottom: 6,
+              flexDirection: 'row', alignItems: 'center', gap: 6,
+              opacity: pressed ? 0.5 : 1,
+            })}
+            hitSlop={8}
+          >
+            <Icon name="chevR" size={14} color={T.muted}/>
+            <Text style={{ fontSize: 12, color: T.muted, fontWeight: '700', letterSpacing: 0.3 }}>
+              HIDE COMPLETED
+            </Text>
+          </Pressable>
+        </>
+      ) : (
+        <Pressable
+          onPress={() => setExpanded(true)}
+          style={({ pressed }) => ({
+            paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10,
+            backgroundColor: T.raised, marginBottom: 10,
+            flexDirection: 'row', alignItems: 'center', gap: 10,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Icon name="checkCirc" size={18} color={T.green}/>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: T.text }}>
+                {doneCount} {doneCount === 1 ? 'stop' : 'stops'} completed
+              </Text>
+              <Text style={{ fontSize: 11.5, color: T.muted, fontWeight: '600' }} numberOfLines={1}>
+                {timeRange}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 12, color: T.muted, marginTop: 2 }} numberOfLines={1}>
+              {placeChain}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 11, color: T.muted, fontWeight: '700', letterSpacing: 0.4 }}>
+            SHOW ▾
+          </Text>
+        </Pressable>
+      )}
+
+      {restStops.map((s, i) => (
+        <TimelineStop key={`rest-${i}`} stop={s} isLast={i === restStops.length - 1} state={restStates[i]}/>
+      ))}
+    </>
   );
 }
 

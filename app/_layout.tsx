@@ -5,12 +5,29 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
+import * as Sentry from '@sentry/react-native';
 import { ThemeProvider, useTokens, useThemeControls } from '../theme/ThemeProvider';
 import { queryClient } from '../lib/queryClient';
 import { ensureDevSession, DevSessionResult } from '../lib/devSession';
 import { ensurePushNotifications } from '../lib/push';
 
-export default function RootLayout() {
+// Crash + JS-error reporting. Captures Fabric "child already has parent" and
+// other native crashes with native stack traces, plus any unhandled JS errors.
+// Free tier is plenty for our scale; toggle off by removing EXPO_PUBLIC_SENTRY_DSN.
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    // Send a sample of normal traffic so we can see what was happening before
+    // a crash (e.g. last screen visited). 0.0 = errors-only.
+    tracesSampleRate: 0.1,
+    // We don't ship dev builds; keep it on in __DEV__ too so we catch issues
+    // when iterating locally.
+    enabled: true,
+  });
+}
+
+function RootLayoutImpl() {
   const [session, setSession] = useState<DevSessionResult | null>(null);
 
   useEffect(() => {
@@ -33,6 +50,9 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+// Wrap the root so Sentry can hook into React's error boundary + ErrorUtils.
+export default SENTRY_DSN ? Sentry.wrap(RootLayoutImpl) : RootLayoutImpl;
 
 function ThemedShell({ session }: { session: DevSessionResult | null }) {
   const T = useTokens();
@@ -64,8 +84,13 @@ function ThemedShell({ session }: { session: DevSessionResult | null }) {
           animation: 'slide_from_right',
         }}
       >
-        <Stack.Screen name="sign-in"/>
-        <Stack.Screen name="(tabs)"/>
+        {/* Auth screens use animation: 'none' to dodge a RN Fabric race where
+            the heavy next-screen layout mounts while the auth screen is still
+            sliding out, crashing with "child already has parent" (issue first
+            captured in Sentry on 2026-05-20). */}
+        <Stack.Screen name="sign-in" options={{ animation: 'none' }}/>
+        <Stack.Screen name="set-pin" options={{ animation: 'none' }}/>
+        <Stack.Screen name="(tabs)" options={{ animation: 'none' }}/>
         <Stack.Screen name="jobs/[id]"/>
         <Stack.Screen name="jobs/active"/>
         <Stack.Screen
@@ -75,6 +100,10 @@ function ThemedShell({ session }: { session: DevSessionResult | null }) {
         <Stack.Screen name="expenses/[id]"/>
         <Stack.Screen
           name="profile/time-off"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="notifications"
           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
         />
       </Stack>
