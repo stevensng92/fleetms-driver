@@ -52,7 +52,18 @@ export type SignInResult =
 export async function signInWithPin(phone: string, pin: string): Promise<SignInResult> {
   const email = driverSyntheticEmail(phone);
   const { error } = await supabase.auth.signInWithPassword({ email, password: pin });
-  if (!error) return { ok: true };
+  if (!error) {
+    // Single-active-device policy: a driver can only be signed in on one
+    // phone at a time. Revoke any other sessions this driver has so a
+    // fresh sign-in kicks the old phone off. Prevents account sharing
+    // (driver A using driver B's phone) and limits the blast radius when
+    // a phone is lost. Best-effort — a transient failure here just leaves
+    // the prior multi-session behaviour, not a security regression.
+    try {
+      await supabase.auth.signOut({ scope: 'others' });
+    } catch { /* non-fatal */ }
+    return { ok: true };
+  }
 
   // Supabase's AuthApiError has .code on newer versions; fall back to message match.
   const code = (error as { code?: string }).code;

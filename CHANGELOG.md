@@ -2,6 +2,12 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.1] - 2026-05-21
+
+### Security
+
+- **Single-active-device policy.** After a successful PIN sign-in the client now calls `supabase.auth.signOut({ scope: 'others' })`, revoking every refresh token for the driver except the one just created. A driver can only be signed in on one phone at a time — signing in on a new phone kicks the previous one off within ~1h (access-token lifetime; refresh fails immediately). Prevents account sharing (driver A using driver B's phone) and limits the blast radius when a phone is lost. Mirrors the same change shipped on the dispatcher side as v0.11.5.0. Same enforcement also applied to the dev silent auto-sign-in so developer testing across phones stays consistent.
+
 ## [0.3.0] - 2026-05-21
 
 First external-cohort release. The version-tag jump marks the line between "scaffold + Steven dogfooding" and "real drivers installing this off a download link." No new features over 0.2.3 — this is purely about cutting a build that goes on Continental drivers' phones.

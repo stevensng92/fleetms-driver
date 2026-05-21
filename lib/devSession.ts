@@ -25,5 +25,12 @@ export async function ensureDevSession(): Promise<DevSessionResult> {
 
   const { error } = await supabase.auth.signInWithPassword({ email: EMAIL, password: PASSWORD });
   if (error) return { kind: 'error', message: error.message };
+  // Mirror the production /sign-in path: single-active-device policy. The
+  // dev shortcut is the only place this used to silently leave concurrent
+  // sessions around — fine for local dev, but trips the single-session
+  // invariant when a developer hops between phones. Best-effort.
+  try {
+    await supabase.auth.signOut({ scope: 'others' });
+  } catch { /* non-fatal */ }
   return { kind: 'ok' };
 }
