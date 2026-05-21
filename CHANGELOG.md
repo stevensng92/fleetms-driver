@@ -2,6 +2,12 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.2] - 2026-05-21
+
+### Fixed
+
+- **Sign-in spinner stuck after wrong PIN.** The lockout RPC call introduced in 0.2.1 was hanging indefinitely after a failed `signInWithPassword` — supabase-js gets into an auth-resolution holding state where subsequent RPC calls can stall. Wrapped the call in a 2-second Promise.race timeout so the UI clears even if the response never comes back. Server-side counter still bumps; we just stop waiting on the response.
+
 ## [0.2.1] - 2026-05-21
 
 ### Security

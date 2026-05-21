@@ -58,13 +58,20 @@ export async function signInWithPin(phone: string, pin: string): Promise<SignInR
   const code = (error as { code?: string }).code;
   if (code === 'invalid_credentials' || /invalid login credentials/i.test(error.message)) {
     // Bump server-side failure counter. Returns {locked, lockout_seconds}.
-    // Best-effort: if the RPC fails (e.g. network), still surface the
-    // invalid-credentials message to the user — we're never worse off than
-    // we used to be.
+    // Hard timeout — supabase-js can hang RPC calls immediately after a failed
+    // signInWithPassword (auth-state resolution gets stuck waiting for token
+    // refresh that never comes). We never let a best-effort write block the
+    // sign-in UI; fall through to invalid-credentials if it doesn't return
+    // in 2 seconds. The DB write still happens server-side; we just stop
+    // waiting for the response.
     try {
-      const { data } = await supabase.rpc('note_failed_signin', { p_phone: phone });
-      const locked = (data as { locked?: boolean } | null)?.locked === true;
-      const lockoutSeconds = (data as { lockout_seconds?: number } | null)?.lockout_seconds ?? 0;
+      const rpcPromise = supabase.rpc('note_failed_signin', { p_phone: phone });
+      const timeoutPromise = new Promise<{ data: null }>((resolve) =>
+        setTimeout(() => resolve({ data: null }), 2000),
+      );
+      const { data } = await Promise.race([rpcPromise, timeoutPromise]) as { data: { locked?: boolean; lockout_seconds?: number } | null };
+      const locked = data?.locked === true;
+      const lockoutSeconds = data?.lockout_seconds ?? 0;
       if (locked) {
         const mins = Math.max(1, Math.ceil(lockoutSeconds / 60));
         return {
