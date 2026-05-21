@@ -2,7 +2,7 @@
   "expo": {
     "name": "FleetMS Driver",
     "slug": "fleetms-driver",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fleetmsdriver",
@@ -38,11 +38,19 @@
             "backgroundColor": "#0B1117"
           }
         }
-      ]
+      ],
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "40998b1c-c29e-4497-a3b3-3033ee640d29"
+      }
+    },
+    "owner": "stevie2k"
   }
 }
