@@ -36,13 +36,18 @@ export function driverSyntheticEmail(rawPhone: string): string {
 
 export type SignInResult =
   | { ok: true }
-  | { ok: false; reason: 'invalid_credentials' | 'network' | 'unknown'; message: string };
+  | { ok: false; reason: 'invalid_credentials' | 'locked' | 'network' | 'unknown'; message: string; lockoutSeconds?: number };
 
 /**
  * Sign in with phone + PIN. The PIN is the bcrypt password under the hood.
  * Supabase returns AuthApiError with status 400 + 'invalid_credentials' code
  * for both wrong phone and wrong PIN — we don't distinguish (avoids leaking
  * which phones are registered).
+ *
+ * On invalid_credentials we additionally call `note_failed_signin` to bump
+ * the driver's failed-attempt counter. After 5 failures the server sets a
+ * 15-min lockout and we surface 'locked' so the UI can show a countdown
+ * instead of telling the user to keep guessing.
  */
 export async function signInWithPin(phone: string, pin: string): Promise<SignInResult> {
   const email = driverSyntheticEmail(phone);
@@ -50,10 +55,27 @@ export async function signInWithPin(phone: string, pin: string): Promise<SignInR
   if (!error) return { ok: true };
 
   // Supabase's AuthApiError has .code on newer versions; fall back to message match.
-  // We treat anything that looks like a credential mismatch as 'invalid_credentials'
-  // so the UI surface stays consistent.
   const code = (error as { code?: string }).code;
   if (code === 'invalid_credentials' || /invalid login credentials/i.test(error.message)) {
+    // Bump server-side failure counter. Returns {locked, lockout_seconds}.
+    // Best-effort: if the RPC fails (e.g. network), still surface the
+    // invalid-credentials message to the user — we're never worse off than
+    // we used to be.
+    try {
+      const { data } = await supabase.rpc('note_failed_signin', { p_phone: phone });
+      const locked = (data as { locked?: boolean } | null)?.locked === true;
+      const lockoutSeconds = (data as { lockout_seconds?: number } | null)?.lockout_seconds ?? 0;
+      if (locked) {
+        const mins = Math.max(1, Math.ceil(lockoutSeconds / 60));
+        return {
+          ok: false, reason: 'locked',
+          message: `Too many failed attempts. Try again in ${mins} ${mins === 1 ? 'minute' : 'minutes'}.`,
+          lockoutSeconds,
+        };
+      }
+    } catch {
+      // Swallow — fall through to the normal invalid-credentials path.
+    }
     return { ok: false, reason: 'invalid_credentials', message: 'Phone or PIN is incorrect.' };
   }
   if (/fetch|network|timed? out/i.test(error.message)) {

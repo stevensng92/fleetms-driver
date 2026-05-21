@@ -2,6 +2,12 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.1] - 2026-05-21
+
+### Security
+
+- **PIN lockout enforcement.** On `invalid_credentials`, the client now calls the new `note_failed_signin` RPC which bumps the server-side failure counter and sets a 15-minute lockout at 5 failures. Sign-in surfaces a `'locked'` reason with a countdown message so the user knows when to retry instead of guessing again. Pairs with the dispatcher repo's lockout migration (v0.11.0.0).
+
 ## [0.2.0] - 2026-05-21
 
 The first meaningful release after the scaffold. Drivers can now sign in for real, manage their schedule, see real jobs + earnings, and the dispatcher's changes show up live.
