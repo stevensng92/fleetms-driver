@@ -27,6 +27,23 @@ export function useJobsRealtime() {
   useEffect(() => {
     if (!driverId) return;
 
+    // Supabase Realtime caches channels by topic. If a prior mount's cleanup
+    // is racing with this mount's effect (which happens in RN Fabric +
+    // concurrent rendering — verified on Android v0.3.2+1 via logcat
+    // "cannot add `postgres_changes` callbacks after subscribe()"), the
+    // .channel(name) call below returns the still-subscribed channel and the
+    // next .on(...) throws. The throw propagates to the error boundary and
+    // blanks the JobsToday screen.
+    //
+    // Defensive teardown: remove any existing channel with the same topic
+    // BEFORE subscribing. Idempotent — no-op when there's nothing to clean up.
+    const expectedTopic = `realtime:driver-jobs-${driverId}`;
+    for (const existing of supabase.getChannels()) {
+      if (existing.topic === expectedTopic) {
+        supabase.removeChannel(existing);
+      }
+    }
+
     const channel = supabase
       .channel(`driver-jobs-${driverId}`)
       .on(

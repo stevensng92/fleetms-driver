@@ -1,5 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -46,10 +47,47 @@ if (SENTRY_DSN) {
     // when iterating locally.
     enabled: true,
   });
+
+  // Cold-start heartbeat. Observed in v0.3.2+1: SDK initialised cleanly
+  // (RNSentry: "Starting with DSN ..." in logcat, all native integrations
+  // registered) but zero sessions and zero events made it to the cloud
+  // even after backgrounding the app and a known JS error reaching the
+  // error boundary. This one-shot message guarantees AT LEAST one event
+  // per cold start, which gives us:
+  //   - a definitive "SDK → cloud is reachable" smoke test per release
+  //   - a session-anchor row so AppLifecycleIntegration can hang the
+  //     session on something (without an in-flight event, some Sentry
+  //     SDK builds drop the empty session entirely)
+  // One event per cold start is negligible quota-wise (~< 1k/month even
+  // at full driver rollout). Drop or rate-limit later if it ever becomes
+  // noisy.
+  Sentry.captureMessage(`app_started v${APP_VERSION}+${APP_BUILD}`, 'info');
 }
 
 function RootLayoutImpl() {
   const [session, setSession] = useState<DevSessionResult | null>(null);
+
+  // Belt-and-suspenders Sentry flush on app background. The native
+  // AppLifecycleIntegration is supposed to do this automatically but we
+  // observed it isn't firing reliably on v0.3.2+1 (Sentry SDK 7.2 + Expo
+  // SDK 54 + RN New Architecture + React Compiler — at least one of those
+  // breaks the path). flush() returns once queued events drain or fail;
+  // cheap to call, no-op when the queue is already empty.
+  //
+  // The @sentry/react-native v7.2 re-export of flush() takes zero args
+  // (the timeout overload from @sentry/core doesn't make it through).
+  useEffect(() => {
+    if (!process.env.EXPO_PUBLIC_SENTRY_DSN) return;
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'background' || state === 'inactive') {
+        Sentry.flush().catch(() => {
+          // Network down, Sentry endpoint down — nothing to do, dropping
+          // the queued envelopes is the failure mode either way.
+        });
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     let alive = true;
