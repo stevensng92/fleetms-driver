@@ -2,6 +2,29 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.3] - 2026-05-22
+
+### Fixed
+
+- **Blank screen on the Today/Jobs tab after sign-in.** On v0.3.2+1 the originally-reported Mark-as-Done crash was confirmed fixed (no more `IllegalStateException` at `SurfaceMountingManager.addViewAt` in logcat) — but a *different* failure surfaced: the JobsToday screen rendered blank, with a JS-level error caught by the React error boundary. Root cause in `lib/realtime/jobsRealtime.ts`: `supabase.channel('driver-jobs-${driverId}')` returns the existing cached channel when one with the same topic is still subscribed, and a fast mount → unmount → remount sequence under RN Fabric + concurrent rendering left the prior channel in place. The next `.on('postgres_changes', ...)` call then hit Supabase's hard rule "cannot add callbacks after `subscribe()`" and threw. Added a defensive sweep of `supabase.getChannels()` before re-subscribing; idempotent, ~5 lines.
+
+### Changed
+
+- **Sentry cold-start heartbeat + manual background flush.** Despite v0.3.2's release-tag fix, no sessions or events from v0.3.2+1 ever reached the cloud — the native SDK initialized cleanly (verified via `RNSentry: Starting with DSN ...` in logcat with all integrations registered) but neither the `AppLifecycleIntegration`'s auto-flush on background nor an actual JS error reaching `Sentry.TouchEventBoundary` produced a single event in the dashboard. Two mitigations added:
+  - **One-shot `Sentry.captureMessage('app_started vX')` on cold start** — gives every cold start a definitive "SDK → cloud is reachable" event. Negligible quota cost (one event per cold start; <1k/month at full driver rollout). Doubles as the session anchor since some Sentry SDK builds drop sessions that never see an in-flight event.
+  - **Explicit `Sentry.flush(2000)` on `AppState change → background/inactive`** — belt-and-suspenders for the broken AppLifecycleIntegration flush path. Cheap, no-op when the envelope queue is empty.
+- Suspect root cause for the broken auto-flush: Sentry RN SDK 7.2 + Expo SDK 54 + React Native New Architecture + React Compiler experimental flag — at least one of those is interfering with the native side's session lifecycle hooks. Tracked as a follow-up rather than rolled back, since the workarounds above restore visibility and the symptoms haven't been root-caused.
+
+## [0.3.2] - 2026-05-22
+
+### Fixed
+
+- **Sentry was reporting no sessions and tagging all events as `release=NONE`.** Investigated after the v0.3.1 Mark-as-Done fix appeared to land but the user reported the app "still crashes." Sentry showed zero runtime sessions in the last 14 days across all three registered releases (v0.1.0+1, v0.3.0+1, v0.3.1+1), and both captured crash events had `release=NONE` even though the EAS build-time source-map upload had registered the releases correctly. Sentry aggregates sessions by release; with no release tag, every session was silently dropped. Net effect: we've been flying blind on the driver app since launch — the only reason FLEETMS-DRIVER-1 surfaced at all was the native Android Sentry SDK catching the unhandled Java exception. The `@sentry/react-native/expo` plugin is supposed to inject release into native build artifacts and have the runtime SDK auto-fill it, but that path isn't working under Sentry RN v7.2 + New Architecture + React Compiler. Set `release`, `dist`, `environment`, and explicit `enableAutoSessionTracking: true` in the `Sentry.init` call in `_layout.tsx`, reading the app version from `expo-constants` (already installed) so it stays in sync with `app.json`. Build number hardcoded to `1` until EAS auto-increment moves past it. Source maps still upload via the plugin; this just stops the runtime SDK from depending on the broken native-injection path.
+
+### Changed
+
+- **Synced `package.json` version to `app.json`.** `package.json` had been stuck at `0.2.3` since before the v0.3.0 cut — harmless drift but noise when grepping for the current version. Both files now read `0.3.2`.
+
 ## [0.3.1] - 2026-05-21
 
 ### Fixed

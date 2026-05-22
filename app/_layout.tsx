@@ -1,11 +1,13 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
 import * as Sentry from '@sentry/react-native';
+import Constants from 'expo-constants';
 import { ThemeProvider, useTokens, useThemeControls } from '../theme/ThemeProvider';
 import { queryClient } from '../lib/queryClient';
 import { ensureDevSession, DevSessionResult } from '../lib/devSession';
@@ -14,10 +16,30 @@ import { ensurePushNotifications } from '../lib/push';
 // Crash + JS-error reporting. Captures Fabric "child already has parent" and
 // other native crashes with native stack traces, plus any unhandled JS errors.
 // Free tier is plenty for our scale; toggle off by removing EXPO_PUBLIC_SENTRY_DSN.
+//
+// Release + dist are set explicitly here rather than relying on the
+// @sentry/react-native/expo plugin's native-side injection. Observed in
+// production v0.1.0+1 and v0.3.x: events arrived with release=NONE despite
+// the plugin running at build time, so sessions silently dropped (Sentry
+// aggregates sessions by release; no release = no session bucket). Setting
+// them explicitly here is belt-and-suspenders and keeps the source-map
+// upload path working — the plugin still runs at build time, this just
+// ensures the runtime SDK tags events even if the native injection fails.
+//
+// Build number (`+1`) is hardcoded because expo-application isn't installed
+// and Constants doesn't expose nativeBuildVersion. If we ever ship a build
+// where the EAS auto-increment moves past +1, bump APP_BUILD or pull
+// expo-application in to read it dynamically.
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
+const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
+const APP_BUILD = '1';
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
+    release: `my.fleetms.driver@${APP_VERSION}+${APP_BUILD}`,
+    dist: APP_BUILD,
+    environment: __DEV__ ? 'development' : 'production',
+    enableAutoSessionTracking: true,
     // Send a sample of normal traffic so we can see what was happening before
     // a crash (e.g. last screen visited). 0.0 = errors-only.
     tracesSampleRate: 0.1,
@@ -25,10 +47,47 @@ if (SENTRY_DSN) {
     // when iterating locally.
     enabled: true,
   });
+
+  // Cold-start heartbeat. Observed in v0.3.2+1: SDK initialised cleanly
+  // (RNSentry: "Starting with DSN ..." in logcat, all native integrations
+  // registered) but zero sessions and zero events made it to the cloud
+  // even after backgrounding the app and a known JS error reaching the
+  // error boundary. This one-shot message guarantees AT LEAST one event
+  // per cold start, which gives us:
+  //   - a definitive "SDK → cloud is reachable" smoke test per release
+  //   - a session-anchor row so AppLifecycleIntegration can hang the
+  //     session on something (without an in-flight event, some Sentry
+  //     SDK builds drop the empty session entirely)
+  // One event per cold start is negligible quota-wise (~< 1k/month even
+  // at full driver rollout). Drop or rate-limit later if it ever becomes
+  // noisy.
+  Sentry.captureMessage(`app_started v${APP_VERSION}+${APP_BUILD}`, 'info');
 }
 
 function RootLayoutImpl() {
   const [session, setSession] = useState<DevSessionResult | null>(null);
+
+  // Belt-and-suspenders Sentry flush on app background. The native
+  // AppLifecycleIntegration is supposed to do this automatically but we
+  // observed it isn't firing reliably on v0.3.2+1 (Sentry SDK 7.2 + Expo
+  // SDK 54 + RN New Architecture + React Compiler — at least one of those
+  // breaks the path). flush() returns once queued events drain or fail;
+  // cheap to call, no-op when the queue is already empty.
+  //
+  // The @sentry/react-native v7.2 re-export of flush() takes zero args
+  // (the timeout overload from @sentry/core doesn't make it through).
+  useEffect(() => {
+    if (!process.env.EXPO_PUBLIC_SENTRY_DSN) return;
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'background' || state === 'inactive') {
+        Sentry.flush().catch(() => {
+          // Network down, Sentry endpoint down — nothing to do, dropping
+          // the queued envelopes is the failure mode either way.
+        });
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     let alive = true;
