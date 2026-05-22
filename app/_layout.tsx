@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
 import * as Sentry from '@sentry/react-native';
+import Constants from 'expo-constants';
 import { ThemeProvider, useTokens, useThemeControls } from '../theme/ThemeProvider';
 import { queryClient } from '../lib/queryClient';
 import { ensureDevSession, DevSessionResult } from '../lib/devSession';
@@ -14,10 +15,30 @@ import { ensurePushNotifications } from '../lib/push';
 // Crash + JS-error reporting. Captures Fabric "child already has parent" and
 // other native crashes with native stack traces, plus any unhandled JS errors.
 // Free tier is plenty for our scale; toggle off by removing EXPO_PUBLIC_SENTRY_DSN.
+//
+// Release + dist are set explicitly here rather than relying on the
+// @sentry/react-native/expo plugin's native-side injection. Observed in
+// production v0.1.0+1 and v0.3.x: events arrived with release=NONE despite
+// the plugin running at build time, so sessions silently dropped (Sentry
+// aggregates sessions by release; no release = no session bucket). Setting
+// them explicitly here is belt-and-suspenders and keeps the source-map
+// upload path working — the plugin still runs at build time, this just
+// ensures the runtime SDK tags events even if the native injection fails.
+//
+// Build number (`+1`) is hardcoded because expo-application isn't installed
+// and Constants doesn't expose nativeBuildVersion. If we ever ship a build
+// where the EAS auto-increment moves past +1, bump APP_BUILD or pull
+// expo-application in to read it dynamically.
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
+const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
+const APP_BUILD = '1';
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
+    release: `my.fleetms.driver@${APP_VERSION}+${APP_BUILD}`,
+    dist: APP_BUILD,
+    environment: __DEV__ ? 'development' : 'production',
+    enableAutoSessionTracking: true,
     // Send a sample of normal traffic so we can see what was happening before
     // a crash (e.g. last screen visited). 0.0 = errors-only.
     tracesSampleRate: 0.1,

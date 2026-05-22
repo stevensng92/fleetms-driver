@@ -2,6 +2,16 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.2] - 2026-05-22
+
+### Fixed
+
+- **Sentry was reporting no sessions and tagging all events as `release=NONE`.** Investigated after the v0.3.1 Mark-as-Done fix appeared to land but the user reported the app "still crashes." Sentry showed zero runtime sessions in the last 14 days across all three registered releases (v0.1.0+1, v0.3.0+1, v0.3.1+1), and both captured crash events had `release=NONE` even though the EAS build-time source-map upload had registered the releases correctly. Sentry aggregates sessions by release; with no release tag, every session was silently dropped. Net effect: we've been flying blind on the driver app since launch — the only reason FLEETMS-DRIVER-1 surfaced at all was the native Android Sentry SDK catching the unhandled Java exception. The `@sentry/react-native/expo` plugin is supposed to inject release into native build artifacts and have the runtime SDK auto-fill it, but that path isn't working under Sentry RN v7.2 + New Architecture + React Compiler. Set `release`, `dist`, `environment`, and explicit `enableAutoSessionTracking: true` in the `Sentry.init` call in `_layout.tsx`, reading the app version from `expo-constants` (already installed) so it stays in sync with `app.json`. Build number hardcoded to `1` until EAS auto-increment moves past it. Source maps still upload via the plugin; this just stops the runtime SDK from depending on the broken native-injection path.
+
+### Changed
+
+- **Synced `package.json` version to `app.json`.** `package.json` had been stuck at `0.2.3` since before the v0.3.0 cut — harmless drift but noise when grepping for the current version. Both files now read `0.3.2`.
+
 ## [0.3.1] - 2026-05-21
 
 ### Fixed
