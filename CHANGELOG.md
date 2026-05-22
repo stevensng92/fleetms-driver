@@ -4,6 +4,10 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
 
 ## [0.3.1] - 2026-05-21
 
+### Fixed
+
+- **Mark-as-Done app crash (FLEETMS-DRIVER-1).** Tapping Mark as Done on an active job crashed the app on Android with `IllegalStateException: The specified child already has a parent` at `SurfaceMountingManager.addViewAt`. Same Fabric view-tree race that hit the sign-in + set-PIN flows last week — `router.replace('/(tabs)')` was firing on the same frame as the mutation's tree updates. Wrapped the navigation in `setTimeout(_, 0)` to defer it one frame, matching the workaround already in place at `sign-in.tsx` and `set-pin.tsx`.
+
 ### Security
 
 - **Single-active-device policy.** After a successful PIN sign-in the client now calls `supabase.auth.signOut({ scope: 'others' })`, revoking every refresh token for the driver except the one just created. A driver can only be signed in on one phone at a time — signing in on a new phone kicks the previous one off within ~1h (access-token lifetime; refresh fails immediately). Prevents account sharing (driver A using driver B's phone) and limits the blast radius when a phone is lost. Mirrors the same change shipped on the dispatcher side as v0.11.5.0. Same enforcement also applied to the dev silent auto-sign-in so developer testing across phones stays consistent.

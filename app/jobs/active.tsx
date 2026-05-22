@@ -80,7 +80,12 @@ export default function ActiveJob() {
   const onMarkDone = async () => {
     try {
       await completeJob.mutateAsync(job.jobUuid);
-      router.replace('/(tabs)');
+      // Defer one frame to avoid the Fabric "child already has parent" race
+      // that bites when navigation fires on the same frame as the mutation's
+      // RN tree updates. Same workaround the sign-in + set-PIN flows use;
+      // surfaced again as the Mark-as-Done crash captured in Sentry as
+      // FLEETMS-DRIVER-1 (IllegalStateException at SurfaceMountingManager.addViewAt).
+      setTimeout(() => router.replace('/(tabs)'), 0);
     } catch (e: any) {
       Alert.alert('Could not mark done', e?.message ?? 'Unknown error');
     }
