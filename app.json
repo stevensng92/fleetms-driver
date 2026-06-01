@@ -2,7 +2,7 @@
   "expo": {
     "name": "FleetMS Driver",
     "slug": "fleetms-driver",
-    "version": "0.3.3",
+    "version": "0.3.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fleetmsdriver",
@@ -14,6 +14,8 @@
     },
     "android": {
       "package": "my.fleetms.driver",
+      "googleServicesFile": "./google-services.json",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/images/android-icon-foreground.png"
@@ -27,6 +29,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-splash-screen",
         {
