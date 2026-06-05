@@ -31,6 +31,7 @@ export default function JobsToday() {
   const rejectAsg = useRejectAssignment();
   const firstName = profile?.name.split(/\s+/)[0] ?? 'driver';
 
+  const overdue = data?.overdue ?? [];
   const today = data?.today ?? [];
   const tomorrow = data?.tomorrow ?? [];
   const upcoming = data?.upcoming ?? [];
@@ -67,7 +68,39 @@ export default function JobsToday() {
         {isLoading && <LoadingState/>}
         {isError && <ErrorState message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>}
 
-        {!isLoading && !isError && today.length === 0 && tomorrow.length === 0 && <EmptyState/>}
+        {!isLoading && !isError && overdue.length === 0 && today.length === 0 && tomorrow.length === 0 && <EmptyState/>}
+
+        {!isLoading && !isError && overdue.length > 0 && (
+          <>
+            <SectionLabel
+              right={<Text style={{ fontSize: 12, color: T.red, fontWeight: '700' }}>
+                {overdue.length} {overdue.length === 1 ? 'job' : 'jobs'}
+              </Text>}
+            >Overdue</SectionLabel>
+            {overdue.map(j => (
+              <JobCard
+                key={j.id}
+                job={j}
+                onPress={() => router.push(
+                  j.status === 'progress'
+                    ? { pathname: '/jobs/active', params: { id: j.id } }
+                    : `/jobs/${j.id}`,
+                )}
+                onView={() => router.push(`/jobs/${j.id}`)}
+                onAccept={async () => {
+                  if (!j.assignmentId) return;
+                  try { await confirmAsg.mutateAsync(j.assignmentId); }
+                  catch (e: any) { Alert.alert('Could not accept', e?.message ?? 'Unknown error'); }
+                }}
+                onReject={async () => {
+                  if (!j.assignmentId) return;
+                  try { await rejectAsg.mutateAsync({ assignmentId: j.assignmentId }); }
+                  catch (e: any) { Alert.alert('Could not reject', e?.message ?? 'Unknown error'); }
+                }}
+              />
+            ))}
+          </>
+        )}
 
         {!isLoading && !isError && today.length > 0 && (
           <>

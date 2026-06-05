@@ -48,6 +48,10 @@ export type UpcomingGroup = {
 };
 
 export type FetchedJobs = {
+  /** Past, still-open jobs (not done/cancelled/rejected) carried over from
+   *  previous days so they don't vanish at midnight before the driver closes
+   *  them out. Bounded to the last OVERDUE_LOOKBACK_DAYS. */
+  overdue: Job[];
   today: Job[];
   tomorrow: Job[];
   /** Day-by-day groupings from day-after-tomorrow up to UPCOMING_DAYS out. */
@@ -58,6 +62,16 @@ export type FetchedJobs = {
  *  14 days = "next two weeks" — past that, drivers should rely on the dispatcher. */
 const UPCOMING_DAYS = 14;
 
+/** How far back we surface still-open jobs whose pickup has already passed. A
+ *  job the driver never marked done shouldn't disappear at midnight — but we
+ *  don't resurrect ancient stuck rows either. */
+const OVERDUE_LOOKBACK_DAYS = 30;
+
+/** job_status values still actionable by the driver (confirm / start / mark
+ *  done). Terminal states (done/cancelled/rejected) are NOT carried over once
+ *  their pickup is in the past — only open work follows the driver forward. */
+const OPEN_STATUSES = ['pending', 'confirmed', 'in_progress'] as const;
+
 // Pulls the current driver's upcoming jobs (today + tomorrow + next 14 days).
 // RLS scopes results via private.is_driver_self(driver_id) so the anon JWT
 // only sees its own. PostgREST embedding handles the FK join automatically.
@@ -67,7 +81,15 @@ async function fetchJobs(): Promise<FetchedJobs> {
   const startTomorrow      = new Date(startToday); startTomorrow.setDate(startTomorrow.getDate() + 1);
   const startDayAfterTmrw  = new Date(startToday); startDayAfterTmrw.setDate(startDayAfterTmrw.getDate() + 2);
   const endWindow          = new Date(startToday); endWindow.setDate(endWindow.getDate() + 2 + UPCOMING_DAYS);
+  const overdueFloor       = new Date(startToday); overdueFloor.setDate(overdueFloor.getDate() - OVERDUE_LOOKBACK_DAYS);
 
+  // Two windows on the embedded job, OR'd together:
+  //   1. the scheduled window [today 00:00, +16d) at ANY status, and
+  //   2. an overdue still-open job [today-30d, today 00:00) the driver hasn't
+  //      closed out yet (status pending/confirmed/in_progress).
+  // Without branch 2, a job not marked done by local midnight dropped out of
+  // the list entirely and the driver could never complete it ("jobs not
+  // showing after the next day").
   const { data, error } = await supabase
     .from('assignments')
     .select(`
@@ -87,8 +109,11 @@ async function fetchJobs(): Promise<FetchedJobs> {
       )
     `)
     .eq('is_current', true)
-    .gte('jobs.pickup_datetime', startToday.toISOString())
-    .lt('jobs.pickup_datetime', endWindow.toISOString())
+    .or(
+      `and(pickup_datetime.gte.${startToday.toISOString()},pickup_datetime.lt.${endWindow.toISOString()}),` +
+      `and(pickup_datetime.gte.${overdueFloor.toISOString()},pickup_datetime.lt.${startToday.toISOString()},status.in.(${OPEN_STATUSES.join(',')}))`,
+      { foreignTable: 'jobs' },
+    )
     .order('pickup_datetime', { foreignTable: 'jobs', ascending: true });
 
   if (error) throw error;
@@ -135,6 +160,7 @@ async function fetchJobs(): Promise<FetchedJobs> {
     status: mapStatus(r.job.status),
   });
 
+  const overdue: Job[] = [];
   const today: Job[] = [];
   const tomorrow: Job[] = [];
   // Map of YYYY-MM-DD → group (preserves insertion order, which is already
@@ -144,7 +170,11 @@ async function fetchJobs(): Promise<FetchedJobs> {
   for (const r of rows) {
     const d = new Date(r.job.pickup_datetime);
     const t = d.getTime();
-    if (t < startTomorrow.getTime()) {
+    if (t < startToday.getTime()) {
+      // Pickup already passed and the job is still open (guaranteed by the
+      // query's status filter) — carry it over so it can still be completed.
+      overdue.push(toUi(r));
+    } else if (t < startTomorrow.getTime()) {
       today.push(toUi(r));
     } else if (t < startDayAfterTmrw.getTime()) {
       tomorrow.push(toUi(r));
@@ -160,7 +190,7 @@ async function fetchJobs(): Promise<FetchedJobs> {
     }
   }
 
-  return { today, tomorrow, upcoming: Array.from(upcomingMap.values()) };
+  return { overdue, today, tomorrow, upcoming: Array.from(upcomingMap.values()) };
 }
 
 export function useTodaysJobs() {
