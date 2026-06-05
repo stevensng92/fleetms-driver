@@ -18,6 +18,10 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Build artifacts — local APK/AAB outputs ship via GitHub Releases, not git
+*.apk
+*.aab
+
 # Metro
 .metro-health-check*
 

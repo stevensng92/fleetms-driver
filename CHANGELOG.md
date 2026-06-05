@@ -2,6 +2,20 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.4] - 2026-06-05
+
+### Added
+
+- **Android push notifications (FCM) are now enabled.** The app was wired for push in code but could never mint a token: no Firebase/FCM config was compiled into the build, so `getExpoPushTokenAsync()` threw on every Android launch and no driver ever registered a token. This build bakes `google-services.json` in (via the `expo-notifications` plugin + `android.googleServicesFile`), and the FCM V1 service-account key is registered with Expo's push service, so tokens mint on launch and dispatch changes can be delivered as real push notifications. **Drivers must uninstall the previous build and reinstall** — the signing identity changes from the local debug keystore to the EAS keystore, and they will re-enter their PIN.
+
+### Fixed
+
+- **Overdue jobs no longer disappear from the Jobs tab.** The list only fetched jobs with a pickup time from today's local midnight onward, so any job a driver hadn't completed by midnight silently dropped off and could never be marked done. The query now also returns still-open jobs (pending / confirmed / in-progress) whose pickup is in the past, within the last 30 days, and shows them in a new **"Overdue"** section at the top of the tab.
+
+### Changed
+
+- **Build config now uses a dynamic `app.config.js` layer** so EAS Build can inject the gitignored `google-services.json` through the `GOOGLE_SERVICES_JSON` file environment variable (a static `app.json` can't read env vars). `app.json` stays the source of truth; the dynamic layer only overrides the google-services file path, falling back to the local file for on-device builds.
+
 ## [0.3.3] - 2026-05-22
 
 ### Fixed
