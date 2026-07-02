@@ -26,13 +26,16 @@ import { ensurePushNotifications } from '../lib/push';
 // upload path working — the plugin still runs at build time, this just
 // ensures the runtime SDK tags events even if the native injection fails.
 //
-// Build number (`+1`) is hardcoded because expo-application isn't installed
-// and Constants doesn't expose nativeBuildVersion. If we ever ship a build
-// where the EAS auto-increment moves past +1, bump APP_BUILD or pull
-// expo-application in to read it dynamically.
+// Build number is hardcoded because expo-application isn't installed and
+// Constants doesn't expose nativeBuildVersion. eas.json's preview profile
+// now has autoIncrement: true (remote versionCode source), so EVERY release
+// build bumps the remote versionCode by 1 — bump APP_BUILD in the same
+// commit as the release cut, or pull expo-application in to read it
+// dynamically. v0.4.0 ships as versionCode 2 (remote was 1 for all builds
+// through v0.3.5).
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
-const APP_BUILD = '1';
+const APP_BUILD = '2';
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,

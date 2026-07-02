@@ -7,7 +7,7 @@ import { AppHeader } from '../../components/AppHeader';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { supabase } from '../../lib/supabase';
-import { getSignedReceiptUrl, type ExpenseCategory } from '../../lib/queries/expenses';
+import { getSignedReceiptUrl, type ExpenseCategory, type ExpenseStatus } from '../../lib/queries/expenses';
 
 const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
 const CAT_LABEL: Record<ExpenseCategory, string> = { fuel: 'Fuel', toll: 'Toll', other: 'Other' };
@@ -20,6 +20,7 @@ type ExpenseDetail = {
   receiptPath: string | null;
   notes: string | null;
   voidedAt: string | null;
+  status: ExpenseStatus;
   vehiclePlate: string;
 };
 
@@ -27,7 +28,7 @@ async function fetchExpenseDetail(id: string): Promise<ExpenseDetail> {
   const { data, error } = await supabase
     .from('expenses')
     .select(`
-      id, category, amount, expense_date, receipt_path, notes, voided_at,
+      id, category, amount, expense_date, receipt_path, notes, voided_at, status,
       vehicle:vehicles!expenses_org_vehicle_fkey ( plate_number )
     `)
     .eq('id', id)
@@ -41,6 +42,9 @@ async function fetchExpenseDetail(id: string): Promise<ExpenseDetail> {
     receiptPath: data.receipt_path,
     notes: data.notes,
     voidedAt: data.voided_at,
+    // NOT NULL since the expense-approval migration (in prod before any
+    // build with this code shipped) — see note in lib/queries/expenses.ts.
+    status: (data as any).status as ExpenseStatus,
     vehiclePlate: (data.vehicle as any)?.plate_number ?? '—',
   };
 }
@@ -155,7 +159,7 @@ export default function Receipt() {
           )}
         </View>
 
-        {e.voidedAt && (
+        {e.voidedAt ? (
           <View style={{
             marginTop: 16, padding: 12, borderRadius: 10,
             backgroundColor: T.redSoft, borderWidth: 1, borderColor: T.red,
@@ -165,7 +169,27 @@ export default function Receipt() {
               This expense has been voided by your dispatcher and is not counted in your monthly total.
             </Text>
           </View>
-        )}
+        ) : e.status === 'rejected' ? (
+          <View style={{
+            marginTop: 16, padding: 12, borderRadius: 10,
+            backgroundColor: T.redSoft, borderWidth: 1, borderColor: T.red,
+          }}>
+            <Text style={{ fontSize: 13, color: T.redFg, fontWeight: '700' }}>REJECTED</Text>
+            <Text style={{ fontSize: 12, color: T.redFg, marginTop: 4 }}>
+              Your dispatcher reviewed this expense and declined it. It is not counted in your monthly total.
+            </Text>
+          </View>
+        ) : e.status === 'pending' ? (
+          <View style={{
+            marginTop: 16, padding: 12, borderRadius: 10,
+            backgroundColor: T.pendingBg, borderWidth: 1, borderColor: T.pendingDot,
+          }}>
+            <Text style={{ fontSize: 13, color: T.pendingFg, fontWeight: '700' }}>PENDING REVIEW</Text>
+            <Text style={{ fontSize: 12, color: T.pendingFg, marginTop: 4 }}>
+              Your dispatcher hasn't reviewed this expense yet. It stays in your monthly total unless it's rejected.
+            </Text>
+          </View>
+        ) : null}
 
         <Text style={{
           fontSize: 11, color: T.mutedLight, textAlign: 'center', lineHeight: 16, marginTop: 24,

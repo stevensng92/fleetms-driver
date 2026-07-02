@@ -2,6 +2,18 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-07-02
+
+### Added
+
+- **Expense review states.** Expenses you log now go to your dispatcher for review before they count as final. New rows start as **PENDING** (amber tag; still included in your "Logged this month" total) and become approved, or **REJECTED** (struck through, excluded from your total — distinct from VOIDED, which means the record was cancelled rather than declined). The receipt detail screen shows a matching banner for each state. Requires the `expense_approval` backend migration, which was applied to production before this build shipped.
+- **App version reporting.** The app now sends its own version (from `expo-constants`) to the backend alongside push-token registration, so the dispatcher's driver registry can show which build each driver is running. This is how ops will spot phones still on old builds during rollouts — including this one.
+
+### Changed
+
+- **Release builds now auto-increment the Android versionCode** (`autoIncrement: true` in eas.json's preview profile; remote version source). Every build through v0.3.5 shipped as versionCode 1, which made in-place upgrades ambiguous. This build is versionCode 2; updating over v0.3.5 installs in place (same EAS keystore, higher versionCode). Drivers still on pre-v0.3.5 debug-keystore builds must uninstall first, as before.
+- Synced `package.json` version (stuck at 0.3.3) back to the app version.
+
 ## [0.3.4] - 2026-06-05
 
 ### Added

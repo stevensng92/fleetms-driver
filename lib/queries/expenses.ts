@@ -3,6 +3,11 @@ import { supabase } from '../supabase';
 
 export type ExpenseCategory = 'fuel' | 'toll' | 'other';
 
+/** Review lifecycle. Rows we submit start 'pending' until the dispatcher
+ *  approves or rejects them. Voiding is separate: an approved expense can
+ *  later be voided (cancelled record). */
+export type ExpenseStatus = 'pending' | 'approved' | 'rejected';
+
 export type ExpenseRow = {
   id: string;
   category: ExpenseCategory;
@@ -11,6 +16,7 @@ export type ExpenseRow = {
   receiptPath: string | null;
   notes: string | null;
   voidedAt: string | null;
+  status: ExpenseStatus;
   vehiclePlate: string;
 };
 
@@ -35,7 +41,7 @@ async function fetchMyExpenses(): Promise<ExpensesSummary> {
   const { data, error } = await supabase
     .from('expenses')
     .select(`
-      id, category, amount, expense_date, receipt_path, notes, voided_at,
+      id, category, amount, expense_date, receipt_path, notes, voided_at, status,
       vehicle:vehicles!expenses_org_vehicle_fkey ( plate_number )
     `)
     .gte('expense_date', startOfMonthIso())
@@ -53,13 +59,21 @@ async function fetchMyExpenses(): Promise<ExpensesSummary> {
     receiptPath: r.receipt_path,
     notes: r.notes,
     voidedAt: r.voided_at,
+    // Requires the expense-approval migration (applied to prod 2026-07-02,
+    // before any build with this code shipped). The column is NOT NULL with
+    // default 'approved' — a backend without it fails this whole select
+    // with 42703, so there is no partial-degradation path to handle.
+    status: r.status as ExpenseStatus,
     vehiclePlate: r.vehicle?.plate_number ?? '—',
   }));
 
   const totalsByCategory: Record<ExpenseCategory, number> = { fuel: 0, toll: 0, other: 0 };
   let total = 0;
   for (const r of rows) {
-    if (r.voidedAt) continue; // voided rows excluded from totals
+    if (r.voidedAt) continue;             // voided rows excluded from totals
+    if (r.status === 'rejected') continue; // rejected claims don't count either
+    // Pending rows stay in the total — it's "logged this month" from the
+    // driver's side, and dropping to RM 0 right after logging would confuse.
     totalsByCategory[r.category] += r.amount;
     total += r.amount;
   }

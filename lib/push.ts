@@ -92,8 +92,18 @@ export async function ensurePushNotifications(router: Router): Promise<PushSetup
   const token = tokenResult.data;
 
   // Skip the RPC if token is unchanged from last register (cheap dedup).
+  // registeredToken resets to null on every cold start, so the version below
+  // is re-reported on each launch — that's how a driver's row picks up the
+  // new build after they update.
   if (token && token !== registeredToken) {
-    const { error } = await supabase.rpc('register_driver_push_token', { p_token: token });
+    // Piggyback the app's semver so ops can see which build each driver runs.
+    // expo-application isn't installed; expoConfig.version is the semver from
+    // app.json baked in at build time, which is all we need here.
+    const appVersion = Constants.expoConfig?.version ?? null;
+    const { error } = await supabase.rpc('register_driver_push_token', {
+      p_token: token,
+      p_app_version: appVersion,
+    });
     if (error) {
       return { kind: 'error', message: error.message };
     }

@@ -148,7 +148,12 @@ function ExpenseRowView({ e, last }: { e: ExpenseRow; last?: boolean }) {
     e.category === 'fuel' ? { bg: T.pendingBg, fg: T.pendingFg } :
     e.category === 'toll' ? { bg: T.confirmBg, fg: T.confirmFg } :
                             { bg: T.voidedBg,  fg: T.voidedFg  };
-  const voided = Boolean(e.voidedAt);
+  const voided   = Boolean(e.voidedAt);
+  const rejected = !voided && e.status === 'rejected';
+  const pending  = !voided && e.status === 'pending';
+  // Rejected reads like voided (dead row, struck through) but keeps its own
+  // label — the dispatcher declined this claim, vs. cancelled the record.
+  const dead = voided || rejected;
   const dayShort = new Date(e.expenseDate).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' });
 
   return (
@@ -158,7 +163,7 @@ function ExpenseRowView({ e, last }: { e: ExpenseRow; last?: boolean }) {
         flexDirection: 'row', alignItems: 'center', gap: 12,
         paddingHorizontal: 16, paddingVertical: 14,
         borderBottomWidth: last ? 0 : 1, borderBottomColor: T.border,
-        opacity: voided ? 0.55 : 1,
+        opacity: dead ? 0.55 : 1,
       }}
     >
       <View style={{
@@ -170,19 +175,21 @@ function ExpenseRowView({ e, last }: { e: ExpenseRow; last?: boolean }) {
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{
           fontSize: 15, fontWeight: '600', color: T.text, letterSpacing: -0.2,
-          textDecorationLine: voided ? 'line-through' : 'none',
+          textDecorationLine: dead ? 'line-through' : 'none',
         }}>
           {CAT_LABEL[e.category]}{e.notes ? ` · ${e.notes}` : ''}
         </Text>
         <Text style={{ fontSize: 12, color: T.muted, marginTop: 2, fontFamily: MONO }}>
           {dayShort} · {e.vehiclePlate}
-          {voided && <Text style={{ color: T.red, fontWeight: '600' }}>  VOIDED</Text>}
+          {voided   && <Text style={{ color: T.red,        fontWeight: '600' }}>  VOIDED</Text>}
+          {rejected && <Text style={{ color: T.red,        fontWeight: '600' }}>  REJECTED</Text>}
+          {pending  && <Text style={{ color: T.pendingDot, fontWeight: '600' }}>  PENDING</Text>}
         </Text>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={{
           fontSize: 15, fontWeight: '700', color: T.text, letterSpacing: -0.3,
-          textDecorationLine: voided ? 'line-through' : 'none',
+          textDecorationLine: dead ? 'line-through' : 'none',
         }}>RM {e.amount.toFixed(2)}</Text>
         {e.receiptPath && (
           <View style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
