@@ -33,6 +33,14 @@ function timeOf(iso: string): string {
   });
 }
 
+// "Thu, 2 Jul" — only rendered on overdue cards, so a driver can see at a
+// glance the pickup was on a past day, not "due today".
+function dateOf(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-MY', {
+    weekday: 'short', day: 'numeric', month: 'short',
+  });
+}
+
 function startOfLocalDay(d: Date) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -153,6 +161,7 @@ async function fetchJobs(): Promise<FetchedJobs> {
     // type. Driver cares which car they're in, not what the dispatcher asked for.
     vehicle: r.vehicle_plate ?? '—',
     time: timeOf(r.job.pickup_datetime),
+    pickupDate: dateOf(r.job.pickup_datetime),
     from: r.job.pickup_location,
     to: r.job.dropoff_location,
     client: r.job.client_name,

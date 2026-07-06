@@ -2,6 +2,40 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] - 2026-07-06
+
+### Added
+
+- **Force-update gate.** The app now checks a server-controlled version bar
+  on every cold start, and again whenever it's foregrounded from the
+  background, and reacts one of three ways:
+  - Below the **minimum** version — a full-screen "Update required" block
+    replaces the entire app, including the sign-in screen, with no way to
+    dismiss it.
+  - Below the **recommended** version (but at or above minimum) — a
+    dismissible banner appears on the Jobs tab (it reappears every cold
+    start until you actually update), and a persistent red dot stays on the
+    Profile tab until you do.
+  - Otherwise, or if the check itself fails (no signal, server hiccup) — the
+    app fails open. It never blocks on a network problem alone.
+
+  Both thresholds are set from the dispatcher-side super-admin console.
+- **Update push notifications.** When ops raises either version bar,
+  already-installed drivers who are now below it get a push notification
+  (distinct wording for "recommended" vs. "required") prompting them to
+  update, instead of only reaching drivers who happen to reopen the app on
+  their own.
+
+### Fixed
+
+- **Overdue jobs no longer look identical to jobs scheduled for today.** The
+  Overdue section's pickup chip is now red-tinted and shows the actual
+  missed date ("Fri, 3 Jul") instead of just a bare time, and a one-line
+  explainer under the section header spells out what "Overdue" means.
+  Previously an overdue job (pickup already passed on a prior day, but still
+  open) rendered exactly like a same-day job except for the section label,
+  which a driver could easily misread as "due today."
+
 ## [0.4.0] - 2026-07-02
 
 ### Added

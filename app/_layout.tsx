@@ -12,6 +12,8 @@ import { ThemeProvider, useTokens, useThemeControls } from '../theme/ThemeProvid
 import { queryClient } from '../lib/queryClient';
 import { ensureDevSession, DevSessionResult } from '../lib/devSession';
 import { ensurePushNotifications } from '../lib/push';
+import { useAppVersionGate } from '../lib/queries/appVersionConfig';
+import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
 
 // Crash + JS-error reporting. Captures Fabric "child already has parent" and
 // other native crashes with native stack traces, plus any unhandled JS errors.
@@ -31,11 +33,11 @@ import { ensurePushNotifications } from '../lib/push';
 // now has autoIncrement: true (remote versionCode source), so EVERY release
 // build bumps the remote versionCode by 1 — bump APP_BUILD in the same
 // commit as the release cut, or pull expo-application in to read it
-// dynamically. v0.4.0 ships as versionCode 2 (remote was 1 for all builds
-// through v0.3.5).
+// dynamically. v0.4.0 shipped as versionCode 2; v0.5.0 is the next release
+// build, so versionCode 3.
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
-const APP_BUILD = '2';
+const APP_BUILD = '3';
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
@@ -120,6 +122,7 @@ function ThemedShell({ session }: { session: DevSessionResult | null }) {
   const T = useTokens();
   const { resolvedTheme } = useThemeControls();
   const router = useRouter();
+  const versionGate = useAppVersionGate();
   // Expose session status on a global for screens that want to nudge the user.
   // Not a state container — just a one-shot diagnostic.
   (globalThis as any).__FLEETMS_DEV_SESSION__ = session;
@@ -135,6 +138,35 @@ function ThemedShell({ session }: { session: DevSessionResult | null }) {
     });
     return () => { alive = false; };
   }, [session?.kind, router]);
+
+  // Separate from the Sentry-flush listener above — this one re-checks the
+  // force-update config whenever the app comes back to the foreground, so a
+  // driver who backgrounds and resumes gets a fresh answer without needing a
+  // full cold start.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        queryClient.invalidateQueries({ queryKey: ['app-version-config'] });
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Hard block takes over the ENTIRE app — including the sign-in screen —
+  // before any auth/routing decision is made. Still rendered inside the
+  // GestureHandlerRootView/SafeAreaProvider/QueryClientProvider/ThemeProvider
+  // wrappers (this function runs inside all of them) so theming still works.
+  if (versionGate.status === 'required') {
+    return (
+      <>
+        <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'}/>
+        <UpdateRequiredScreen
+          currentVersion={versionGate.currentVersion}
+          minimumVersion={versionGate.minimumVersion}
+        />
+      </>
+    );
+  }
 
   return (
     <>

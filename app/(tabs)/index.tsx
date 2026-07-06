@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, SectionLabel } from '../../components/AppHeader';
@@ -11,6 +11,9 @@ import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/j
 import { useUnreadCount } from '../../lib/queries/notifications';
 import { useDriverProfile } from '../../lib/queries/driverProfile';
 import { useJobsRealtime } from '../../lib/realtime/jobsRealtime';
+import { useAppVersionGate } from '../../lib/queries/appVersionConfig';
+
+const APP_DOWNLOAD_URL = 'https://app.fleetms.my/driver-app';
 
 // Time-of-day greeting that matches the device's local hour. Saturated to the
 // 3 standard buckets so we don't say "Good afternoon" at 1pm and "Good evening"
@@ -30,6 +33,11 @@ export default function JobsToday() {
   const confirmAsg = useConfirmAssignment();
   const rejectAsg = useRejectAssignment();
   const firstName = profile?.name.split(/\s+/)[0] ?? 'driver';
+  const versionGate = useAppVersionGate();
+  // Local-only dismiss state — resets on every cold start by design (no
+  // AsyncStorage). The Profile tab badge is the persistent signal; this
+  // banner is just a soft nudge.
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   const overdue = data?.overdue ?? [];
   const today = data?.today ?? [];
@@ -65,6 +73,10 @@ export default function JobsToday() {
           right={<BellButton/>}
         />
 
+        {versionGate.status === 'recommended' && !bannerDismissed && (
+          <UpdateAvailableBanner onDismiss={() => setBannerDismissed(true)}/>
+        )}
+
         {isLoading && <LoadingState/>}
         {isError && <ErrorState message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>}
 
@@ -77,10 +89,17 @@ export default function JobsToday() {
                 {overdue.length} {overdue.length === 1 ? 'job' : 'jobs'}
               </Text>}
             >Overdue</SectionLabel>
+            <Text style={{
+              paddingHorizontal: 20, marginTop: -6, marginBottom: 10,
+              fontSize: 12.5, color: T.muted, lineHeight: 17,
+            }}>
+              Pickup already passed on a previous day — not for today. Accept, reject, or mark done to clear it.
+            </Text>
             {overdue.map(j => (
               <JobCard
                 key={j.id}
                 job={j}
+                overdue
                 onPress={() => router.push(
                   j.status === 'progress'
                     ? { pathname: '/jobs/active', params: { id: j.id } }
@@ -212,6 +231,31 @@ export default function JobsToday() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function UpdateAvailableBanner({ onDismiss }: { onDismiss: () => void }) {
+  const T = useTokens();
+  return (
+    <View style={{
+      marginHorizontal: 16, marginBottom: 14,
+      backgroundColor: T.amberSoft, borderRadius: 10,
+      paddingVertical: 10, paddingHorizontal: 14,
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+    }}>
+      <Text style={{ flex: 1, fontSize: 13, color: T.amberFg, lineHeight: 18 }}>
+        A newer version of FleetMS Driver is available.{' '}
+        <Text
+          style={{ fontWeight: '700', textDecorationLine: 'underline' }}
+          onPress={() => { Linking.openURL(APP_DOWNLOAD_URL); }}
+        >
+          Update
+        </Text>
+      </Text>
+      <Pressable onPress={onDismiss} hitSlop={8} style={{ padding: 2 }}>
+        <Icon name="x" size={16} color={T.amberFg}/>
+      </Pressable>
+    </View>
   );
 }
 
