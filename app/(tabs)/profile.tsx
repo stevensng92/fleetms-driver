@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, Linking, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { AppFrame } from '../../components/AppFrame';
 import { AppHeader, SectionLabel } from '../../components/AppHeader';
@@ -9,15 +9,17 @@ import { useTokens, useThemeControls } from '../../theme/ThemeProvider';
 import { useDriverProfile, formatVehicleLine, availabilityBadge } from '../../lib/queries/driverProfile';
 import { useDriverTimeOff, REASON_LABEL, type TimeOffEntry, type TimeOffStatus } from '../../lib/queries/timeOff';
 import { useCancelTimeOff } from '../../lib/mutations/timeOff';
+import { useAppVersionGate } from '../../lib/queries/appVersionConfig';
 import { signOut } from '../../lib/auth';
-import { Alert, ActivityIndicator } from 'react-native';
 
 const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
+const APP_DOWNLOAD_URL = 'https://app.fleetms.my/driver-app';
 
 export default function Profile() {
   const T = useTokens();
   const { preference, setPreference } = useThemeControls();
   const { data: profile, isLoading } = useDriverProfile();
+  const versionGate = useAppVersionGate();
 
   const badge = profile ? availabilityBadge(profile.availability) : null;
 
@@ -65,6 +67,12 @@ export default function Profile() {
           </View>
         </Card>
       </View>
+
+      {versionGate.status !== 'ok' && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+          <UpdateAvailableRow/>
+        </View>
+      )}
 
       <SectionLabel>Driver info</SectionLabel>
       <Card style={{ marginHorizontal: 16, marginBottom: 18, overflow: 'hidden' }}>
@@ -120,6 +128,45 @@ export default function Profile() {
         </Pressable>
       </View>
     </AppFrame>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// UpdateAvailableRow — soft-nag entry point on the Profile screen. Mirrors the
+// visual style of the "Driver info" Card rows. Shown whenever the version
+// gate isn't 'ok' (covers both 'recommended' and 'required', though the
+// 'required' case is normally intercepted earlier by UpdateRequiredScreen).
+// -----------------------------------------------------------------------------
+function UpdateAvailableRow() {
+  const T = useTokens();
+  return (
+    <Card style={{ overflow: 'hidden' }}>
+      <Pressable
+        onPress={() => { Linking.openURL(APP_DOWNLOAD_URL); }}
+        style={({ pressed }) => ({
+          flexDirection: 'row', alignItems: 'center', gap: 12,
+          paddingHorizontal: 16, paddingVertical: 14,
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        <View style={{
+          width: 34, height: 34, borderRadius: 17,
+          backgroundColor: T.amberSoft,
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon name="arrowRight" size={16} color={T.amberFg}/>
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: T.text }}>
+            Update available
+          </Text>
+          <Text style={{ fontSize: 12.5, color: T.muted, marginTop: 1 }}>
+            A newer version of FleetMS Driver is ready to install
+          </Text>
+        </View>
+        <Icon name="chevR" size={18} color={T.mutedLight}/>
+      </Pressable>
+    </Card>
   );
 }
 

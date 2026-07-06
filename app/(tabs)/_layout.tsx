@@ -3,10 +3,15 @@ import { Tabs } from 'expo-router';
 import { View } from 'react-native';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
+import { useAppVersionGate } from '../../lib/queries/appVersionConfig';
 
 // Bottom tab bar — visually approximates iOS UITabBar / Material 3 Navigation Bar.
 export default function TabsLayout() {
   const T = useTokens();
+  const versionGate = useAppVersionGate();
+  // Persistent — does NOT get dismissed like the Jobs-tab banner. Stays until
+  // the driver actually updates (status flips back to 'ok').
+  const showBadge = versionGate.status !== 'ok';
 
   return (
     <Tabs
@@ -60,7 +65,17 @@ export default function TabsLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <Icon name="user" size={24} stroke={focused ? 2.2 : 1.8} color={color}/>
+            <View>
+              <Icon name="user" size={24} stroke={focused ? 2.2 : 1.8} color={color}/>
+              {showBadge && (
+                <View style={{
+                  position: 'absolute', top: -2, right: -4,
+                  width: 8, height: 8, borderRadius: 4,
+                  borderWidth: 1.5, borderColor: T.page,
+                  backgroundColor: T.red,
+                }}/>
+              )}
+            </View>
           ),
         }}
       />

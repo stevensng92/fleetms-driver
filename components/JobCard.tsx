@@ -14,6 +14,8 @@ export type Job = {
   /** Current assignment uuid; required for confirm/reject mutations. */
   assignmentId?: string;
   time: string;
+  /** "Thu, 2 Jul" — the pickup's calendar date. Only shown when `overdue`. */
+  pickupDate?: string;
   vehicle: string;
   from: string;
   to: string;
@@ -25,10 +27,14 @@ export type Job = {
 const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
 
 export function JobCard({
-  job, dim, hideActions, onAccept, onReject, onView, onPress,
+  job, dim, overdue, hideActions, onAccept, onReject, onView, onPress,
 }: {
   job: Job;
   dim?: boolean;
+  /** Pickup already passed on a previous day and the job is still open.
+   *  Marks the PICKUP chip red and swaps in the missed date so it can't be
+   *  mistaken for a job scheduled today. */
+  overdue?: boolean;
   hideActions?: boolean;
   onAccept?: () => void;
   onReject?: () => void;
@@ -53,23 +59,30 @@ export function JobCard({
     >
       {/* Header row: PICKUP block (left) + client + meta + status pill */}
       <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
-        {/* PICKUP time block — anchors the card, most-scanned info */}
+        {/* PICKUP time block — anchors the card, most-scanned info.
+            Overdue cards get a red tint + the missed date so they can't be
+            mistaken for a job scheduled today. */}
         <View style={{
           paddingHorizontal: 10, paddingVertical: 8,
-          borderRadius: 8, backgroundColor: T.raised,
+          borderRadius: 8, backgroundColor: overdue ? T.redSoft : T.raised,
           alignItems: 'center', minWidth: 64,
         }}>
           <Text style={{
-            fontSize: 9.5, fontWeight: '800', color: T.muted,
+            fontSize: 9.5, fontWeight: '800', color: overdue ? T.red : T.muted,
             letterSpacing: 0.8, textTransform: 'uppercase',
-          }}>Pickup</Text>
+          }}>{overdue ? 'Missed' : 'Pickup'}</Text>
           <Text style={{
-            fontSize: 18, fontWeight: '800', color: T.text,
+            fontSize: 18, fontWeight: '800', color: overdue ? T.redFg : T.text,
             letterSpacing: -0.3, marginTop: 2,
             // tabular-nums keeps the time numerals same-width so cards line
             // up vertically (12:30 vs 9:00 don't shift).
             fontVariant: ['tabular-nums'],
           }}>{job.time}</Text>
+          {overdue && job.pickupDate && (
+            <Text style={{
+              fontSize: 10.5, fontWeight: '700', color: T.red, marginTop: 3,
+            }}>{job.pickupDate}</Text>
+          )}
         </View>
 
         {/* Right side: client + meta + status pill */}
