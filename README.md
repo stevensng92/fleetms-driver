@@ -9,27 +9,35 @@ Postgres/Supabase backend, scoped to a driver's own data via the existing
 
 ## Status
 
-Scaffold + first real slice. 12 screens implemented against the approved
-design system (navy primary, cyan accent, cream/dark surfaces, Inter, 6px
-radius). **Today's Jobs reads real Supabase data** scoped to a logged-in
-driver via the existing `is_driver_self()` RLS helper. Auth is bypassed
-on boot via a hidden dev-session sign-in (see `.env`); the on-screen sign-in
-flow is still UI-only.
+All screens are wired to real Supabase data, scoped to the signed-in driver
+via the `private.is_driver_self()` RLS helper. Sign-in is **phone + 6-digit
+PIN** (live since dispatcher-side v0.11.0 — see
+`../fleetms/docs/driver-pin-auth.md`), not a mock or a dev bypass; a driver
+sets their own PIN on first sign-in after the dispatcher provisions them.
+`lib/devSession.ts` still exists as a local-dev convenience (silent
+sign-in via `.env` credentials, used only when no session exists yet) but
+is not the primary auth path anymore. Since v0.5.0 the app also enforces a
+server-controlled minimum/recommended version gate on every cold start
+(`useAppVersionGate`, `lib/semver.ts`) — set from the dispatcher-side
+super-admin console.
 
-| Screen                | Route                       | Source           | Wired? |
-|-----------------------|-----------------------------|------------------|--------|
-| 01 Sign In            | `/sign-in`                  | mock             | UI     |
-| 02 Today's Jobs       | `/(tabs)`                   | **Supabase**     | **real** |
-| 02b Today (empty)     | `/(tabs)` (flip `EMPTY`)    | n/a              | UI     |
-| 03 Job Detail         | `/jobs/[id]`                | `data/mock.ts`   | UI     |
-| 04 Active Job         | `/jobs/active`              | `data/mock.ts`   | UI     |
-| 05 Expenses           | `/(tabs)/expenses`          | `data/mock.ts`   | UI     |
-| 05b Expenses (empty)  | flip `EMPTY` in file        | n/a              | UI     |
-| 06 Log Expense        | `/expenses/log` (modal)     | mock             | UI     |
-| 07 Earnings           | `/(tabs)/earnings`          | `data/mock.ts`   | UI     |
-| 08 Profile            | `/(tabs)/profile`           | `data/mock.ts`   | UI     |
-| 08b Request Time Off  | `/profile/time-off` (modal) | mock             | UI     |
-| 09 Receipt Viewer     | `/expenses/[id]`            | mock             | UI     |
+| Screen           | Route                        | Wired? |
+|-------------------|-------------------------------|--------|
+| Sign In           | `/sign-in`                    | real (PIN) |
+| Set PIN           | `/set-pin`                    | real |
+| Today's Jobs      | `/(tabs)`                     | real |
+| Job Detail        | `/jobs/[id]`                  | real |
+| Active Job        | `/jobs/active`                | real |
+| Expenses          | `/(tabs)/expenses`            | real |
+| Log Expense       | `/expenses/log` (modal)       | real |
+| Receipt Viewer    | `/expenses/[id]`              | real |
+| Earnings          | `/(tabs)/earnings`            | real |
+| Profile           | `/(tabs)/profile`             | real |
+| Request Time Off  | `/profile/time-off` (modal)   | real |
+| Notifications     | `/notifications`              | real |
+
+`data/mock.ts` still exists in the repo but nothing under `app/` reads from
+it anymore — safe to treat as legacy fixtures, not current wiring.
 
 ## Run
 
@@ -48,8 +56,11 @@ npx expo start
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY` — anon key for that project (safe to bundle;
   RLS gates access).
 - `EXPO_PUBLIC_DEV_DRIVER_EMAIL` / `EXPO_PUBLIC_DEV_DRIVER_PASSWORD` —
-  credentials for a driver `auth.users` row that's already linked to a
-  `drivers.user_id`. The app silently signs in as this user on cold start.
+  **optional** dev shortcut: credentials for a driver `auth.users` row
+  that's already linked to a `drivers.user_id`. If set, the app silently
+  signs in as this user on cold start when no session exists, skipping
+  `/sign-in`. Leave unset to exercise the real phone + PIN flow like a
+  driver would.
 
 To create a test driver against your existing project, run something like
 this in the dispatcher repo's Supabase Studio (or via psql):
@@ -76,28 +87,38 @@ enabled.
 
 ```
 app/                       file-based routes (expo-router)
-  _layout.tsx              root stack, ThemeProvider, gesture/safe-area
-  index.tsx                redirect to /(tabs) (skips sign-in for scaffold)
-  sign-in.tsx              S1
+  _layout.tsx              root stack, ThemeProvider, gesture/safe-area, force-update gate
+  index.tsx                session gate — routes to /sign-in, /set-pin, or /(tabs)
+  sign-in.tsx              phone + PIN sign-in
+  set-pin.tsx              first-time PIN setup
+  notifications.tsx        notification inbox (bell icon on Jobs tab)
   (tabs)/                  bottom-tab group
     _layout.tsx            tab bar (Jobs / Expenses / Earnings / Profile)
-    index.tsx              S2 / S2b — Today's Jobs
-    expenses.tsx           S5 / S5b — Expenses
-    earnings.tsx           S7
-    profile.tsx            S8 + theme/accent controls
+    index.tsx               Today's Jobs
+    expenses.tsx             Expenses
+    earnings.tsx             Earnings
+    profile.tsx              Profile + theme/accent controls
   jobs/
-    [id].tsx               S3 — Job Detail
-    active.tsx             S4 — Active Job (in progress)
+    [id].tsx               Job Detail
+    active.tsx             Active Job (in progress)
   expenses/
-    [id].tsx               S9 — Receipt Viewer
-    log.tsx                S6 — Log Expense (modal sheet)
+    [id].tsx               Receipt Viewer
+    log.tsx                Log Expense (modal sheet)
   profile/
-    time-off.tsx           S8b — Request Time Off (modal sheet)
+    time-off.tsx           Request Time Off (modal sheet)
 
 components/                shared UI building blocks (ported from design handoff)
 theme/                     design tokens + ThemeProvider
-data/                      static fixtures shaped like real Supabase queries
-lib/                       Supabase client scaffold (not yet installed)
+data/mock.ts               legacy fixtures — unused by app/ now, kept for reference
+lib/
+  supabase.ts              Supabase client
+  auth.ts                  PIN sign-in / sign-out / profile fetch
+  devSession.ts            local-dev-only silent sign-in fallback
+  semver.ts                force-update version comparator
+  push.ts                  push-token registration
+  queryClient.ts           React Query client
+  queries/, mutations/     per-screen data-access layer (React Query hooks)
+  realtime/                Supabase Realtime subscriptions (Jobs tab)
 ```
 
 ## Theming
@@ -111,25 +132,19 @@ for the user-facing toggles. The Profile screen lets you flip:
 Cyan accent (for the in-progress timeline state) and the functional status
 colours are fixed regardless of accent.
 
-## Wiring real data
+## Data layer
 
-This scaffold is intentionally backendless. To plug into the live FleetMS
-Supabase project:
+Every screen reads/writes through a React Query hook in `lib/queries/` or
+`lib/mutations/`, one file per screen concern (jobs, expenses, earnings,
+timeOff, notifications, driverProfile, vehicles, appVersionConfig). Each
+hook calls Supabase directly — RLS via `private.is_driver_self()` does the
+per-driver scoping, so there's no separate authorization layer in the app.
+`lib/realtime/jobsRealtime.ts` subscribes the Jobs tab to live updates.
 
-1. `npm install @supabase/supabase-js`
-2. Create `.env`:
-   ```
-   EXPO_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon>
-   ```
-3. Flesh out `lib/supabase.ts` with `createClient(...)`.
-4. Replace the fixtures in `data/mock.ts` with real DAL calls. The header
-   comment in that file lists the Postgres query for each screen.
-5. Add OTP login on `/sign-in` (`supabase.auth.signInWithOtp({ phone })` plus
-   a verify screen). The dispatcher repo's
-   `supabase/migrations/20260502083020_link_drivers_to_users.sql` already
-   links a `drivers` row to `auth.uid()` and exposes `is_driver_self()` for
-   RLS — your queries should just work once authenticated.
+Auth is phone + PIN against `supabase.auth.signInWithPassword` using a
+synthetic email derived from the phone — see
+`../fleetms/docs/driver-pin-auth.md` for the full design (schema, RPCs,
+lockout policy).
 
 ## Design provenance
 
