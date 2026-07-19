@@ -2,6 +2,23 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Hotfix] - 2026-07-20
+
+Landed as a direct commit to `master` (no PR, no version bump — JS-only,
+shipped as an EAS Update on the `preview` channel rather than a new build).
+
+### Fixed
+
+- **Push-notification deep links could silently fail on cold start.**
+  Tapping a job-assignment notification while the app was fully closed
+  would launch the app and replay that tap through the push listener —
+  but on a slower device the listener could fire before the navigator had
+  finished mounting, throwing "Attempted to navigate before mounting the
+  Root Layout component" and dropping the deep link (Sentry
+  FLEETMS-DRIVER-4, first seen 2026-07-09). Push setup now waits for
+  `useRootNavigationState().key` before subscribing the tap-response
+  listener, so a replayed cold-start tap can never outrun the navigator.
+
 ## [0.5.0] - 2026-07-06
 
 ### Added
