@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -127,17 +127,31 @@ function ThemedShell({ session }: { session: DevSessionResult | null }) {
   // Not a state container — just a one-shot diagnostic.
   (globalThis as any).__FLEETMS_DEV_SESSION__ = session;
 
-  // Register push notifications once the session is up. Idempotent — the
-  // helper short-circuits if the token hasn't changed across cold starts.
+  // Root navigator readiness. When the app is cold-started by tapping a push
+  // notification, expo-notifications replays that tap's response the instant
+  // ensurePushNotifications() subscribes its listener — which can race ahead
+  // of the Stack below actually mounting on a slower device, so the
+  // listener's router.push(deeplink) throws "Attempted to navigate before
+  // mounting the Root Layout component" (captured in Sentry, FLEETMS-DRIVER-4,
+  // 2026-07-09) and the deep link is silently lost. Gating push setup on
+  // rootNavigationState.key means the listener only ever subscribes once the
+  // navigator can actually handle a push, so the replayed tap can't outrun it.
+  const rootNavigationState = useRootNavigationState();
+  const isNavigationReady = !!rootNavigationState?.key;
+
+  // Register push notifications once the session is up AND the navigator is
+  // ready. Idempotent — the helper short-circuits if the token hasn't
+  // changed across cold starts.
   useEffect(() => {
     if (session?.kind !== 'ok') return;
+    if (!isNavigationReady) return;
     let alive = true;
     ensurePushNotifications(router).then(r => {
       if (!alive) return;
       (globalThis as any).__FLEETMS_PUSH__ = r;
     });
     return () => { alive = false; };
-  }, [session?.kind, router]);
+  }, [session?.kind, isNavigationReady, router]);
 
   // Separate from the Sentry-flush listener above — this one re-checks the
   // force-update config whenever the app comes back to the foreground, so a
