@@ -21,6 +21,17 @@ server-controlled minimum/recommended version gate on every cold start
 (`useAppVersionGate`, `lib/semver.ts`) — set from the dispatcher-side
 super-admin console.
 
+Since v0.6.0 the app also reports its own build on every cold start
+independently of push registration (`lib/version.ts` →
+`report_driver_app_version`), so a driver who declined the notification
+permission still shows their version in the dispatcher's Drivers panel. Job
+Detail surfaces dispatcher-attached surcharges as **Included services**, and
+both the Jobs list and Job Detail label a job whose commission rate differs
+from the org default (`lib/commissionRate.ts` — a value comparison, so an
+override pinned to the default rate is correctly treated as standard). All
+three read through RLS the dispatcher side already grants; no driver-specific
+backend exists for them beyond the `job_surcharges` assigned-driver policy.
+
 | Screen           | Route                        | Wired? |
 |-------------------|-------------------------------|--------|
 | Sign In           | `/sign-in`                    | real (PIN) |
