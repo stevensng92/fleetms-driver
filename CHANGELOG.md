@@ -2,6 +2,18 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **Commission-rate label on jobs that don't pay your usual rate.** When a job
+  carries a rate different from your normal one, the Jobs list card shows a
+  small **"20% rate"** badge and Job Detail shows a **Commission rate** row
+  under the job amount. Jobs at your standard rate look exactly as before —
+  no badge, no extra row. The label reflects the rate actually applied to the
+  job, so a job the dispatcher pinned to your normal rate is correctly treated
+  as standard rather than flagged as special.
+
 ## [Hotfix] - 2026-07-20
 
 Landed as a direct commit to `master` (no PR, no version bump — JS-only,

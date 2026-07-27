@@ -10,6 +10,7 @@ import { ClientCard } from '../../components/ClientCard';
 import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
+import { formatRatePct } from '../../lib/commissionRate';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { useStartJob, useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 
@@ -121,6 +122,31 @@ export default function JobDetail() {
             </View>
             <Text style={{ fontSize: 22, fontWeight: '700', color: T.text, letterSpacing: -0.5 }}>
               RM {job.amount.toFixed(2)}
+            </Text>
+          </View>
+        )}
+
+        {/* Non-default commission rate. Sits directly under the amount so the
+            fare and the rate applied to it read together. Rendered
+            independently of `amount` because an unpriced job can still carry a
+            rate the driver should know about before accepting. */}
+        {job.specialRatePct != null && (
+          <View style={{
+            backgroundColor: T.surface, borderRadius: 12,
+            paddingHorizontal: 16, paddingVertical: 12, marginTop: job.amount !== null ? 10 : 0,
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+            shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+            elevation: 2,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+              <Icon name="wallet" size={15} color={T.muted}/>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontSize: 13, color: T.text, fontWeight: '600' }}>Commission rate</Text>
+                <Text style={{ fontSize: 11, color: T.mutedLight }}>Different from your usual rate</Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: T.text, letterSpacing: -0.3 }}>
+              {formatRatePct(job.specialRatePct)}
             </Text>
           </View>
         )}

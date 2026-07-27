@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
+import { resolveSpecialRate } from '../commissionRate';
 import type { StatusKind } from '../../components/StatusPill';
 
 // The Job Detail screen expects: trip meta, route stops, instructions, earnings,
@@ -49,6 +50,11 @@ export type JobDetail = {
   vehiclePlate: string | null;
   vehicleModel: string | null;
   amount: number | null;
+  /** Commission rate for this job when it differs from the driver's normal org
+   *  rate (e.g. 20 → "20% rate"). null = standard rate, nothing to show.
+   *  See lib/commissionRate.ts — an override pinned to the org default is not
+   *  treated as special. */
+  specialRatePct: number | null;
   specialInstructions: string | null;
   stops: Array<{
     seq: number;
@@ -78,7 +84,7 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
       pickup_datetime, pickup_location, pickup_detail, pickup_lat, pickup_lng,
       dropoff_location, dropoff_detail, dropoff_lat, dropoff_lng,
       client_name, passenger_name, passenger_phone,
-      pax, vehicle_type_required, amount, special_instructions,
+      pax, vehicle_type_required, amount, commission_rate_override, special_instructions,
       assignments!assignments_job_id_fkey!inner (
         id, is_current,
         vehicle:vehicles!assignments_vehicle_id_fkey ( plate_number, type, model )
@@ -92,6 +98,17 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
 
   if (jobErr) throw jobErr;
   if (!job) throw new Error('Job not found');
+
+  // Org default rate, to decide whether this job's rate is worth surfacing.
+  // Scoped by the "drivers can see their own org" RLS policy. A failed lookup
+  // degrades to "no badge" (resolveSpecialRate returns null without a
+  // baseline) rather than failing the whole screen.
+  const { data: orgRow, error: orgErr } = await supabase
+    .from('organizations')
+    .select('driver_commission_rate')
+    .limit(1)
+    .maybeSingle();
+  const orgRate = orgErr || !orgRow ? null : Number(orgRow.driver_commission_rate);
 
   const assignment = (job.assignments as any[] | undefined)?.find((a: any) => a.is_current) ?? null;
   const assignedVehicle = (() => {
@@ -146,6 +163,10 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
     vehiclePlate: assignedVehicle?.plate ?? null,
     vehicleModel: assignedVehicle?.model ?? null,
     amount: job.amount === null ? null : Number(job.amount),
+    specialRatePct: resolveSpecialRate(
+      job.commission_rate_override === null ? null : Number(job.commission_rate_override),
+      orgRate,
+    ),
     specialInstructions: job.special_instructions,
     stops: [pickup, ...dbStops],
   };
