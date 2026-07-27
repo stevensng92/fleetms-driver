@@ -34,11 +34,11 @@ import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
 // now has autoIncrement: true (remote versionCode source), so EVERY release
 // build bumps the remote versionCode by 1 — bump APP_BUILD in the same
 // commit as the release cut, or pull expo-application in to read it
-// dynamically. v0.4.0 shipped as versionCode 2; v0.5.0 is the next release
-// build, so versionCode 3.
+// dynamically. v0.4.0 shipped as versionCode 2, v0.5.0 as versionCode 3;
+// v0.6.0 is the next release build, so versionCode 4.
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
-const APP_BUILD = '3';
+const APP_BUILD = '4';
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
