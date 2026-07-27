@@ -18,6 +18,13 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
   Requires the dispatcher-side `driver_surcharge_visibility_prepaid`
   migration (deployed to production 2026-07-27) — older backends simply
   return no rows and the section stays hidden.
+- **Commission-rate label on jobs that don't pay your usual rate.** When a job
+  carries a rate different from your normal one, the Jobs list card shows a
+  small **"20% rate"** badge and Job Detail shows a **Commission rate** row
+  under the job amount. Jobs at your standard rate look exactly as before —
+  no badge, no extra row. The label reflects the rate actually applied to the
+  job, so a job the dispatcher pinned to your normal rate is correctly treated
+  as standard rather than flagged as special.
 
 ### Fixed
 

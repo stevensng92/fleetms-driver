@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
+import { resolveSpecialRate } from '../commissionRate';
 import type { Job } from '../../components/JobCard';
 import type { StatusKind } from '../../components/StatusPill';
 
@@ -98,33 +99,49 @@ async function fetchJobs(): Promise<FetchedJobs> {
   // Without branch 2, a job not marked done by local midnight dropped out of
   // the list entirely and the driver could never complete it ("jobs not
   // showing after the next day").
-  const { data, error } = await supabase
-    .from('assignments')
-    .select(`
-      id,
-      driver_id,
-      is_current,
-      vehicle:vehicles!assignments_vehicle_id_fkey ( plate_number ),
-      jobs:job_id (
+  // The org's default commission rate rides alongside the jobs query so each
+  // card can tell "this job pays my normal rate" from "this one doesn't".
+  // RLS ("drivers can see their own org") scopes this to exactly the driver's
+  // own org, and `driver_commission_rate` is granted to `authenticated`.
+  // limit(1) guards the theoretical multi-org driver rather than throwing.
+  const [{ data, error }, orgRes] = await Promise.all([
+    supabase
+      .from('assignments')
+      .select(`
         id,
-        job_number,
-        pickup_datetime,
-        pickup_location,
-        dropoff_location,
-        client_name,
-        pax,
-        status
+        driver_id,
+        is_current,
+        vehicle:vehicles!assignments_vehicle_id_fkey ( plate_number ),
+        jobs:job_id (
+          id,
+          job_number,
+          pickup_datetime,
+          pickup_location,
+          dropoff_location,
+          client_name,
+          pax,
+          status,
+          commission_rate_override
+        )
+      `)
+      .eq('is_current', true)
+      .or(
+        `and(pickup_datetime.gte.${startToday.toISOString()},pickup_datetime.lt.${endWindow.toISOString()}),` +
+        `and(pickup_datetime.gte.${overdueFloor.toISOString()},pickup_datetime.lt.${startToday.toISOString()},status.in.(${OPEN_STATUSES.join(',')}))`,
+        { foreignTable: 'jobs' },
       )
-    `)
-    .eq('is_current', true)
-    .or(
-      `and(pickup_datetime.gte.${startToday.toISOString()},pickup_datetime.lt.${endWindow.toISOString()}),` +
-      `and(pickup_datetime.gte.${overdueFloor.toISOString()},pickup_datetime.lt.${startToday.toISOString()},status.in.(${OPEN_STATUSES.join(',')}))`,
-      { foreignTable: 'jobs' },
-    )
-    .order('pickup_datetime', { foreignTable: 'jobs', ascending: true });
+      .order('pickup_datetime', { foreignTable: 'jobs', ascending: true }),
+    supabase.from('organizations').select('driver_commission_rate').limit(1).maybeSingle(),
+  ]);
 
   if (error) throw error;
+
+  // A failed/empty org lookup is NOT fatal — resolveSpecialRate returns null
+  // without a default to compare against, so every job simply renders without
+  // a rate badge. Losing a badge beats blocking the driver's job list.
+  const orgRate = orgRes.error || !orgRes.data
+    ? null
+    : Number(orgRes.data.driver_commission_rate);
 
   type Row = {
     assignment_id: string;
@@ -138,6 +155,7 @@ async function fetchJobs(): Promise<FetchedJobs> {
       client_name: string;
       pax: number | null;
       status: string;
+      commission_rate_override: number | null;
     };
   };
 
@@ -167,6 +185,12 @@ async function fetchJobs(): Promise<FetchedJobs> {
     client: r.job.client_name,
     pax: r.job.pax ?? 0,
     status: mapStatus(r.job.status),
+    // null unless this job's rate actually differs from the driver's normal
+    // one — an override pinned to the default rate is not "special".
+    specialRatePct: resolveSpecialRate(
+      r.job.commission_rate_override === null ? null : Number(r.job.commission_rate_override),
+      orgRate,
+    ),
   });
 
   const overdue: Job[] = [];
