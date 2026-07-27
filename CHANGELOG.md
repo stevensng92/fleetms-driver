@@ -19,6 +19,18 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
   migration (deployed to production 2026-07-27) — older backends simply
   return no rows and the section stays hidden.
 
+### Fixed
+
+- **The app now reports its build to the dispatcher even with notifications
+  off.** Version reporting previously happened only as a side effect of
+  push-token registration (`lib/push.ts`), so a driver who declined the
+  notification permission never surfaced their build — the dispatcher's Drivers
+  panel showed "Not reported" even after they updated. New `lib/version.ts`
+  reports the installed build on every cold start via the push-independent
+  `report_driver_app_version` RPC, gated only on the session (not on push
+  permission or navigator readiness). Requires the dispatcher-side migration of
+  the same name to be deployed.
+
 ## [Hotfix] - 2026-07-20
 
 Landed as a direct commit to `master` (no PR, no version bump — JS-only,
