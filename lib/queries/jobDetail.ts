@@ -50,6 +50,19 @@ export type JobDetail = {
   vehicleModel: string | null;
   amount: number | null;
   specialInstructions: string | null;
+  /** Spec #215 — surcharges attached by the dispatcher. These are services
+   *  the driver performs (Overnight, Paging, Accommodation) and money they
+   *  earn. RLS (assigned-driver SELECT policy) scopes rows to this driver's
+   *  current jobs; snapshot fields mean no catalogue access is needed.
+   *  paidInAdvance = the cash was handed over before the trip, so it is
+   *  excluded from commission (it is not still owed). */
+  surcharges: Array<{
+    id: string;
+    name: string;
+    amount: number;
+    treatment: 'commissionable' | 'pass_through';
+    paidInAdvance: boolean;
+  }>;
   stops: Array<{
     seq: number;
     kind: string;
@@ -83,7 +96,8 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
         id, is_current,
         vehicle:vehicles!assignments_vehicle_id_fkey ( plate_number, type, model )
       ),
-      job_stops!job_stops_job_id_fkey ( position, area, detail, scheduled_arrival_at, lat, lng )
+      job_stops!job_stops_job_id_fkey ( position, area, detail, scheduled_arrival_at, lat, lng ),
+      job_surcharges ( id, name_snapshot, amount_snapshot, treatment_snapshot, paid_in_advance )
     `)
     .eq('id', jobUuid)
     .eq('assignments.is_current', true)
@@ -147,6 +161,15 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
     vehicleModel: assignedVehicle?.model ?? null,
     amount: job.amount === null ? null : Number(job.amount),
     specialInstructions: job.special_instructions,
+    // job_surcharges has a single FK path to jobs, so no !fkname disambiguator
+    // is needed (unlike job_stops). RLS returns only this driver's rows.
+    surcharges: ((job.job_surcharges as any[]) ?? []).map((s) => ({
+      id:            s.id as string,
+      name:          s.name_snapshot as string,
+      amount:        Number(s.amount_snapshot),
+      treatment:     s.treatment_snapshot as 'commissionable' | 'pass_through',
+      paidInAdvance: Boolean(s.paid_in_advance),
+    })),
     stops: [pickup, ...dbStops],
   };
 }
