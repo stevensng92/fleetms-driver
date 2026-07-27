@@ -12,6 +12,7 @@ import { ThemeProvider, useTokens, useThemeControls } from '../theme/ThemeProvid
 import { queryClient } from '../lib/queryClient';
 import { ensureDevSession, DevSessionResult } from '../lib/devSession';
 import { ensurePushNotifications } from '../lib/push';
+import { reportAppVersion } from '../lib/version';
 import { useAppVersionGate } from '../lib/queries/appVersionConfig';
 import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
 
@@ -152,6 +153,15 @@ function ThemedShell({ session }: { session: DevSessionResult | null }) {
     });
     return () => { alive = false; };
   }, [session?.kind, isNavigationReady, router]);
+
+  // Report the installed build's version — separate from push registration
+  // above, and gated ONLY on the session (not push permission or navigator
+  // readiness) so a driver with notifications off still shows up in the
+  // dispatcher's Drivers panel as running this build, not "Not reported".
+  useEffect(() => {
+    if (session?.kind !== 'ok') return;
+    reportAppVersion();
+  }, [session?.kind]);
 
   // Separate from the Sentry-flush listener above — this one re-checks the
   // force-update config whenever the app comes back to the foreground, so a
