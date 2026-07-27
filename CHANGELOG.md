@@ -2,6 +2,23 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **"Included services" on Job Detail.** Surcharges your dispatcher attaches
+  to a job — Overnight, Paging, Accommodation and the like — now show on the
+  job's detail screen with their amounts. These are services you carry out on
+  the job and money attached to them, labelled from your point of view:
+  - **Added to your pay** — extra money you receive on top of the fare.
+  - **Paid in advance** — you already received this in cash before the trip
+    (shown struck through; it is not owed again).
+  - **Counts toward fare** — included in the fare your commission is
+    calculated from.
+  Requires the dispatcher-side `driver_surcharge_visibility_prepaid`
+  migration (deployed to production 2026-07-27) — older backends simply
+  return no rows and the section stays hidden.
+
 ## [Hotfix] - 2026-07-20
 
 Landed as a direct commit to `master` (no PR, no version bump — JS-only,
