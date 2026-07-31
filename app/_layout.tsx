@@ -31,14 +31,22 @@ import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
 //
 // Build number is hardcoded because expo-application isn't installed and
 // Constants doesn't expose nativeBuildVersion. eas.json's preview profile
-// now has autoIncrement: true (remote versionCode source), so EVERY release
-// build bumps the remote versionCode by 1 — bump APP_BUILD in the same
-// commit as the release cut, or pull expo-application in to read it
-// dynamically. v0.4.0 shipped as versionCode 2, v0.5.0 as versionCode 3;
-// v0.6.0 is the next release build, so versionCode 4.
+// has autoIncrement: true with a REMOTE versionCode source, so every release
+// build bumps the remote counter by 1 — bump APP_BUILD in the same commit as
+// the release cut, or pull expo-application in to read it dynamically
+// (TODOS.md, P2).
+//
+// Confirm before bumping rather than counting releases: run
+//   npx eas-cli build:version:get --platform android
+// and set APP_BUILD to that value PLUS ONE, since autoIncrement applies at
+// build time. Getting it wrong doesn't break the app — it silently mislabels
+// the Sentry `dist` tag, so crashes get attributed to the wrong binary.
+//
+// v0.4.0 = 2, v0.5.0 = 3, v0.6.0 = 4. Remote counter read as 4 on 2026-08-01,
+// so this v0.7.0 build lands on 5.
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
-const APP_BUILD = '4';
+const APP_BUILD = '5';
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,

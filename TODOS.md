@@ -14,13 +14,6 @@ Job**, whose pay section (included services + commission rate) is brand new.
 Also confirm the last card isn't clipped by the sticky CTA: `AppFrame` uses
 `bottomInset={120}` while the CTA measures roughly 127px.
 
-### Bump `APP_BUILD` when cutting the next release
-**Priority:** P1
-`APP_BUILD` in `app/_layout.tsx` is hand-synced and must match the EAS
-versionCode, which `autoIncrement` bumps on every build. It reads `'2'` while
-v0.6.0 shipped as versionCode 4, so the Sentry `dist` tag is already wrong.
-Superseded by the `expo-application` item below.
-
 ### Replace hardcoded `APP_BUILD` with `expo-application`
 **Priority:** P2
 Use `nativeBuildVersion` instead of hand-syncing a string constant. Removes the
@@ -100,3 +93,9 @@ FleetMS surface did.
 
 ### Bootstrap a test framework
 **Completed:** v0.7.0 (2026-07-31) — jest + jest-expo + RNTL, 47 tests, CI workflow.
+
+### Bump APP_BUILD for the v0.7.0 release
+**Completed:** v0.7.0 (2026-08-01) — remote versionCode read as 4 via
+`eas build:version:get`, so `APP_BUILD` set to `'5'` to match what
+`autoIncrement` produces at build time. Still hand-synced; see the
+`expo-application` item to remove the class.
