@@ -39,6 +39,11 @@ const MONTHS = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ] as const;
 
+const MONTHS_LONG = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+] as const;
+
 /** Shift an instant so its UTC components read as Malaysian wall-clock time. */
 function toMyParts(value: string | Date): Date | null {
   const d = value instanceof Date ? value : new Date(value);
@@ -62,6 +67,48 @@ export function formatDate(value: string | Date, opts: { weekday?: boolean } = {
   if (!my) return '—';
   const core = `${pad2(my.getUTCDate())} ${MONTHS[my.getUTCMonth()]}`;
   return opts.weekday ? `${WEEKDAYS[my.getUTCDay()]}, ${core}` : core;
+}
+
+/** "1 August 2026" — long-form Malaysian date, for one-off display labels. */
+export function formatDateLong(value: string | Date): string {
+  const my = toMyParts(value);
+  if (!my) return '—';
+  return `${my.getUTCDate()} ${MONTHS_LONG[my.getUTCMonth()]} ${my.getUTCFullYear()}`;
+}
+
+/**
+ * "2026-08-01" — the Malaysian calendar day, for values STORED as a date
+ * (e.g. expenses.expense_date) rather than displayed.
+ *
+ * Never build these with `new Date().toISOString().slice(0, 10)`. That is the
+ * UTC day, and Malaysia is UTC+8 — so between 00:00 and 08:00 local, the UTC
+ * day is still YESTERDAY. A driver logging fuel after a pre-dawn airport run
+ * would see one date on screen and store the day before, landing the expense in
+ * the wrong month at a period boundary.
+ */
+export function myDateKey(value: string | Date = new Date()): string {
+  const my = toMyParts(value);
+  if (!my) return '—';
+  return `${my.getUTCFullYear()}-${pad2(my.getUTCMonth() + 1)}-${pad2(my.getUTCDate())}`;
+}
+
+/**
+ * "2026-08-01" — first day of the Malaysian month containing `value`, shifted
+ * by `monthOffset` months. Pass 1 for the exclusive upper bound of a month
+ * range.
+ *
+ * Same trap as myDateKey, one level up: `new Date(y, m, 1).toISOString()` looks
+ * like it builds a month boundary, but it builds LOCAL midnight and then prints
+ * it in UTC. At UTC+8 that lands at 16:00 on the LAST DAY OF THE PREVIOUS
+ * MONTH, so a "this month" range quietly swallows one extra day of the month
+ * before — which for an expenses total is a wrong number in a wrong month.
+ */
+export function myMonthStartKey(value: string | Date = new Date(), monthOffset = 0): string {
+  const my = toMyParts(value);
+  if (!my) return '—';
+  // Month arithmetic via Date.UTC so December + 1 rolls the year correctly.
+  const anchor = new Date(Date.UTC(my.getUTCFullYear(), my.getUTCMonth() + monthOffset, 1));
+  return `${anchor.getUTCFullYear()}-${pad2(anchor.getUTCMonth() + 1)}-01`;
 }
 
 /**

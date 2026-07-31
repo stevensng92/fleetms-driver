@@ -1,4 +1,6 @@
-import { formatClock, formatDate, formatDateTime } from '../timeFormat';
+import {
+  formatClock, formatDate, formatDateLong, formatDateTime, myDateKey, myMonthStartKey,
+} from '../timeFormat';
 
 // The house format is 24-hour digits with the am/pm marker KEPT behind them
 // ("14:30 pm"). That marker is redundant after noon and is retained on purpose
@@ -83,6 +85,81 @@ describe('formatDate', () => {
 
   it('degrades to an em dash on unparseable input', () => {
     expect(formatDate('nope')).toBe('—');
+  });
+});
+
+describe('formatDateLong', () => {
+  it('spells the month out with the year', () => {
+    expect(formatDateLong('2026-08-01T02:00:00Z')).toBe('1 August 2026');
+  });
+
+  it('degrades to an em dash on unparseable input', () => {
+    expect(formatDateLong('nope')).toBe('—');
+  });
+});
+
+describe('myDateKey', () => {
+  it('returns the Malaysian calendar day, not the UTC one', () => {
+    // 2026-07-31T17:00Z is already 01:00 on 1 Aug in Malaysia. The old
+    // toISOString().slice(0,10) returned "2026-07-31" here — a driver logging
+    // fuel after a pre-dawn airport run saw 1 August on screen and filed the
+    // expense against 31 July, landing it in the previous MONTH.
+    expect(myDateKey('2026-07-31T17:00:00Z')).toBe('2026-08-01');
+  });
+
+  it('agrees with what the screen displays, at the boundary', () => {
+    // The bug was the mismatch, so pin the pair rather than each half.
+    const preDawn = '2026-07-31T17:30:00Z'; // 01:30 on 1 Aug, MY
+    expect(formatDateLong(preDawn)).toBe('1 August 2026');
+    expect(myDateKey(preDawn)).toBe('2026-08-01');
+  });
+
+  it('zero-pads month and day', () => {
+    expect(myDateKey('2026-01-05T02:00:00Z')).toBe('2026-01-05');
+  });
+
+  it('ignores the device timezone', () => {
+    const instant = '2026-07-31T17:00:00Z';
+    const original = process.env.TZ;
+    for (const tz of ['UTC', 'America/New_York', 'Australia/Sydney']) {
+      process.env.TZ = tz;
+      expect(myDateKey(instant)).toBe('2026-08-01');
+    }
+    process.env.TZ = original;
+  });
+});
+
+describe('myMonthStartKey', () => {
+  it('anchors to the first of the Malaysian month', () => {
+    expect(myMonthStartKey('2026-08-14T06:00:00Z')).toBe('2026-08-01');
+  });
+
+  it('does not bleed into the previous month at the boundary', () => {
+    // The regression: `new Date(2026, 7, 1).toISOString().slice(0,10)` yields
+    // "2026-07-31" at UTC+8, so a "this month" expenses range started a day
+    // early and swallowed the last day of July into August's total.
+    expect(myMonthStartKey('2026-08-01T00:30:00Z')).toBe('2026-08-01');
+    expect(myMonthStartKey('2026-07-31T17:00:00Z')).toBe('2026-08-01'); // 01:00 MY, 1 Aug
+    expect(myMonthStartKey('2026-07-31T15:00:00Z')).toBe('2026-07-01'); // 23:00 MY, 31 Jul
+  });
+
+  it('rolls the year over on the December boundary', () => {
+    expect(myMonthStartKey('2026-12-14T06:00:00Z', 1)).toBe('2027-01-01');
+    expect(myMonthStartKey('2026-01-14T06:00:00Z', -1)).toBe('2025-12-01');
+  });
+
+  it('gives an exclusive upper bound with offset 1', () => {
+    expect(myMonthStartKey('2026-08-14T06:00:00Z', 1)).toBe('2026-09-01');
+  });
+
+  it('ignores the device timezone', () => {
+    const instant = '2026-07-31T17:00:00Z';
+    const original = process.env.TZ;
+    for (const tz of ['UTC', 'America/New_York', 'Australia/Sydney']) {
+      process.env.TZ = tz;
+      expect(myMonthStartKey(instant)).toBe('2026-08-01');
+    }
+    process.env.TZ = original;
   });
 });
 

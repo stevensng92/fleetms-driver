@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
+import { myMonthStartKey } from '../timeFormat';
 
 export type ExpenseCategory = 'fuel' | 'toll' | 'other';
 
@@ -26,15 +27,12 @@ export type ExpensesSummary = {
   total: number;
 };
 
-function startOfMonthIso(d = new Date()) {
-  const x = new Date(d.getFullYear(), d.getMonth(), 1);
-  // YYYY-MM-DD
-  return x.toISOString().slice(0, 10);
-}
-function startOfNextMonthIso(d = new Date()) {
-  const x = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-  return x.toISOString().slice(0, 10);
-}
+// Month bounds pinned to Malaysia. These previously built `new Date(y, m, 1)`
+// and printed it with toISOString(), which is LOCAL midnight rendered in UTC —
+// at UTC+8 that is 16:00 on the last day of the PREVIOUS month, so every
+// "this month" total silently included one extra day of the month before.
+const startOfMonthIso = (d = new Date()) => myMonthStartKey(d);
+const startOfNextMonthIso = (d = new Date()) => myMonthStartKey(d, 1);
 
 async function fetchMyExpenses(): Promise<ExpensesSummary> {
   // RLS scopes to is_driver_self(driver_id), so anon JWT only ever returns own rows.

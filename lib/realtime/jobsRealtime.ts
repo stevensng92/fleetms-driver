@@ -59,6 +59,10 @@ export function useJobsRealtime() {
           // about which keys this single event touches, and the query is
           // already small.
           qc.invalidateQueries({ queryKey: ['jobs'] });
+          // Earnings too: a dispatcher setting commission_amount, or an
+          // assignment reaching completed_at, changes what this screen owes the
+          // driver. Without it a mounted Earnings tab shows stale pay.
+          qc.invalidateQueries({ queryKey: ['driver-earnings'] });
         },
       )
       .on(

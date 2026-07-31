@@ -16,6 +16,20 @@ serves. Not yet built as an APK; nothing has been verified on a real device.
   (`DEV-J03`). Nothing matched, so the screen gave up. Rows now open the job
   they point at.
 
+- **Expenses could land in the wrong month.** Two separate date bugs, both from
+  building a date in Malaysian time and then printing it in UTC. Logging an
+  expense between midnight and 8am showed you one date on screen and filed it
+  under the day before. Separately, the monthly expenses total started a day
+  early, so the last day of the previous month was counted twice — once in its
+  own month and once in the next.
+- **Times no longer depend on your phone's timezone.** Clocks are now pinned to
+  Malaysian time. A phone with the wrong timezone set, or one used while
+  travelling, used to show pickup times that no other part of FleetMS agreed
+  with.
+- **Earnings stayed stale after finishing a job.** If you had opened Earnings
+  earlier, marked a job done, then went back, the job wasn't there — and
+  wouldn't appear until you restarted the app.
+
 ### Added
 
 - **Your pay is now on the Active Job screen.** While a job is in progress you
@@ -49,9 +63,19 @@ serves. Not yet built as an APK; nothing has been verified on a real device.
   (`SurchargesCard`, `CommissionRateCard`, `CommissionPill`) so the
   driver-facing wording lives in one place rather than two that can drift.
   `app/jobs/[id].tsx` lost 73 lines to the extraction (net 63).
-- New `lib/timeFormat.ts` owns clock formatting. Hand-rolled rather than `Intl`:
-  no `toLocaleTimeString` option pair produces 24h digits *and* an am/pm marker,
-  and it avoids Hermes' patchy `Intl` support on Android.
+- New `lib/timeFormat.ts` owns all clock and date formatting, pinned to a fixed
+  UTC+8 and free of `Intl` entirely — no `toLocaleTimeString` option pair yields
+  24h digits *and* an am/pm marker, and Hermes' `Intl` on Android has
+  historically disagreed with the web build, which made tests unable to predict
+  what a driver actually sees. `myDateKey` / `myMonthStartKey` exist so stored
+  dates and month ranges stop being built with `toISOString().slice(0, 10)`.
+- Reviewed by a six-specialist pass before merge. It caught a shipping bug this
+  branch introduced: `app/(tabs)/__tests__/` sat inside the expo-router app
+  root, where every `.tsx` becomes a route, so the test file would have shipped
+  in the APK as a fifth tab. Screen tests now live in `__tests__/screens/`.
+- Removed `useJobDetail(jobUuid)` — exported, zero callers, and taking a uuid
+  beside a hook taking a job_number. That pairing is what caused the Earnings
+  bug above.
 
 ## [0.6.0] - 2026-07-27
 

@@ -78,6 +78,23 @@ They claim push works and no uninstall is needed. Both were untrue at the time.
 ### Fix Earnings row navigation (uuid vs job_number)
 **Completed:** v0.7.0 (2026-07-31)
 
+### Remove the by-uuid job hook that recreated the navigation trap
+**Completed:** v0.7.0 (2026-08-01) — `useJobDetail(jobUuid)` had zero callers and
+sat beside a by-job_number hook; the dead `['job']` invalidation went with it.
+
+### Invalidate Earnings after a job changes
+**Completed:** v0.7.0 (2026-08-01) — added `['driver-earnings']` to all four job
+mutations and the realtime assignments handler.
+
+### Fix the expenses date/month boundary bugs
+**Completed:** v0.7.0 (2026-08-01) — expense_date was stored from the UTC day, and
+the monthly range started a day early. Both now go through `myDateKey` /
+`myMonthStartKey`.
+
+### Pin clock formatting to Malaysian time
+**Completed:** v0.7.0 (2026-08-01) — was reading the device zone, which no other
+FleetMS surface did.
+
 ### Make pay surfaces consistent across Job Detail, Active Job, and Earnings
 **Completed:** v0.7.0 (2026-07-31)
 
