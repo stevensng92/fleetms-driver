@@ -2,6 +2,57 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0] - 2026-07-31
+
+No backend changes — everything here reads through data the dispatcher already
+serves. Not yet built as an APK; nothing has been verified on a real device.
+
+### Fixed
+
+- **Tapping a job in Earnings opened the job again.** Every row under *Recent
+  jobs* failed with "Couldn't Load Job — Cannot coerce the result to a single
+  JSON object". The Earnings list passed the job's internal database id to the
+  job screen, which expects the job number you actually see on the card
+  (`DEV-J03`). Nothing matched, so the screen gave up. Rows now open the job
+  they point at.
+
+### Added
+
+- **Your pay is now on the Active Job screen.** While a job is in progress you
+  can see the included services and the commission rate for that job. Both were
+  previously only on the job's detail screen, which you can't reach once a job
+  is underway — so the one screen you're on mid-trip was the only screen that
+  couldn't tell you what you were earning.
+- **Commission rate on Earnings rows.** A job that paid a rate different from
+  your usual one now carries the same badge in Earnings that it does on the Jobs
+  list, so a row whose take-home looks off explains itself.
+
+### Changed
+
+- **Times now read as 24-hour.** A 2:30pm pickup shows as `14:30 pm` instead of
+  `2:30 pm`, everywhere times appear: job cards, both route timelines, and
+  notifications. The am/pm marker is kept on purpose.
+- **The commission-rate badge stands out.** It reads `20% comm` (was `20% rate`)
+  on a light red background, instead of the grey chip that blended into the card
+  it sat on.
+
+### Internal
+
+- **The app has tests now.** Jest + `jest-expo` + React Native Testing Library,
+  47 tests across 6 suites, plus a GitHub Actions workflow running typecheck and
+  tests on every push and PR. The repo previously had none. Covered: the time
+  formatter, commission-rate resolution, the version comparator behind the
+  force-update gate, the shared pay components, and a regression test for the
+  Earnings bug above (verified to fail without the fix). Not covered: screens
+  generally, the data hooks, realtime, auth — see `TESTING.md`.
+- Surcharges and the commission rate moved into shared components
+  (`SurchargesCard`, `CommissionRateCard`, `CommissionPill`) so the
+  driver-facing wording lives in one place rather than two that can drift.
+  `app/jobs/[id].tsx` lost 83 lines to the extraction.
+- New `lib/timeFormat.ts` owns clock formatting. Hand-rolled rather than `Intl`:
+  no `toLocaleTimeString` option pair produces 24h digits *and* an am/pm marker,
+  and it avoids Hermes' patchy `Intl` support on Android.
+
 ## [0.6.0] - 2026-07-27
 
 Requires the dispatcher-side `driver_surcharge_visibility_prepaid` and
