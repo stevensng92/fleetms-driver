@@ -5,6 +5,7 @@ import { AppFrame } from '../../components/AppFrame';
 import { AppHeader, SectionLabel } from '../../components/AppHeader';
 import { Card } from '../../components/Card';
 import { StatusPill } from '../../components/StatusPill';
+import { CommissionPill } from '../../components/CommissionPill';
 import { useTokens } from '../../theme/ThemeProvider';
 import { useDriverEarnings, type EarningsPeriod, type EarningsRow, type EarningsPaymentStatus } from '../../lib/queries/earnings';
 import { useDriverProfile } from '../../lib/queries/driverProfile';
@@ -198,7 +199,7 @@ function EarningsRowItem({ row, isLast }: { row: EarningsRow; isLast: boolean })
   const commissionLabel = row.commission == null ? '—' : `RM ${row.commission.toFixed(2)}`;
   return (
     <Pressable
-      onPress={() => router.push(`/jobs/${row.jobId}` as '/')}
+      onPress={() => router.push(`/jobs/${row.jobNumber}` as '/')}
       style={({ pressed }) => ({
         flexDirection: 'row', alignItems: 'center', gap: 12,
         paddingHorizontal: 16, paddingVertical: 14,
@@ -212,6 +213,9 @@ function EarningsRowItem({ row, isLast }: { row: EarningsRow; isLast: boolean })
           fontFamily: MONO, letterSpacing: 0.2,
         }}>{row.jobNumber}</Text>
         <Text style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{formatRowDate(row.completedAt)}</Text>
+        {/* Only the handful of jobs that paid a non-standard rate get this —
+            it's the answer to "why is my cut different on this one?". */}
+        <CommissionPill pct={row.specialRatePct} style={{ marginTop: 5 }}/>
       </View>
       <View style={{ alignItems: 'flex-end', minWidth: 96 }}>
         <Text style={{

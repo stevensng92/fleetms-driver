@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
+import { resolveSpecialRate } from '../commissionRate';
 
 // Driver Earnings — driver's own completed jobs, scoped via RLS
 // (private.is_driver_self on assignments → flow through jobs INNER JOIN).
@@ -27,6 +28,12 @@ export type EarningsRow = {
   fare: number;              // RM, jobs.amount (what client paid the company)
   commission: number | null; // RM, jobs.commission_amount (driver take-home); null when dispatcher hasn't set it
   paymentStatus: EarningsPaymentStatus;
+  /** Commission rate this job paid at, when it differs from the driver's normal
+   *  org rate (e.g. 20 → "20% comm"). null = standard rate, no badge. Same
+   *  resolveSpecialRate rule the Jobs list uses — an override pinned to the org
+   *  default is NOT special. Explains why a row's take-home doesn't match the
+   *  driver's usual cut of the fare. */
+  specialRatePct: number | null;
 };
 
 export type EarningsSummary = {
@@ -74,7 +81,7 @@ export function useDriverEarnings(period: EarningsPeriod) {
           completed_at,
           job:jobs!assignments_job_id_fkey (
             id, job_number, amount, commission_amount, payment_status,
-            pickup_datetime, status
+            pickup_datetime, status, commission_rate_override
           )
         `)
         .eq('is_current', true)
@@ -86,8 +93,20 @@ export function useDriverEarnings(period: EarningsPeriod) {
         query = query.gte('completed_at', since);
       }
 
-      const { data, error } = await query;
+      // Org default rate rides alongside so each row can tell "this paid my
+      // normal rate" from "this one didn't". Same pattern as queries/jobs.ts.
+      const [{ data, error }, orgRes] = await Promise.all([
+        query,
+        supabase.from('organizations').select('driver_commission_rate').limit(1).maybeSingle(),
+      ]);
       if (error) throw error;
+
+      // A failed/empty org lookup is NOT fatal — resolveSpecialRate returns
+      // null without a baseline, so rows simply render without a rate badge.
+      // Losing a badge beats blocking the driver's earnings.
+      const orgRate = orgRes.error || !orgRes.data
+        ? null
+        : Number(orgRes.data.driver_commission_rate);
 
       const rows: EarningsRow[] = (data ?? [])
         .map((r: any) => {
@@ -104,6 +123,10 @@ export function useDriverEarnings(period: EarningsPeriod) {
             fare:          Number(j.amount ?? 0),
             commission:    j.commission_amount == null ? null : Number(j.commission_amount),
             paymentStatus: (j.payment_status as EarningsPaymentStatus) ?? 'unpaid',
+            specialRatePct: resolveSpecialRate(
+              j.commission_rate_override == null ? null : Number(j.commission_rate_override),
+              orgRate,
+            ),
           };
         })
         .filter((r): r is EarningsRow => r !== null);
