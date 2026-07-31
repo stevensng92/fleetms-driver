@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
 import { resolveSpecialRate } from '../commissionRate';
-import { formatClock } from '../timeFormat';
+import { formatClock, formatDate, myDateKey, myStartOfDay } from '../timeFormat';
 import type { Job } from '../../components/JobCard';
 import type { StatusKind } from '../../components/StatusPill';
 
@@ -32,21 +32,12 @@ function mapStatus(s: string): StatusKind {
 const timeOf = formatClock;
 
 // "Thu, 2 Jul" — only rendered on overdue cards, so a driver can see at a
-// glance the pickup was on a past day, not "due today".
-function dateOf(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-MY', {
-    weekday: 'short', day: 'numeric', month: 'short',
-  });
-}
-
-function startOfLocalDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
+// glance the pickup was on a past day, not "due today". MY-pinned like every
+// other date in the app, so it can't disagree with the time on the same card.
+const dateOf = (iso: string) => formatDate(iso, { weekday: true });
 
 export type UpcomingGroup = {
-  /** YYYY-MM-DD in driver's local timezone — stable key for the section header */
+  /** YYYY-MM-DD in Malaysian time — stable key for the section header */
   dateKey: string;
   /** Human label, e.g. "Thu 22 May" */
   label: string;
@@ -82,12 +73,17 @@ const OPEN_STATUSES = ['pending', 'confirmed', 'in_progress'] as const;
 // RLS scopes results via private.is_driver_self(driver_id) so the anon JWT
 // only sees its own. PostgREST embedding handles the FK join automatically.
 async function fetchJobs(): Promise<FetchedJobs> {
+  // Every boundary derived independently from the same MY day, rather than by
+  // walking forward from startToday with setDate(). setDate() operates in the
+  // DEVICE's local terms, so on a phone that observes DST it would add 23 or 25
+  // hours across a transition and slide the MY day boundary off by an hour.
+  // Malaysia has no DST; the device might.
   const now = new Date();
-  const startToday = startOfLocalDay(now);
-  const startTomorrow      = new Date(startToday); startTomorrow.setDate(startTomorrow.getDate() + 1);
-  const startDayAfterTmrw  = new Date(startToday); startDayAfterTmrw.setDate(startDayAfterTmrw.getDate() + 2);
-  const endWindow          = new Date(startToday); endWindow.setDate(endWindow.getDate() + 2 + UPCOMING_DAYS);
-  const overdueFloor       = new Date(startToday); overdueFloor.setDate(overdueFloor.getDate() - OVERDUE_LOOKBACK_DAYS);
+  const startToday         = myStartOfDay(now);
+  const startTomorrow      = myStartOfDay(now, 1);
+  const startDayAfterTmrw  = myStartOfDay(now, 2);
+  const endWindow          = myStartOfDay(now, 2 + UPCOMING_DAYS);
+  const overdueFloor       = myStartOfDay(now, -OVERDUE_LOOKBACK_DAYS);
 
   // Two windows on the embedded job, OR'd together:
   //   1. the scheduled window [today 00:00, +16d) at ANY status, and
@@ -209,10 +205,10 @@ async function fetchJobs(): Promise<FetchedJobs> {
     } else if (t < startDayAfterTmrw.getTime()) {
       tomorrow.push(toUi(r));
     } else {
-      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const dateKey = myDateKey(d);
       let group = upcomingMap.get(dateKey);
       if (!group) {
-        const label = d.toLocaleDateString('en-MY', { weekday: 'short', day: 'numeric', month: 'short' });
+        const label = formatDate(d, { weekday: true });
         group = { dateKey, label, jobs: [] };
         upcomingMap.set(dateKey, group);
       }

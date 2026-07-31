@@ -64,7 +64,26 @@ that calls `useTokens()` pulls it in. Without a mock every such test dies with
 `NativeModule: AsyncStorage is null`. The library's own Jest mock is wired in
 `test/setup.ts` — you don't need to do anything per-test.
 
-**The timezone is pinned to `Asia/Kuala_Lumpur`** in `test/globalSetup.js`.
+**All dates and times go through `lib/timeFormat.ts`, pinned to UTC+8.** Nothing
+else in the app should call `toLocaleDateString`, `toLocaleTimeString`,
+`getHours()`, `setHours(0,0,0,0)`, or `new Date(...).toISOString().slice(0,10)`.
+The one deliberate exception is the greeting in `app/(tabs)/index.tsx`, which
+describes the driver rather than a job.
+
+Two traps worth knowing, both of which shipped before being caught:
+
+- `new Date('2026-08-01')` — a date-ONLY string parses as **UTC**, while
+  `new Date('2026-08-01T00:00:00')` parses as **local**. Rendering a stored
+  `DATE` column through the first form shows the previous day west of UTC. Use
+  `formatDateKey`, which formats the string and never builds a `Date`.
+- `new Date(y, m, 1).toISOString().slice(0, 10)` builds *local* midnight and
+  then prints it in UTC — at UTC+8 that lands on the last day of the previous
+  month. Use `myMonthStartKey` / `myStartOfMonth`.
+
+Date tests assert across several device timezones (`America/New_York`,
+`Australia/Sydney`, …) so they can't pass by accident on a Malaysian machine.
+
+**The timezone is also pinned to `Asia/Kuala_Lumpur`** in `test/globalSetup.js`.
 Drivers and jobs are all in Malaysia and the app renders device-local wall-clock
 time, so date tests need a fixed zone or they pass locally and fail on CI. This
 has to be `globalSetup` rather than a setup file — Node caches the zone on first

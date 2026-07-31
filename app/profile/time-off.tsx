@@ -8,6 +8,7 @@ import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { useRequestTimeOff } from '../../lib/mutations/timeOff';
 import type { TimeOffReason } from '../../lib/queries/timeOff';
+import { formatDateKey, myDateKey, myStartOfDay } from '../../lib/timeFormat';
 
 // S8b — Request Time Off. Inline calendar picker → reason → notes → submit.
 //
@@ -23,24 +24,28 @@ const REASONS: { key: TimeOffReason; label: string; help: string }[] = [
   { key: 'off_duty', label: 'Off duty', help: 'Rest day or personal' },
 ];
 
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+// Calendar keys are MALAYSIAN calendar days, matching lib/timeFormat.ts and the
+// range this screen ultimately submits. The parse/format round-trip used to be
+// device-local at both ends — self-consistent, so the marking loop worked, but
+// `today` below was then the DEVICE's today, which on a phone outside MY offers
+// the driver the wrong first selectable day.
+const myMidnight = (key: string) => `${key}T00:00:00+08:00`;
 
 function daysBetweenInclusive(start: string, end: string): number {
-  const s = new Date(`${start}T00:00:00`);
-  const e = new Date(`${end}T00:00:00`);
+  // Both are exact MY midnights and Malaysia has no DST, so the day count is
+  // exact rather than rounded-and-hoped.
+  const s = myStartOfDay(myMidnight(start));
+  const e = myStartOfDay(myMidnight(end));
   return Math.round((e.getTime() - s.getTime()) / 86400000) + 1;
 }
 
-function formatDate(ymdStr: string): string {
-  const d = new Date(`${ymdStr}T00:00:00`);
-  return d.toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' });
-}
+// The key is already a calendar day, so format the string — putting it through
+// a Date only invites a timezone onto a value that doesn't have one.
+const formatDate = formatDateKey;
 
 export default function TimeOff() {
   const T = useTokens();
-  const today = ymd(new Date());
+  const today = myDateKey(new Date());
 
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate]     = useState<string | null>(null);
@@ -71,10 +76,12 @@ export default function TimeOff() {
     if (!startDate) return {};
     const marks: Record<string, object> = {};
     const final = endDate ?? startDate;
-    const a = new Date(`${startDate}T00:00:00`);
-    const b = new Date(`${final}T00:00:00`);
-    for (let d = new Date(a); d <= b; d.setDate(d.getDate() + 1)) {
-      const key = ymd(d);
+    // Step by MY day index rather than mutating with setDate(), which walks in
+    // the DEVICE's local terms and would jump 23 or 25 hours across a DST
+    // transition on phones in zones that observe one.
+    const total = daysBetweenInclusive(startDate, final);
+    for (let i = 0; i < total; i++) {
+      const key = myDateKey(myStartOfDay(myMidnight(startDate), i));
       const isStart = key === startDate;
       const isEnd   = key === final;
       marks[key] = {

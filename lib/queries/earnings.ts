@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
 import { resolveSpecialRate } from '../commissionRate';
+import { myStartOfDay, myStartOfMonth } from '../timeFormat';
 
 // Driver Earnings — driver's own completed jobs, scoped via RLS
 // (private.is_driver_self on assignments → flow through jobs INNER JOIN).
@@ -64,19 +65,17 @@ export type EarningsSummary = {
  *  `truncated` and the banner it drives. */
 export const ROW_LIMIT = 200;
 
+// Boundaries are pinned to Malaysia, matching lib/timeFormat.ts. These used to
+// use setHours(0,0,0,0) and new Date(y, m, 1), both device-local — so a phone
+// outside MY selected a different window than the dates rendered beside it. The
+// month case was the worst: on a UTC-negative device the local month can still
+// be the previous one, so "This month" silently covered an extra month.
 function periodStartIso(p: EarningsPeriod, now = new Date()): string | null {
   if (p === 'all') return null;
-  if (p === 'week') {
-    // Last 7 days INCLUSIVE — Sunday-start would diverge across locales; keep
-    // it simple: anchor at "exactly 7 days ago at midnight local".
-    const d = new Date(now);
-    d.setDate(d.getDate() - 6);
-    d.setHours(0, 0, 0, 0);
-    return d.toISOString();
-  }
-  // month: start of current calendar month, local
-  const d = new Date(now.getFullYear(), now.getMonth(), 1);
-  return d.toISOString();
+  // Last 7 days INCLUSIVE — Sunday-start would diverge across locales, so
+  // anchor at "start of the MY day 6 days ago".
+  if (p === 'week') return myStartOfDay(now, -6).toISOString();
+  return myStartOfMonth(now).toISOString();
 }
 
 export function useDriverEarnings(period: EarningsPeriod) {

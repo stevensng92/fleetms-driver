@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../supabase';
 import type { TimeOffReason } from '../queries/timeOff';
+import { myStartOfDay } from '../timeFormat';
 
 export type RequestTimeOffInput = {
   /** Local YYYY-MM-DD — sent to the RPC as the start of that day in UTC.
@@ -14,17 +15,22 @@ export type RequestTimeOffInput = {
   notes?: string;
 };
 
+// Both boundaries anchor to MALAYSIAN midnight, matching lib/timeFormat.ts and
+// the dispatcher's own range checks.
+//
+// These used to build `new Date(\`${ymd}T00:00:00\`)`, which JS parses as
+// DEVICE-local (a datetime string without an offset is local; a bare
+// YYYY-MM-DD would have been UTC — the two forms disagree, which is the whole
+// footgun). On a phone outside MY that shifted a requested day off by hours,
+// and the dispatcher's strict_scheduling check then compared it against a MY
+// range, so a day off could land against the wrong day.
 function toIsoStartOfDay(ymd: string): string {
-  // Append 'T00:00:00' so it's parsed as local-midnight, then send as ISO.
-  // The driver's expectation is "days off in their local timezone".
-  return new Date(`${ymd}T00:00:00`).toISOString();
+  return myStartOfDay(`${ymd}T00:00:00+08:00`).toISOString();
 }
 
 function toIsoEndOfDay(ymd: string): string {
-  // Half-open range: end day + 1 day at 00:00 local.
-  const d = new Date(`${ymd}T00:00:00`);
-  d.setDate(d.getDate() + 1);
-  return d.toISOString();
+  // Half-open range: the end day is INCLUSIVE, so the bound is the next MY midnight.
+  return myStartOfDay(`${ymd}T00:00:00+08:00`, 1).toISOString();
 }
 
 export function useRequestTimeOff() {

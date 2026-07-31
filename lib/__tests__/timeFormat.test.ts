@@ -1,5 +1,7 @@
 import {
-  formatClock, formatDate, formatDateLong, formatDateTime, myDateKey, myMonthStartKey,
+  formatClock, formatDate, formatDateKey, formatDateLong, formatDateTime,
+  formatDayLong, formatMonthLong,
+  myDateKey, myMonthStartKey, myStartOfDay, myStartOfMonth,
 } from '../timeFormat';
 
 // The house format is 24-hour digits with the am/pm marker KEPT behind them
@@ -160,6 +162,104 @@ describe('myMonthStartKey', () => {
       expect(myMonthStartKey(instant)).toBe('2026-08-01');
     }
     process.env.TZ = original;
+  });
+});
+
+describe('formatDateKey', () => {
+  it('formats a calendar-day string without touching Date', () => {
+    expect(formatDateKey('2026-08-01')).toBe('01 Aug 2026');
+    expect(formatDateKey('2026-12-31')).toBe('31 Dec 2026');
+  });
+
+  it('honours the year and long-month options', () => {
+    expect(formatDateKey('2026-08-01', { year: false })).toBe('01 Aug');
+    expect(formatDateKey('2026-08-01', { long: true })).toBe('01 August 2026');
+  });
+
+  it('rejects anything that is not a YYYY-MM-DD key', () => {
+    expect(formatDateKey('2026-8-1')).toBe('—');
+    expect(formatDateKey('2026-13-01')).toBe('—');
+    expect(formatDateKey('')).toBe('—');
+  });
+
+  it('does not shift a stored DATE column by a day', () => {
+    // The regression: expenses.expense_date is a DATE ("2026-08-01"), and
+    // `new Date('2026-08-01')` parses date-ONLY strings as UTC, then renders
+    // device-local — so west of UTC an expense filed on 1 Aug displayed as
+    // 31 Jul. Formatting the string can't do that.
+    const original = process.env.TZ;
+    for (const tz of ['Asia/Kuala_Lumpur', 'UTC', 'America/New_York', 'America/Los_Angeles']) {
+      process.env.TZ = tz;
+      expect(formatDateKey('2026-08-01', { year: false })).toBe('01 Aug');
+    }
+    process.env.TZ = original;
+  });
+});
+
+describe('formatMonthLong / formatDayLong', () => {
+  it('names the Malaysian month and day', () => {
+    expect(formatMonthLong('2026-08-01T03:00:00Z')).toBe('August 2026');
+    expect(formatDayLong('2026-08-01T03:00:00Z')).toBe('Saturday, 1 August 2026');
+  });
+
+  it('uses the MY calendar day at the boundary, not the UTC one', () => {
+    // 17:00Z on 31 Jul is already 01:00 on 1 Aug in Malaysia, so the Jobs
+    // header and the Expenses month label must both roll over with MY.
+    expect(formatDayLong('2026-07-31T17:00:00Z')).toBe('Saturday, 1 August 2026');
+    expect(formatMonthLong('2026-07-31T17:00:00Z')).toBe('August 2026');
+  });
+
+  it('degrades to an em dash on unparseable input', () => {
+    expect(formatMonthLong('nope')).toBe('—');
+    expect(formatDayLong('nope')).toBe('—');
+  });
+});
+
+describe('myStartOfDay / myStartOfMonth', () => {
+  // These decide which day a job lands on and which jobs a period covers, so
+  // they get the timezone sweep too.
+  const TZS = ['Asia/Kuala_Lumpur', 'UTC', 'America/New_York', 'Australia/Sydney'];
+
+  it('anchors at Malaysian midnight, whatever the device thinks', () => {
+    const original = process.env.TZ;
+    for (const tz of TZS) {
+      process.env.TZ = tz;
+      // 11:00 MY on 1 Aug -> the day began at 2026-07-31T16:00Z.
+      expect(myStartOfDay('2026-08-01T03:00:00Z').toISOString())
+        .toBe('2026-07-31T16:00:00.000Z');
+    }
+    process.env.TZ = original;
+  });
+
+  it('offsets by whole MY days without DST drift', () => {
+    // Stepping via setDate() on a device that observes DST would jump 23 or 25
+    // hours across a transition; these are exact 24h steps from MY midnight.
+    expect(myStartOfDay('2026-08-01T03:00:00Z', 1).toISOString())
+      .toBe('2026-08-01T16:00:00.000Z');
+    expect(myStartOfDay('2026-08-01T03:00:00Z', -1).toISOString())
+      .toBe('2026-07-30T16:00:00.000Z');
+    // Across a US DST boundary (1 Nov 2026), still exactly 24h apart.
+    const a = myStartOfDay('2026-11-01T03:00:00Z').getTime();
+    const b = myStartOfDay('2026-11-01T03:00:00Z', 1).getTime();
+    expect(b - a).toBe(86_400_000);
+  });
+
+  it('anchors the month to Malaysian time, not the device month', () => {
+    const original = process.env.TZ;
+    for (const tz of TZS) {
+      process.env.TZ = tz;
+      // The regression: on a UTC-negative device the LOCAL month was still
+      // July at this instant, so "This month" on Earnings covered all of July
+      // as well as August.
+      expect(myStartOfMonth('2026-08-01T03:00:00Z').toISOString())
+        .toBe('2026-07-31T16:00:00.000Z');
+    }
+    process.env.TZ = original;
+  });
+
+  it('rolls the year over correctly', () => {
+    expect(myStartOfMonth('2026-12-14T06:00:00Z', 1).toISOString())
+      .toBe('2026-12-31T16:00:00.000Z'); // 1 Jan 2027, 00:00 MY
   });
 });
 

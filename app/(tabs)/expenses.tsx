@@ -7,6 +7,7 @@ import { Button } from '../../components/Button';
 import { Icon, IconName } from '../../components/Icon';
 import { Card } from '../../components/Card';
 import { useTokens } from '../../theme/ThemeProvider';
+import { formatDateKey, formatMonthLong } from '../../lib/timeFormat';
 import { useMyExpenses, type ExpenseRow, type ExpenseCategory } from '../../lib/queries/expenses';
 
 const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
@@ -22,7 +23,10 @@ export default function Expenses() {
   const T = useTokens();
   const { data, isLoading, isError, error, refetch, isRefetching } = useMyExpenses();
 
-  const monthLabel = new Date().toLocaleDateString('en-MY', { month: 'long', year: 'numeric' });
+  // MY month, matching the MY range the totals are computed over (see
+  // lib/queries/expenses.ts). Device-local would let the label say one month
+  // while the figures below cover another.
+  const monthLabel = formatMonthLong();
   const totals = data?.totalsByCategory ?? { fuel: 0, toll: 0, other: 0 };
   const total = data?.total ?? 0;
   const rows = data?.rows ?? [];
@@ -154,7 +158,11 @@ function ExpenseRowView({ e, last }: { e: ExpenseRow; last?: boolean }) {
   // Rejected reads like voided (dead row, struck through) but keeps its own
   // label — the dispatcher declined this claim, vs. cancelled the record.
   const dead = voided || rejected;
-  const dayShort = new Date(e.expenseDate).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' });
+  // expenseDate is a DATE column ("2026-08-01"). new Date() parses a bare
+  // date-only string as UTC, then toLocaleDateString renders it device-local —
+  // so on any UTC-negative device this showed the DAY BEFORE the expense was
+  // filed. Format the string instead; it has no timezone to apply.
+  const dayShort = formatDateKey(e.expenseDate, { year: false });
 
   return (
     <Pressable

@@ -69,6 +69,38 @@ export function formatDate(value: string | Date, opts: { weekday?: boolean } = {
   return opts.weekday ? `${WEEKDAYS[my.getUTCDay()]}, ${core}` : core;
 }
 
+/**
+ * "01 Aug 2026" from a "2026-08-01" key.
+ *
+ * Formats the STRING directly, with no Date in the middle — a YYYY-MM-DD key is
+ * already a calendar day, so round-tripping it through Date only creates an
+ * opportunity to apply a timezone to something that doesn't have one.
+ */
+export function formatDateKey(key: string, opts: { year?: boolean; long?: boolean } = {}): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!m) return '—';
+  const monthIdx = Number(m[2]) - 1;
+  if (monthIdx < 0 || monthIdx > 11) return '—';
+  const month = opts.long ? MONTHS_LONG[monthIdx] : MONTHS[monthIdx];
+  const core = `${m[3]} ${month}`;
+  return opts.year === false ? core : `${core} ${m[1]}`;
+}
+
+/** "August 2026" — the Malaysian month containing `value`. */
+export function formatMonthLong(value: string | Date = new Date()): string {
+  const my = toMyParts(value);
+  if (!my) return '—';
+  return `${MONTHS_LONG[my.getUTCMonth()]} ${my.getUTCFullYear()}`;
+}
+
+/** "Friday, 1 August 2026" — the Malaysian day containing `value`. */
+export function formatDayLong(value: string | Date = new Date()): string {
+  const my = toMyParts(value);
+  if (!my) return '—';
+  const weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][my.getUTCDay()];
+  return `${weekday}, ${my.getUTCDate()} ${MONTHS_LONG[my.getUTCMonth()]} ${my.getUTCFullYear()}`;
+}
+
 /** "1 August 2026" — long-form Malaysian date, for one-off display labels. */
 export function formatDateLong(value: string | Date): string {
   const my = toMyParts(value);
@@ -109,6 +141,35 @@ export function myMonthStartKey(value: string | Date = new Date(), monthOffset =
   // Month arithmetic via Date.UTC so December + 1 rolls the year correctly.
   const anchor = new Date(Date.UTC(my.getUTCFullYear(), my.getUTCMonth() + monthOffset, 1));
   return `${anchor.getUTCFullYear()}-${pad2(anchor.getUTCMonth() + 1)}-01`;
+}
+
+/**
+ * The INSTANT at which a Malaysian calendar day begins, offset by `dayOffset`
+ * days. Use for range boundaries against a timestamptz column.
+ *
+ * `x.setHours(0, 0, 0, 0)` is the tempting version and it is device-local: on a
+ * phone outside MY it anchors the wrong day, so "Today" on the Jobs tab and
+ * "This week" on Earnings would cover a different window than the clock beside
+ * them claims. Same reasoning as pinning formatClock — a boundary is just a
+ * clock reading you compare against.
+ */
+export function myStartOfDay(value: string | Date = new Date(), dayOffset = 0): Date {
+  const my = toMyParts(value);
+  if (!my) return new Date(NaN);
+  const utcMidnightMy = Date.UTC(
+    my.getUTCFullYear(), my.getUTCMonth(), my.getUTCDate() + dayOffset,
+  );
+  // That timestamp is MY-wall-clock midnight expressed as UTC; subtract the
+  // offset to get the real instant.
+  return new Date(utcMidnightMy - MY_UTC_OFFSET_MIN * 60_000);
+}
+
+/** The instant at which the Malaysian month containing `value` begins. */
+export function myStartOfMonth(value: string | Date = new Date(), monthOffset = 0): Date {
+  const my = toMyParts(value);
+  if (!my) return new Date(NaN);
+  const utcMonthStartMy = Date.UTC(my.getUTCFullYear(), my.getUTCMonth() + monthOffset, 1);
+  return new Date(utcMonthStartMy - MY_UTC_OFFSET_MIN * 60_000);
 }
 
 /**
