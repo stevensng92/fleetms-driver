@@ -8,9 +8,10 @@ import { Button } from '../../components/Button';
 import { TimelineStop, Stop } from '../../components/TimelineStop';
 import { ClientCard } from '../../components/ClientCard';
 import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
-import { Icon } from '../../components/Icon';
+import { SurchargesCard } from '../../components/SurchargesCard';
+import { CommissionRateCard } from '../../components/CommissionRateCard';
 import { useTokens } from '../../theme/ThemeProvider';
-import { formatRatePct } from '../../lib/commissionRate';
+import { formatClock } from '../../lib/timeFormat';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { useStartJob, useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 
@@ -43,7 +44,7 @@ export default function JobDetail() {
   const stopsForUi: Stop[] = job.stops.map(s => ({
     kind: s.kind,
     arriveLabel: s.scheduledAt ? 'Arrive' : '—',
-    arrive: s.scheduledAt ? new Date(s.scheduledAt).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' }) : '—',
+    arrive: s.scheduledAt ? formatClock(s.scheduledAt) : '—',
     place: s.location + (s.detail ? `, ${s.detail}` : ''),
     depart: undefined,
     lat: s.lat,
@@ -56,7 +57,7 @@ export default function JobDetail() {
       {
         kind: 'Pickup',
         arriveLabel: 'Pickup',
-        arrive: new Date(job.pickupAt).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' }),
+        arrive: formatClock(job.pickupAt),
         place: job.pickupLocation + (job.pickupDetail ? `, ${job.pickupDetail}` : ''),
         depart: undefined,
       },
@@ -108,55 +109,7 @@ export default function JobDetail() {
           ))}
         </View>
 
-        {/* Included services (spec #215) — dispatcher-attached surcharges.
-            These are services the driver performs on this job and the extra
-            money attached to them. Badge language, driver-facing:
-              - "Paid in advance"  → cash already handed over; NOT added to pay
-              - "Added to your pay" → pass_through still owed, 100% to driver
-              - "Counts toward fare" → commissionable, driver earns their % of it
-            No section renders when a job carries no surcharges. */}
-        {job.surcharges.length > 0 && (
-          <>
-            <SectionLabel>Included services</SectionLabel>
-            <View style={{
-              backgroundColor: T.surface, borderRadius: 12,
-              paddingHorizontal: 16, paddingVertical: 6, marginBottom: 18,
-              shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-              elevation: 2,
-            }}>
-              {job.surcharges.map((s, i) => (
-                <View
-                  key={s.id}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                    paddingVertical: 10,
-                    borderBottomWidth: i === job.surcharges.length - 1 ? 0 : 1,
-                    borderBottomColor: T.border,
-                  }}
-                >
-                  <View style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: T.text }}>{s.name}</Text>
-                    <Text style={{
-                      fontSize: 11.5, marginTop: 2, fontWeight: '600',
-                      color: s.paidInAdvance ? T.mutedLight : T.muted,
-                    }}>
-                      {s.paidInAdvance
-                        ? 'Paid in advance'
-                        : s.treatment === 'pass_through' ? 'Added to your pay' : 'Counts toward fare'}
-                    </Text>
-                  </View>
-                  <Text style={{
-                    fontSize: 15, fontWeight: '700', letterSpacing: -0.3,
-                    color: s.paidInAdvance ? T.mutedLight : T.text,
-                    textDecorationLine: s.paidInAdvance ? 'line-through' : 'none',
-                  }}>
-                    RM {s.amount.toFixed(2)}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </>
-        )}
+        <SurchargesCard items={job.surcharges}/>
 
         {job.amount !== null && (
           <View style={{
@@ -180,26 +133,10 @@ export default function JobDetail() {
             fare and the rate applied to it read together. Rendered
             independently of `amount` because an unpriced job can still carry a
             rate the driver should know about before accepting. */}
-        {job.specialRatePct != null && (
-          <View style={{
-            backgroundColor: T.surface, borderRadius: 12,
-            paddingHorizontal: 16, paddingVertical: 12, marginTop: job.amount !== null ? 10 : 0,
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-            shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-            elevation: 2,
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-              <Icon name="wallet" size={15} color={T.muted}/>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 13, color: T.text, fontWeight: '600' }}>Commission rate</Text>
-                <Text style={{ fontSize: 11, color: T.mutedLight }}>Different from your usual rate</Text>
-              </View>
-            </View>
-            <Text style={{ fontSize: 17, fontWeight: '700', color: T.text, letterSpacing: -0.3 }}>
-              {formatRatePct(job.specialRatePct)}
-            </Text>
-          </View>
-        )}
+        <CommissionRateCard
+          pct={job.specialRatePct}
+          style={{ marginTop: job.amount !== null ? 10 : 0 }}
+        />
       </View>
 
       {/* Sticky CTA — depends on status */}

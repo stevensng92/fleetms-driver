@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
 import { resolveSpecialRate } from '../commissionRate';
+import { formatClock } from '../timeFormat';
 import type { Job } from '../../components/JobCard';
 import type { StatusKind } from '../../components/StatusPill';
 
@@ -26,13 +27,9 @@ function mapStatus(s: string): StatusKind {
   }
 }
 
-// Human "9:00 AM" time label, MY locale. 12-hour with AM/PM marker — drivers
-// shouldn't have to do the 24h math glancing at the card.
-function timeOf(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-MY', {
-    hour: 'numeric', minute: '2-digit', hour12: true,
-  });
-}
+// "14:30 pm" — 24h digits with the am/pm marker behind them. See
+// lib/timeFormat.ts for why the format is shaped that way.
+const timeOf = formatClock;
 
 // "Thu, 2 Jul" — only rendered on overdue cards, so a driver can see at a
 // glance the pickup was on a past day, not "due today".

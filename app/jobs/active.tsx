@@ -8,9 +8,12 @@ import { Button } from '../../components/Button';
 import { TimelineStop, Stop } from '../../components/TimelineStop';
 import { ClientCard } from '../../components/ClientCard';
 import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
+import { SurchargesCard } from '../../components/SurchargesCard';
+import { CommissionRateCard } from '../../components/CommissionRateCard';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
+import { formatClock } from '../../lib/timeFormat';
 import { useCompleteJob } from '../../lib/mutations/jobActions';
 
 // S4 — Active Job. Same shape as Job Detail but UI emphasises progress and
@@ -41,9 +44,7 @@ export default function ActiveJob() {
   const stopsForUi: Stop[] = job.stops.map(s => ({
     kind: s.kind,
     arriveLabel: s.scheduledAt ? 'Arrive' : '—',
-    arrive: s.scheduledAt
-      ? new Date(s.scheduledAt).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' })
-      : '—',
+    arrive: s.scheduledAt ? formatClock(s.scheduledAt) : '—',
     place: s.location + (s.detail ? `, ${s.detail}` : ''),
     depart: undefined,
     lat: s.lat,
@@ -54,7 +55,7 @@ export default function ActiveJob() {
       {
         kind: 'Pickup',
         arriveLabel: 'Pickup',
-        arrive: new Date(job.pickupAt).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' }),
+        arrive: formatClock(job.pickupAt),
         place: job.pickupLocation + (job.pickupDetail ? `, ${job.pickupDetail}` : ''),
         depart: undefined,
       },
@@ -142,6 +143,13 @@ export default function ActiveJob() {
           <RouteWithCollapsedDoneStops stops={stopsForUi} states={states}/>
         </View>
 
+        {/* Pay breakdown, same order and components as Job Detail: what the
+            job includes, then the fare, then the rate applied to it. A driver
+            mid-trip is the person most likely to be asked "is the tolls money
+            yours or mine?" at the counter, so this screen can't be the one
+            place that stays silent about it. */}
+        <SurchargesCard items={job.surcharges}/>
+
         {job.amount !== null && (
           <View style={{
             backgroundColor: T.surface, borderRadius: 12,
@@ -161,6 +169,11 @@ export default function ActiveJob() {
             </Text>
           </View>
         )}
+
+        <CommissionRateCard
+          pct={job.specialRatePct}
+          style={{ marginTop: job.amount !== null ? 10 : 0 }}
+        />
       </ScrollView>
 
       <View style={{
