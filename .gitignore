@@ -56,3 +56,6 @@ app-example
 # generated native folders
 /ios
 /android
+
+# jest coverage output
+coverage/

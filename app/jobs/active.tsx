@@ -159,10 +159,14 @@ export default function ActiveJob() {
             elevation: 2,
           }}>
             <View>
-              <Text style={{ fontSize: 12, color: T.muted, fontWeight: '600' }}>Earnings on completion</Text>
-              <Text style={{ fontSize: 11, color: T.mutedLight }}>
-                {job.client}{job.pax ? ` · ${job.pax} pax` : ''}
-              </Text>
+              {/* "Job amount / Before commission", matching Job Detail. This
+                  field is jobs.amount — the CLIENT's fare, not the driver's
+                  take-home. It previously read "Earnings on completion", which
+                  was already wrong and became an active contradiction once the
+                  commission rate landed directly beneath it: a driver mid-trip
+                  would read RM 500 "earnings" on a job paying them ~RM 100. */}
+              <Text style={{ fontSize: 12, color: T.muted, fontWeight: '600' }}>Job amount</Text>
+              <Text style={{ fontSize: 11, color: T.mutedLight }}>Before commission</Text>
             </View>
             <Text style={{ fontSize: 22, fontWeight: '700', color: T.text, letterSpacing: -0.5 }}>
               RM {job.amount.toFixed(2)}

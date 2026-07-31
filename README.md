@@ -73,6 +73,17 @@ cp .env.example .env   # then fill in the values — see "Configure" below
 npx expo start
 ```
 
+Tests (jest + `jest-expo` + React Native Testing Library):
+
+```bash
+npm test
+```
+
+`TESTING.md` has the full guide, including the sharp edges — `render()` is async
+in RNTL v14, and screen tests must live in `__tests__/screens/` rather than under
+`app/`, where expo-router would register them as routes. CI runs typecheck plus
+the suite on every push and PR (`.github/workflows/test.yml`).
+
 ### Configure
 
 `.env` needs four values:
@@ -133,6 +144,8 @@ app/                       file-based routes (expo-router)
     time-off.tsx           Request Time Off (modal sheet)
 
 components/                shared UI building blocks (ported from design handoff)
+test/                      jest setup — globalSetup.js (TZ pin) + setup.ts (mocks)
+__tests__/screens/         screen tests (kept OUT of app/ — see TESTING.md)
 theme/                     design tokens + ThemeProvider
 data/mock.ts               legacy fixtures — unused by app/ now, kept for reference
 lib/

@@ -7,8 +7,9 @@ import { Card } from '../../components/Card';
 import { StatusPill } from '../../components/StatusPill';
 import { CommissionPill } from '../../components/CommissionPill';
 import { useTokens } from '../../theme/ThemeProvider';
-import { useDriverEarnings, type EarningsPeriod, type EarningsRow, type EarningsPaymentStatus } from '../../lib/queries/earnings';
+import { useDriverEarnings, ROW_LIMIT, type EarningsPeriod, type EarningsRow, type EarningsPaymentStatus } from '../../lib/queries/earnings';
 import { useDriverProfile } from '../../lib/queries/driverProfile';
+import { formatDate } from '../../lib/timeFormat';
 
 const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
 
@@ -34,9 +35,10 @@ function formatRM(amount: number): { whole: string; cents: string } {
   return { whole: grouped, cents };
 }
 
-function formatRowDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' });
-}
+// Uses the shared pinned-timezone helper rather than toLocaleDateString: the
+// row's date has to agree with every clock elsewhere in the app, and the old
+// call also built a fresh Intl formatter per row on a list of up to 200.
+const formatRowDate = formatDate;
 
 export default function Earnings() {
   const T = useTokens();
@@ -113,6 +115,26 @@ export default function Earnings() {
               <Text style={{ fontSize: 13, color: T.muted, marginTop: 2 }}>
                 RM {formatRM(fareTotal).whole} in fares
               </Text>
+            )}
+            {/* The totals above cover only the rows we fetched. Say so rather
+                than showing a number that silently understates — this screen is
+                what a driver uses to check they were paid correctly. */}
+            {data?.truncated && (
+              <View style={{
+                marginTop: 10, paddingHorizontal: 10, paddingVertical: 7,
+                borderRadius: 6, backgroundColor: T.raised,
+              }}>
+                {/* One interpolated string, not mixed JSX children — split
+                    children render as separate text nodes, which breaks both
+                    text matching in tests and screen-reader continuity. */}
+                <Text style={{ fontSize: 12, color: T.muted, fontWeight: '600' }}>
+                  {`Showing your ${ROW_LIMIT} most recent jobs${
+                    data.totalCount != null && data.totalCount > ROW_LIMIT
+                      ? ` of ${data.totalCount}`
+                      : ''
+                  }. Older jobs aren't counted in these totals.`}
+                </Text>
+              </View>
             )}
             {missing > 0 && (
               <View style={{
@@ -199,7 +221,12 @@ function EarningsRowItem({ row, isLast }: { row: EarningsRow; isLast: boolean })
   const commissionLabel = row.commission == null ? '—' : `RM ${row.commission.toFixed(2)}`;
   return (
     <Pressable
-      onPress={() => router.push(`/jobs/${row.jobNumber}` as '/')}
+      // Typed params, not an interpolated path. `job_number` is rendered from
+      // the org-editable `organizations.job_format` template, so a format
+      // carrying "/" or "?" would break a hand-built path — and the `as '/'`
+      // cast the old form needed is exactly what let the uuid-vs-job_number bug
+      // compile clean in the first place.
+      onPress={() => router.push({ pathname: '/jobs/[id]', params: { id: row.jobNumber } })}
       style={({ pressed }) => ({
         flexDirection: 'row', alignItems: 'center', gap: 12,
         paddingHorizontal: 16, paddingVertical: 14,

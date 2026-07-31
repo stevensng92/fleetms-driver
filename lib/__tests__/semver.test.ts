@@ -19,6 +19,20 @@ describe('compareVersions', () => {
   it('treats missing trailing segments as zero', () => {
     expect(compareVersions('0.4', '0.4.0')).toBe(0);
     expect(compareVersions('1', '1.0.0')).toBe(0);
+    // Both directions — the gate sees a short `minimum_version` against a full
+    // app version at least as often as the reverse.
+    expect(compareVersions('0.4.0', '0.4')).toBe(0);
+    expect(compareVersions('1.0.0', '1')).toBe(0);
+  });
+
+  it('silently parses a non-numeric segment as 0 — the force-update gate fails OPEN', () => {
+    // `minimum_version` is free text on driver_app_version_config, so a
+    // dispatcher typing "v1.0.0" yields segments [0,1,0]. compareVersions then
+    // reports the app as AHEAD, the gate says "ok", and the forced update never
+    // fires. Pinning the current behaviour so the failure mode is documented
+    // rather than discovered during an urgent rollout.
+    expect(compareVersions('0.7.0', 'v1.0.0')).toBe(1);
+    expect(compareVersions('0.7.0', 'not-a-version')).toBe(1);
   });
 
   it('strips prerelease and build metadata', () => {

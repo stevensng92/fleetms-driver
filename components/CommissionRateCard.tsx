@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, StyleProp, ViewStyle } from 'react-native';
 import { CommissionPill } from './CommissionPill';
 import { useTokens } from '../theme/ThemeProvider';
 
@@ -17,7 +17,10 @@ import { useTokens } from '../theme/ThemeProvider';
 // wallets in one row reads like a rendering bug.
 //
 // Renders nothing when the job pays the standard rate.
-export function CommissionRateCard({ pct, style }: { pct: number | null | undefined; style?: any }) {
+export function CommissionRateCard({ pct, style }: {
+  pct: number | null | undefined;
+  style?: StyleProp<ViewStyle>;
+}) {
   const T = useTokens();
   if (pct == null) return null;
   return (
@@ -30,7 +33,10 @@ export function CommissionRateCard({ pct, style }: { pct: number | null | undefi
     }, style]}>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{ fontSize: 13, color: T.text, fontWeight: '600' }}>Commission rate</Text>
-        <Text style={{ fontSize: 11, color: T.mutedLight }}>Different from your usual rate</Text>
+        {/* T.muted, not T.mutedLight: this is the only line telling a driver the
+            rate isn't an error, and mutedLight computes 2.56:1 on light /
+            3.57:1 on dark at 11px — both below the WCAG AA 4.5:1 floor. */}
+        <Text style={{ fontSize: 11, color: T.muted }}>Different from your usual rate</Text>
       </View>
       <CommissionPill pct={pct} compact/>
     </View>

@@ -19,11 +19,14 @@
       "<rootDir>/test/setup.ts"
     ],
     "transformIgnorePatterns": [
-      "node_modules/(?!(?:.pnpm/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|react-native-reanimated|react-native-worklets))"
+      "node_modules/(?!(?:.pnpm/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|react-native-reanimated|react-native-worklets))",
+      "/node_modules/react-native-reanimated/plugin/"
     ],
     "collectCoverageFrom": [
+      "app/**/*.{ts,tsx}",
       "lib/**/*.{ts,tsx}",
       "components/**/*.{ts,tsx}",
+      "theme/**/*.{ts,tsx}",
       "!**/node_modules/**"
     ]
   },

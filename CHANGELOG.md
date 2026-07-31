@@ -48,7 +48,7 @@ serves. Not yet built as an APK; nothing has been verified on a real device.
 - Surcharges and the commission rate moved into shared components
   (`SurchargesCard`, `CommissionRateCard`, `CommissionPill`) so the
   driver-facing wording lives in one place rather than two that can drift.
-  `app/jobs/[id].tsx` lost 83 lines to the extraction.
+  `app/jobs/[id].tsx` lost 73 lines to the extraction (net 63).
 - New `lib/timeFormat.ts` owns clock formatting. Hand-rolled rather than `Intl`:
   no `toLocaleTimeString` option pair produces 24h digits *and* an am/pm marker,
   and it avoids Hermes' patchy `Intl` support on Android.

@@ -38,6 +38,11 @@ jest.mock('@sentry/react-native', () => ({
   wrap: (c: unknown) => c,
 }));
 
-// Silence the RN Animated "useNativeDriver is not supported" warning that
-// StatusPill's pulse animation emits in the test environment.
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper', () => ({}), { virtual: true });
+// NOTE: there is deliberately no NativeAnimatedHelper mock here. The commonly
+// copy-pasted `jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper',
+// …, { virtual: true })` targets a path that no longer exists in RN 0.81 (the
+// module moved to react-native/src/private/animated/), and `virtual: true` is
+// exactly what stops that from erroring — so it registers a mock nothing
+// resolves while looking like it works. If StatusPill's pulse animation starts
+// emitting useNativeDriver warnings, fix it at the real path and WITHOUT the
+// virtual flag, so a future RN upgrade that moves the module fails loudly.

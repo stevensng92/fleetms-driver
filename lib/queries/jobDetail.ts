@@ -51,7 +51,7 @@ export type JobDetail = {
   vehicleModel: string | null;
   amount: number | null;
   /** Commission rate for this job when it differs from the driver's normal org
-   *  rate (e.g. 20 → "20% rate"). null = standard rate, nothing to show.
+   *  rate (e.g. 20 → "20% comm"). null = standard rate, nothing to show.
    *  See lib/commissionRate.ts — an override pinned to the org default is not
    *  treated as special. */
   specialRatePct: number | null;

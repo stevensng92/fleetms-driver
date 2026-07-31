@@ -5,6 +5,14 @@ on:
     branches: [master]
   pull_request:
 
+# Least privilege. This repo is PUBLIC and ships the driver APK via GitHub
+# Releases, so a token with write scope is a release-channel compromise. `npm ci`
+# runs install scripts for ~200 transitive packages; none of them need more than
+# read. Without this block the token inherits the repo default, which is
+# write-all on repos created before Feb 2023.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest

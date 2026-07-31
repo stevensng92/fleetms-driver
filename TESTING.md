@@ -51,6 +51,13 @@ Forget the `await` and you get `TypeError: toJSON is not a function` followed by
 `` `render` function has not been called `` — neither message mentions promises,
 so it is easy to lose ten minutes here.
 
+**Safe-area is mocked globally, and the `.default` unwrap is load-bearing.**
+`AppFrame` calls `useSafeAreaInsets()` at the top of every screen, so screen
+tests throw "No safe area value available" without a mock. The library ships one
+at `react-native-safe-area-context/jest/mock`, but it is `export default {...}` —
+requiring it without `.default` yields a module whose `useSafeAreaInsets` is
+`undefined`, which fails with a *different* error that looks unrelated.
+
 **AsyncStorage is mocked globally.** `ThemeProvider` imports
 `@react-native-async-storage/async-storage` at module scope, so *any* component
 that calls `useTokens()` pulls it in. Without a mock every such test dies with
@@ -71,11 +78,20 @@ than from an ISO instant.
 
 ```
 test/
-  globalSetup.js   TZ pin, runs before workers spawn
-  setup.ts         per-file mocks (AsyncStorage, expo-haptics, Sentry)
-lib/__tests__/     pure helper tests
-components/__tests__/  component tests
+  globalSetup.js        TZ pin, runs before workers spawn
+  setup.ts              per-file mocks (AsyncStorage, safe-area, expo-haptics, Sentry)
+lib/__tests__/          pure helper tests
+components/__tests__/   component tests
+__tests__/screens/      screen tests — NOT under app/, see below
 ```
+
+**Screen tests must not live under `app/`.** expo-router's `require.context`
+regex matches every `.tsx` under the app root, and its ignore list covers only
+`+html`, `+native-intent`, `+api`, and `+middleware` — nothing for `__tests__`
+or `.test.`. A test file under `app/` therefore registers as a real **route**:
+it ships inside the production APK, drags `react-test-renderer` in with it, and
+renders as a stray tab that throws `jest is not defined` when tapped. Keep
+screen tests in `__tests__/screens/` at the repo root.
 
 ## Conventions
 

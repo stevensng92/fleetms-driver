@@ -114,7 +114,7 @@ export default function Notifications() {
 function NotificationRow({ item, isLast }: { item: NotificationItem; isLast: boolean }) {
   const T = useTokens();
   const unread = item.readAt === null;
-  const time = formatDateTime(item.enqueuedAt, { day: '2-digit', month: 'short' });
+  const time = formatDateTime(item.enqueuedAt, { weekday: false });
 
   // Deeplinks come from server-controlled push_log.payload.deeplink. Allowlist
   // by prefix so a compromised/bug-buggy trigger can't route the driver to

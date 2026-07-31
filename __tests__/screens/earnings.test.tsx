@@ -1,10 +1,18 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { router } from 'expo-router';
-import Earnings from '../earnings';
-import { useDriverEarnings, type EarningsSummary } from '../../../lib/queries/earnings';
-import { useDriverProfile } from '../../../lib/queries/driverProfile';
+import Earnings from '../../app/(tabs)/earnings';
+import { useDriverEarnings, type EarningsSummary } from '../../lib/queries/earnings';
+import { useDriverProfile } from '../../lib/queries/driverProfile';
 
+// NOTE ON LOCATION: screen tests must NOT live under app/. expo-router's
+// require.context regex (see node_modules/expo-router/_ctx.android.js) matches
+// every .tsx under the app root and its ignore list covers only +html,
+// +native-intent, +api and +middleware — nothing for __tests__ or .test.
+// A test file under app/ therefore registers as a real ROUTE: it ships in the
+// production bundle, drags react-test-renderer in with it, and renders as a
+// stray tab that throws "jest is not defined" when tapped.
+//
 // REGRESSION: tapping a Recent-jobs row died with
 //   "Couldn't Load Job / Cannot coerce the result to a single JSON object"
 //
@@ -13,18 +21,22 @@ import { useDriverProfile } from '../../../lib/queries/driverProfile';
 // (lib/queries/jobs.ts maps `id: r.job.job_number` for exactly this reason), but
 // Earnings pushed `row.jobId` — the real uuid. A uuid never matches a
 // job_number, so PostgREST returned 0 rows and .single() threw PGRST116.
-//
-// The trap is that EarningsRow carries BOTH fields and both look plausible at
-// the call site. This test pins which one the route gets.
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn() },
 }));
-jest.mock('../../../lib/queries/earnings', () => ({
-  ...jest.requireActual('../../../lib/queries/earnings'),
+// No requireActual here: the only other import from this module is a type,
+// which is erased at compile time. Pulling the real module in would construct a
+// live Supabase client against a placeholder URL just to run a screen test.
+// ROW_LIMIT is restated rather than pulled through requireActual: the real
+// module constructs a Supabase client at import time, which a screen test has
+// no business doing. If the cap changes, this and the expectation below change
+// together and the mismatch is visible in the diff.
+jest.mock('../../lib/queries/earnings', () => ({
   useDriverEarnings: jest.fn(),
+  ROW_LIMIT: 200,
 }));
-jest.mock('../../../lib/queries/driverProfile', () => ({
+jest.mock('../../lib/queries/driverProfile', () => ({
   useDriverProfile: jest.fn(),
 }));
 
@@ -47,6 +59,8 @@ const summary = (over: Partial<EarningsSummary> = {}): EarningsSummary => ({
   avgCommissionPerJob: 100,
   pendingCount: 1,
   missingCommissionCount: 0,
+  truncated: false,
+  totalCount: 1,
   ...over,
 });
 
@@ -69,9 +83,14 @@ describe('Earnings — Recent jobs row navigation', () => {
 
     fireEvent.press(screen.getByText(JOB_NUMBER));
 
-    expect(router.push).toHaveBeenCalledWith(`/jobs/${JOB_NUMBER}`);
-    // The specific failure: pushing the uuid is what produced PGRST116.
-    expect(router.push).not.toHaveBeenCalledWith(`/jobs/${JOB_UUID}`);
+    // The typed-params form, not a raw interpolated string: job_number is
+    // rendered from the org-editable `organizations.job_format` template, so a
+    // format containing "/" or "?" would break a hand-built path. expo-router
+    // encodes `params` for us.
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/jobs/[id]',
+      params: { id: JOB_NUMBER },
+    });
   });
 
   it('never puts a uuid in the route', async () => {
@@ -80,8 +99,9 @@ describe('Earnings — Recent jobs row navigation', () => {
 
     fireEvent.press(screen.getByText(JOB_NUMBER));
 
-    const pushed = String((router.push as jest.Mock).mock.calls[0][0]);
-    expect(pushed).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    const arg = (router.push as jest.Mock).mock.calls[0][0];
+    const id = String(typeof arg === 'string' ? arg : arg.params.id);
+    expect(id).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   });
 });
 
@@ -95,7 +115,6 @@ describe('Earnings — row rendering', () => {
     }));
     await render(<Earnings/>);
 
-    // One pill for the 20% job; the standard-rate job contributes nothing.
     expect(screen.getByText('20% comm')).toBeTruthy();
     expect(screen.queryAllByText(/% comm$/)).toHaveLength(1);
   });
@@ -116,6 +135,23 @@ describe('Earnings — row rendering', () => {
     await render(<Earnings/>);
 
     expect(screen.getByText(/No completed jobs/)).toBeTruthy();
+  });
+
+  it('says so when the totals only cover the most recent 200 jobs', async () => {
+    // The failure this guards is silent: past the cap the headline RM figure
+    // just stops growing correctly, with no error and no visual cue, on the
+    // screen a driver uses to check they were paid right.
+    mockEarnings(summary({ truncated: true, totalCount: 247 }));
+    await render(<Earnings/>);
+
+    expect(screen.getByText(/Showing your 200 most recent jobs of 247/)).toBeTruthy();
+  });
+
+  it('stays quiet when nothing was truncated', async () => {
+    mockEarnings(summary({ truncated: false }));
+    await render(<Earnings/>);
+
+    expect(screen.queryByText(/most recent/)).toBeNull();
   });
 
   it('surfaces a query error with a retry affordance', async () => {

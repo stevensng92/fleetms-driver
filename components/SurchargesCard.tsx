@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, StyleProp, ViewStyle } from 'react-native';
 import { SectionLabel } from './AppHeader';
 import { useTokens } from '../theme/ThemeProvider';
 
@@ -25,7 +25,10 @@ export type Surcharge = {
 // settled" regardless of how the surcharge is classified.
 //
 // Renders nothing when the job carries no surcharges.
-export function SurchargesCard({ items, style }: { items: Surcharge[]; style?: any }) {
+export function SurchargesCard({ items, style }: {
+  items: Surcharge[];
+  style?: StyleProp<ViewStyle>;
+}) {
   const T = useTokens();
   if (items.length === 0) return null;
   return (

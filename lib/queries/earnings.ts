@@ -50,7 +50,19 @@ export type EarningsSummary = {
   /** Count of rows where commission_amount is null — dispatcher hasn't set it.
    *  Drives an inline "{n} jobs awaiting commission" warning when > 0. */
   missingCommissionCount: number;
+  /** True when the query hit ROW_LIMIT, so every total above covers only the
+   *  most recent ROW_LIMIT jobs rather than the whole period. Without this the
+   *  headline figure silently understates once a driver passes the cap. */
+  truncated: boolean;
+  /** Completed assignments matching the period, ignoring the row cap. null when
+   *  the count couldn't be read. Lets the UI say how much is missing. */
+  totalCount: number | null;
 };
+
+/** Max rows pulled per period. Totals are computed from what we fetch, so
+ *  crossing this is a correctness cliff, not just a display one — hence
+ *  `truncated` and the banner it drives. */
+export const ROW_LIMIT = 200;
 
 function periodStartIso(p: EarningsPeriod, now = new Date()): string | null {
   if (p === 'all') return null;
@@ -83,11 +95,11 @@ export function useDriverEarnings(period: EarningsPeriod) {
             id, job_number, amount, commission_amount, payment_status,
             pickup_datetime, status, commission_rate_override
           )
-        `)
+        `, { count: 'exact' })
         .eq('is_current', true)
         .not('completed_at', 'is', null)
         .order('completed_at', { ascending: false })
-        .limit(200);
+        .limit(ROW_LIMIT);
 
       if (since) {
         query = query.gte('completed_at', since);
@@ -95,7 +107,7 @@ export function useDriverEarnings(period: EarningsPeriod) {
 
       // Org default rate rides alongside so each row can tell "this paid my
       // normal rate" from "this one didn't". Same pattern as queries/jobs.ts.
-      const [{ data, error }, orgRes] = await Promise.all([
+      const [{ data, error, count }, orgRes] = await Promise.all([
         query,
         supabase.from('organizations').select('driver_commission_rate').limit(1).maybeSingle(),
       ]);
@@ -104,9 +116,17 @@ export function useDriverEarnings(period: EarningsPeriod) {
       // A failed/empty org lookup is NOT fatal — resolveSpecialRate returns
       // null without a baseline, so rows simply render without a rate badge.
       // Losing a badge beats blocking the driver's earnings.
-      const orgRate = orgRes.error || !orgRes.data
+      //
+      // Guard the VALUE, not just the row. Number(null) is 0, not NaN, and
+      // Number.isFinite(0) is true — so a null/absent rate would sail through
+      // resolveSpecialRate as a legitimate 0% baseline and badge every
+      // overridden job as "different from your usual rate". The column is
+      // NOT NULL DEFAULT 0 today, which is the same trap by another door: a
+      // newly-onboarded tenant that hasn't set its rate yet reads 0.
+      const rawOrgRate = orgRes.error ? null : orgRes.data?.driver_commission_rate;
+      const orgRate = rawOrgRate == null || Number(rawOrgRate) <= 0
         ? null
-        : Number(orgRes.data.driver_commission_rate);
+        : Number(rawOrgRate);
 
       const rows: EarningsRow[] = (data ?? [])
         .map((r: any) => {
@@ -147,6 +167,11 @@ export function useDriverEarnings(period: EarningsPeriod) {
         avgCommissionPerJob,
         pendingCount,
         missingCommissionCount,
+        // Measured on the raw response, not on `rows` — rows is post-filter
+        // (non-done jobs are dropped), so it can sit below the cap even when
+        // the query was truncated.
+        truncated: (data?.length ?? 0) >= ROW_LIMIT,
+        totalCount: count ?? null,
       };
     },
   });
