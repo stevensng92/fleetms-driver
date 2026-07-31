@@ -4,8 +4,8 @@ import { Card } from './Card';
 import { StatusPill, StatusKind } from './StatusPill';
 import { Button } from './Button';
 import { Icon } from './Icon';
+import { CommissionPill } from './CommissionPill';
 import { useTokens } from '../theme/ThemeProvider';
-import { formatRatePct } from '../lib/commissionRate';
 
 export type Job = {
   /** Human-readable identifier from jobs.job_number, shown on cards. */
@@ -24,7 +24,7 @@ export type Job = {
   pax: number;
   status: StatusKind;
   /** Commission rate for this job when it differs from the driver's normal
-   *  org rate (e.g. 20 → "20% rate"). null = pays the standard rate, so no
+   *  org rate (e.g. 20 → "20% comm"). null = pays the standard rate, so no
    *  badge renders. Resolved in lib/commissionRate.ts — an override pinned to
    *  the default rate is deliberately NOT special. */
   specialRatePct?: number | null;
@@ -127,20 +127,7 @@ export function JobCard({
               in the crowded meta line above — it only appears on the handful of
               jobs that carry one, and a pay figure shouldn't be the thing that
               gets truncated on a narrow phone. */}
-          {job.specialRatePct != null && (
-            <View style={{ flexDirection: 'row', marginTop: 6 }}>
-              <View style={{
-                flexDirection: 'row', alignItems: 'center', gap: 4,
-                paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
-                backgroundColor: T.raised, borderWidth: 1, borderColor: T.border,
-              }}>
-                <Icon name="wallet" size={11} color={T.muted}/>
-                <Text style={{ fontSize: 11.5, fontWeight: '700', color: T.text }}>
-                  {formatRatePct(job.specialRatePct)} rate
-                </Text>
-              </View>
-            </View>
-          )}
+          <CommissionPill pct={job.specialRatePct} style={{ marginTop: 6 }}/>
         </View>
       </View>
 
