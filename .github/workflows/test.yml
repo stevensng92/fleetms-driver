@@ -1,0 +1,36 @@
+name: Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Least privilege. This repo is PUBLIC and ships the driver APK via GitHub
+# Releases, so a token with write scope is a release-channel compromise. `npm ci`
+# runs install scripts for ~200 transitive packages; none of them need more than
+# read. Without this block the token inherits the repo default, which is
+# write-all on repos created before Feb 2023.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # `npm ci` needs the lockfile to match package.json exactly. If this step
+      # fails after a dependency change, run `npm install` locally and commit
+      # the updated package-lock.json.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test -- --ci

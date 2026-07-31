@@ -11,6 +11,7 @@ import { useDriverTimeOff, REASON_LABEL, type TimeOffEntry, type TimeOffStatus }
 import { useCancelTimeOff } from '../../lib/mutations/timeOff';
 import { useAppVersionGate } from '../../lib/queries/appVersionConfig';
 import { signOut } from '../../lib/auth';
+import { formatDate, myDateKey } from '../../lib/timeFormat';
 
 const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
 const APP_DOWNLOAD_URL = 'https://app.fleetms.my/driver-app';
@@ -255,8 +256,10 @@ function formatRange(startsAt: string, endsAt: string): { range: string; days: n
   // a human-friendly "to" date.
   const eExclusive = new Date(endsAt);
   const eInclusive = new Date(eExclusive.getTime() - 1);
-  const fmt = (d: Date) => d.toLocaleDateString('en-MY', { day: '2-digit', month: 'short' });
-  const sameDay = s.toDateString() === eInclusive.toDateString();
+  // MY-pinned: these ranges were submitted as MY days (lib/mutations/timeOff.ts),
+  // so rendering them device-local could show a different day than was booked.
+  const fmt = (d: Date) => formatDate(d);
+  const sameDay = myDateKey(s) === myDateKey(eInclusive);
   const range = sameDay ? fmt(s) : `${fmt(s)} – ${fmt(eInclusive)}`;
   const days = Math.max(1, Math.round((eExclusive.getTime() - s.getTime()) / 86400000));
   return { range, days };

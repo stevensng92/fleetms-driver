@@ -2,6 +2,81 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0] - 2026-07-31
+
+No backend changes — everything here reads through data the dispatcher already
+serves. Not yet built as an APK; nothing has been verified on a real device.
+
+### Fixed
+
+- **Tapping a job in Earnings opened the job again.** Every row under *Recent
+  jobs* failed with "Couldn't Load Job — Cannot coerce the result to a single
+  JSON object". The Earnings list passed the job's internal database id to the
+  job screen, which expects the job number you actually see on the card
+  (`DEV-J03`). Nothing matched, so the screen gave up. Rows now open the job
+  they point at.
+
+- **Expenses could land in the wrong month.** Two separate date bugs, both from
+  building a date in Malaysian time and then printing it in UTC. Logging an
+  expense between midnight and 8am showed you one date on screen and filed it
+  under the day before. Separately, the monthly expenses total started a day
+  early, so the last day of the previous month was counted twice — once in its
+  own month and once in the next.
+- **Times no longer depend on your phone's timezone.** Clocks are now pinned to
+  Malaysian time. A phone with the wrong timezone set, or one used while
+  travelling, used to show pickup times that no other part of FleetMS agreed
+  with.
+- **Earnings stayed stale after finishing a job.** If you had opened Earnings
+  earlier, marked a job done, then went back, the job wasn't there — and
+  wouldn't appear until you restarted the app.
+
+### Added
+
+- **Your pay is now on the Active Job screen.** While a job is in progress you
+  can see the included services and the commission rate for that job. Both were
+  previously only on the job's detail screen, which you can't reach once a job
+  is underway — so the one screen you're on mid-trip was the only screen that
+  couldn't tell you what you were earning.
+- **Commission rate on Earnings rows.** A job that paid a rate different from
+  your usual one now carries the same badge in Earnings that it does on the Jobs
+  list, so a row whose take-home looks off explains itself.
+
+### Changed
+
+- **Times now read as 24-hour.** A 2:30pm pickup shows as `14:30 pm` instead of
+  `2:30 pm`, everywhere times appear: job cards, both route timelines, and
+  notifications. The am/pm marker is kept on purpose.
+- **The commission-rate badge stands out.** It reads `20% comm` (was `20% rate`)
+  on a light red background, instead of the grey chip that blended into the card
+  it sat on.
+
+### Internal
+
+- **The app has tests now.** Jest + `jest-expo` + React Native Testing Library,
+  47 tests across 6 suites, plus a GitHub Actions workflow running typecheck and
+  tests on every push and PR. The repo previously had none. Covered: the time
+  formatter, commission-rate resolution, the version comparator behind the
+  force-update gate, the shared pay components, and a regression test for the
+  Earnings bug above (verified to fail without the fix). Not covered: screens
+  generally, the data hooks, realtime, auth — see `TESTING.md`.
+- Surcharges and the commission rate moved into shared components
+  (`SurchargesCard`, `CommissionRateCard`, `CommissionPill`) so the
+  driver-facing wording lives in one place rather than two that can drift.
+  `app/jobs/[id].tsx` lost 73 lines to the extraction (net 63).
+- New `lib/timeFormat.ts` owns all clock and date formatting, pinned to a fixed
+  UTC+8 and free of `Intl` entirely — no `toLocaleTimeString` option pair yields
+  24h digits *and* an am/pm marker, and Hermes' `Intl` on Android has
+  historically disagreed with the web build, which made tests unable to predict
+  what a driver actually sees. `myDateKey` / `myMonthStartKey` exist so stored
+  dates and month ranges stop being built with `toISOString().slice(0, 10)`.
+- Reviewed by a six-specialist pass before merge. It caught a shipping bug this
+  branch introduced: `app/(tabs)/__tests__/` sat inside the expo-router app
+  root, where every `.tsx` becomes a route, so the test file would have shipped
+  in the APK as a fifth tab. Screen tests now live in `__tests__/screens/`.
+- Removed `useJobDetail(jobUuid)` — exported, zero callers, and taking a uuid
+  beside a hook taking a job_number. That pairing is what caused the Earnings
+  bug above.
+
 ## [0.6.0] - 2026-07-27
 
 Requires the dispatcher-side `driver_surcharge_visibility_prepaid` and

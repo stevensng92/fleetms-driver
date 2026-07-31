@@ -24,13 +24,27 @@ super-admin console.
 Since v0.6.0 the app also reports its own build on every cold start
 independently of push registration (`lib/version.ts` →
 `report_driver_app_version`), so a driver who declined the notification
-permission still shows their version in the dispatcher's Drivers panel. Job
-Detail surfaces dispatcher-attached surcharges as **Included services**, and
-both the Jobs list and Job Detail label a job whose commission rate differs
-from the org default (`lib/commissionRate.ts` — a value comparison, so an
-override pinned to the default rate is correctly treated as standard). All
-three read through RLS the dispatcher side already grants; no driver-specific
-backend exists for them beyond the `job_surcharges` assigned-driver policy.
+permission still shows their version in the dispatcher's Drivers panel. It also
+surfaces dispatcher-attached surcharges as **Included services**, and labels a
+job whose commission rate differs from the org default
+(`lib/commissionRate.ts` — a value comparison, so an override pinned to the
+default rate is correctly treated as standard). Both read through RLS the
+dispatcher side already grants; no driver-specific backend exists for them
+beyond the `job_surcharges` assigned-driver policy.
+
+Since v0.7.0 those two pay surfaces are consistent everywhere they appear.
+Included services and the commission rate now also render on **Active Job**
+(previously the one screen that showed neither, despite being where a driver
+sits mid-trip), and the commission rate reaches **Earnings** rows. The rate
+renders through one shared `CommissionPill` — red-tinted, labelled
+`20% comm` — so the same fact reads the same way on every screen;
+`CommissionRateCard` and `SurchargesCard` hold the detail-screen treatment
+shared by Job Detail and Active Job.
+
+Clock times render as 24-hour digits with the am/pm marker kept behind them
+(`09:00 am`, `14:30 pm`) via `lib/timeFormat.ts`. The marker is redundant
+after noon by strict notation; it is retained deliberately, so don't
+"simplify" it away.
 
 | Screen           | Route                        | Wired? |
 |-------------------|-------------------------------|--------|
@@ -58,6 +72,17 @@ npm install
 cp .env.example .env   # then fill in the values — see "Configure" below
 npx expo start
 ```
+
+Tests (jest + `jest-expo` + React Native Testing Library):
+
+```bash
+npm test
+```
+
+`TESTING.md` has the full guide, including the sharp edges — `render()` is async
+in RNTL v14, and screen tests must live in `__tests__/screens/` rather than under
+`app/`, where expo-router would register them as routes. CI runs typecheck plus
+the suite on every push and PR (`.github/workflows/test.yml`).
 
 ### Configure
 
@@ -119,6 +144,8 @@ app/                       file-based routes (expo-router)
     time-off.tsx           Request Time Off (modal sheet)
 
 components/                shared UI building blocks (ported from design handoff)
+test/                      jest setup — globalSetup.js (TZ pin) + setup.ts (mocks)
+__tests__/screens/         screen tests (kept OUT of app/ — see TESTING.md)
 theme/                     design tokens + ThemeProvider
 data/mock.ts               legacy fixtures — unused by app/ now, kept for reference
 lib/
@@ -126,6 +153,8 @@ lib/
   auth.ts                  PIN sign-in / sign-out / profile fetch
   devSession.ts            local-dev-only silent sign-in fallback
   semver.ts                force-update version comparator
+  commissionRate.ts        special-vs-standard rate resolution + "20%" formatting
+  timeFormat.ts            clock formatting (24h digits + am/pm marker)
   push.ts                  push-token registration
   queryClient.ts           React Query client
   queries/, mutations/     per-screen data-access layer (React Query hooks)

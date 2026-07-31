@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../supabase';
+import { formatDateTime } from '../timeFormat';
 
 // In-app inbox backed by public.push_log (the same table that drives push
 // delivery). Each row is one outbound push for this driver; the inbox is
@@ -42,12 +43,7 @@ function renderNotification(row: { kind: string; payload: any }): { title: strin
   const deeplink: string | null = p.deeplink ?? null;
   const title = KIND_LABEL[row.kind] ?? row.kind.replace(/_/g, ' ');
 
-  const pickupTime = p.pickup_datetime
-    ? new Date(p.pickup_datetime).toLocaleString('en-MY', {
-        weekday: 'short', day: '2-digit', month: 'short',
-        hour: '2-digit', minute: '2-digit',
-      })
-    : null;
+  const pickupTime = p.pickup_datetime ? formatDateTime(p.pickup_datetime) : null;
 
   switch (row.kind) {
     case 'job_assigned':

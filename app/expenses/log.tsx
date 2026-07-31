@@ -9,6 +9,7 @@ import { useTokens } from '../../theme/ThemeProvider';
 import { useMyVehicles } from '../../lib/queries/vehicles';
 import { useLogExpense } from '../../lib/mutations/logExpense';
 import type { ExpenseCategory } from '../../lib/queries/expenses';
+import { formatDateLong, myDateKey } from '../../lib/timeFormat';
 
 const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
 
@@ -43,10 +44,14 @@ export default function LogExpense() {
     [vehicles, vehicleId],
   );
 
-  const todayLocal = new Date().toLocaleDateString('en-MY', {
-    day: 'numeric', month: 'long', year: 'numeric',
-  });
-  const todayIso = new Date().toISOString().slice(0, 10);
+  // Both derived from the same Malaysian instant, so the date shown and the
+  // date stored can never disagree. They used to: the label was device-local
+  // while the stored value came from toISOString(), which is UTC — so between
+  // 00:00 and 08:00 MY a driver saw one day and filed the expense on the day
+  // before, pushing it into the wrong month at a period boundary.
+  const now = new Date();
+  const todayLocal = formatDateLong(now);
+  const todayIso = myDateKey(now);
 
   async function pickReceipt(source: 'camera' | 'library') {
     const perm = source === 'camera'

@@ -6,6 +6,7 @@ import { AppHeader, SectionLabel } from '../../components/AppHeader';
 import { JobCard } from '../../components/JobCard';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
+import { formatDayLong } from '../../lib/timeFormat';
 import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 import { useUnreadCount } from '../../lib/queries/notifications';
@@ -18,6 +19,12 @@ const APP_DOWNLOAD_URL = 'https://app.fleetms.my/driver-app';
 // Time-of-day greeting that matches the device's local hour. Saturated to the
 // 3 standard buckets so we don't say "Good afternoon" at 1pm and "Good evening"
 // at 5pm — drivers travel a lot and the language stays steady.
+//
+// DELIBERATELY device-local, and the only such reading left in the app. Every
+// other clock and date is pinned to Malaysia (lib/timeFormat.ts) because it
+// describes a JOB, which happens on MY time. A greeting describes the DRIVER,
+// so it should follow the phone they're holding: someone up at 8am elsewhere
+// wants "Good morning", not Malaysia's afternoon. Don't "fix" this to match.
 function timeOfDayGreeting(date = new Date()): string {
   const h = date.getHours();
   if (h < 12) return 'Good morning';
@@ -45,10 +52,10 @@ export default function JobsToday() {
   const upcoming = data?.upcoming ?? [];
   const upcomingTotal = upcoming.reduce((sum, g) => sum + g.jobs.length, 0);
 
-  // Friday · 9 May 2026 — formatted locally
-  const headerSubtitle = new Date().toLocaleDateString('en-MY', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  });
+  // MY day, matching the MY day boundaries the Today/Tomorrow groups below use
+  // (lib/queries/jobs.ts). Device-local would let this header disagree with
+  // which jobs are sitting under 'Today'.
+  const headerSubtitle = formatDayLong();
 
   // Mock RM total — replace with real earnings query once it exists.
   const sumRM = today.length * 80;

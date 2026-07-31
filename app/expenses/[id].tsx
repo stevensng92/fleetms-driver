@@ -6,6 +6,7 @@ import { AppFrame } from '../../components/AppFrame';
 import { AppHeader } from '../../components/AppHeader';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
+import { formatDateKey } from '../../lib/timeFormat';
 import { supabase } from '../../lib/supabase';
 import { getSignedReceiptUrl, type ExpenseCategory, type ExpenseStatus } from '../../lib/queries/expenses';
 
@@ -87,9 +88,9 @@ export default function Receipt() {
     );
   }
 
-  const dateLabel = new Date(e.expenseDate).toLocaleDateString('en-MY', {
-    day: 'numeric', month: 'long', year: 'numeric',
-  });
+  // Format the DATE-column string directly — see the note in (tabs)/expenses.tsx:
+  // new Date('2026-08-01') is UTC midnight and renders a day early west of UTC.
+  const dateLabel = formatDateKey(e.expenseDate, { long: true });
 
   return (
     <AppFrame bg={T.surface}>

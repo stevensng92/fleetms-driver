@@ -51,7 +51,7 @@ export type JobDetail = {
   vehicleModel: string | null;
   amount: number | null;
   /** Commission rate for this job when it differs from the driver's normal org
-   *  rate (e.g. 20 → "20% rate"). null = standard rate, nothing to show.
+   *  rate (e.g. 20 → "20% comm"). null = standard rate, nothing to show.
    *  See lib/commissionRate.ts — an override pinned to the org default is not
    *  treated as special. */
   specialRatePct: number | null;
@@ -195,16 +195,19 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
   };
 }
 
-export function useJobDetail(jobUuid: string | undefined) {
-  return useQuery({
-    queryKey: ['job', jobUuid],
-    queryFn: () => fetchJobDetail(jobUuid!),
-    enabled: Boolean(jobUuid),
-  });
-}
-
-// Helper for screens that route in via job_number rather than uuid. Looks up
-// the uuid, then defers to useJobDetail. Single extra round-trip; cached after.
+// THERE IS DELIBERATELY NO by-uuid HOOK HERE.
+//
+// `useJobDetail(jobUuid)` used to sit at this spot: exported, zero callers, and
+// taking a uuid while its neighbour takes a job_number. That pairing is exactly
+// what produced "Cannot coerce the result to a single JSON object" — a caller
+// holding one kind of id picked the hook expecting the other, PostgREST matched
+// nothing, and `.single()` threw PGRST116. Every screen routes by job_number,
+// so the uuid variant was a loaded gun with no upside. It also meant the
+// `['job']` key that four mutations invalidated was never populated by anything.
+//
+// If a by-uuid read is genuinely needed later, call `fetchJobDetail` directly
+// rather than re-exporting a second hook that differs only in what a `string`
+// means.
 export function useJobDetailByNumber(jobNumber: string | undefined) {
   return useQuery({
     queryKey: ['job-by-number', jobNumber],
