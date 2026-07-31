@@ -1,0 +1,28 @@
+name: Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # `npm ci` needs the lockfile to match package.json exactly. If this step
+      # fails after a dependency change, run `npm install` locally and commit
+      # the updated package-lock.json.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test -- --ci
