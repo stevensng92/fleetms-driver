@@ -36,10 +36,24 @@ Since v0.7.0 those two pay surfaces are consistent everywhere they appear.
 Included services and the commission rate now also render on **Active Job**
 (previously the one screen that showed neither, despite being where a driver
 sits mid-trip), and the commission rate reaches **Earnings** rows. The rate
-renders through one shared `CommissionPill` — red-tinted, labelled
+renders through one shared `CommissionPill` — cyan-tinted, labelled
 `20% comm` — so the same fact reads the same way on every screen;
-`CommissionRateCard` and `SurchargesCard` hold the detail-screen treatment
-shared by Job Detail and Active Job.
+`CommissionRateCard`, `JobAmountCard` and `SurchargesCard` hold the
+detail-screen treatment shared by Job Detail and Active Job.
+
+Since v0.8.0 the app understands the dispatcher's second pricing mode. A job
+can be priced as a **flat fee** agreed at booking (`jobs.commission_fixed_amount`,
+dispatcher v0.31.0.0) instead of a percentage, and the two are mutually
+exclusive by DB constraint — so a fixed-fee job carries no rate override at
+all. The app previously read that as "pays the standard org rate" and rendered
+no badge, which meant a RM 80 flat fee on a RM 500 job looked like the org's
+~20% (~RM 100). `resolveSpecialCommission` now returns a discriminated
+`{kind:'rate'} | {kind:'fixed'}` rather than a bare percentage, so a fee cannot
+be rendered — or multiplied — as a rate; the pill reads `RM 80 flat`, and the
+detail card swaps its caption to say the fare is not what the fee comes out of.
+The app resolves ladder rungs 1, 2 and 5; the per-**driver** default rungs
+(`drivers.commission_fixed_amount` / `drivers.commission_rate`, dispatcher
+v0.30.0.0) are still unread here — see `lib/commissionRate.ts`.
 
 Clock times render as 24-hour digits with the am/pm marker kept behind them
 (`09:00 am`, `14:30 pm`) via `lib/timeFormat.ts`. The marker is redundant
@@ -153,7 +167,8 @@ lib/
   auth.ts                  PIN sign-in / sign-out / profile fetch
   devSession.ts            local-dev-only silent sign-in fallback
   semver.ts                force-update version comparator
-  commissionRate.ts        special-vs-standard rate resolution + "20%" formatting
+  commissionRate.ts        special-vs-standard pay resolution (rate OR flat fee)
+                           + "20%" / "RM 80" formatting
   timeFormat.ts            clock formatting (24h digits + am/pm marker)
   push.ts                  push-token registration
   queryClient.ts           React Query client

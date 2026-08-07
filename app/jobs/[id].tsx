@@ -10,6 +10,7 @@ import { ClientCard } from '../../components/ClientCard';
 import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
 import { SurchargesCard } from '../../components/SurchargesCard';
 import { CommissionRateCard } from '../../components/CommissionRateCard';
+import { JobAmountCard } from '../../components/JobAmountCard';
 import { useTokens } from '../../theme/ThemeProvider';
 import { formatClock } from '../../lib/timeFormat';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
@@ -111,30 +112,16 @@ export default function JobDetail() {
 
         <SurchargesCard items={job.surcharges}/>
 
-        {job.amount !== null && (
-          <View style={{
-            backgroundColor: T.surface, borderRadius: 12,
-            paddingHorizontal: 16, paddingVertical: 14,
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-            shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-            elevation: 2,
-          }}>
-            <View>
-              <Text style={{ fontSize: 12, color: T.muted, fontWeight: '600' }}>Job amount</Text>
-              <Text style={{ fontSize: 11, color: T.mutedLight }}>Before commission</Text>
-            </View>
-            <Text style={{ fontSize: 22, fontWeight: '700', color: T.text, letterSpacing: -0.5 }}>
-              RM {job.amount.toFixed(2)}
-            </Text>
-          </View>
-        )}
+        <JobAmountCard amount={job.amount} commission={job.specialCommission}/>
 
-        {/* Non-default commission rate. Sits directly under the amount so the
-            fare and the rate applied to it read together. Rendered
-            independently of `amount` because an unpriced job can still carry a
-            rate the driver should know about before accepting. */}
+        {/* Non-default pay. Sits directly under the amount so the fare and what
+            the driver gets out of it read together. Rendered independently of
+            `amount` because an unpriced job can still carry pay the driver
+            should know about before accepting — and under fixed-fee pricing
+            that is no longer a hypothetical: a flat fee resolves whatever the
+            fare, so a fareless job can have a real, knowable payout. */}
         <CommissionRateCard
-          pct={job.specialRatePct}
+          commission={job.specialCommission}
           style={{ marginTop: job.amount !== null ? 10 : 0 }}
         />
       </View>

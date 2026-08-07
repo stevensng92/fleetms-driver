@@ -10,6 +10,7 @@ import { ClientCard } from '../../components/ClientCard';
 import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
 import { SurchargesCard } from '../../components/SurchargesCard';
 import { CommissionRateCard } from '../../components/CommissionRateCard';
+import { JobAmountCard } from '../../components/JobAmountCard';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
@@ -144,38 +145,18 @@ export default function ActiveJob() {
         </View>
 
         {/* Pay breakdown, same order and components as Job Detail: what the
-            job includes, then the fare, then the rate applied to it. A driver
-            mid-trip is the person most likely to be asked "is the tolls money
-            yours or mine?" at the counter, so this screen can't be the one
-            place that stays silent about it. */}
+            job includes, then the fare, then what the driver gets out of it. A
+            driver mid-trip is the person most likely to be asked "is the tolls
+            money yours or mine?" at the counter, so this screen can't be the
+            one place that stays silent about it. Every piece is a shared
+            component for the same reason — this screen was the one that stayed
+            silent last time, because the markup lived in the other file. */}
         <SurchargesCard items={job.surcharges}/>
 
-        {job.amount !== null && (
-          <View style={{
-            backgroundColor: T.surface, borderRadius: 12,
-            paddingHorizontal: 16, paddingVertical: 14,
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-            shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-            elevation: 2,
-          }}>
-            <View>
-              {/* "Job amount / Before commission", matching Job Detail. This
-                  field is jobs.amount — the CLIENT's fare, not the driver's
-                  take-home. It previously read "Earnings on completion", which
-                  was already wrong and became an active contradiction once the
-                  commission rate landed directly beneath it: a driver mid-trip
-                  would read RM 500 "earnings" on a job paying them ~RM 100. */}
-              <Text style={{ fontSize: 12, color: T.muted, fontWeight: '600' }}>Job amount</Text>
-              <Text style={{ fontSize: 11, color: T.mutedLight }}>Before commission</Text>
-            </View>
-            <Text style={{ fontSize: 22, fontWeight: '700', color: T.text, letterSpacing: -0.5 }}>
-              RM {job.amount.toFixed(2)}
-            </Text>
-          </View>
-        )}
+        <JobAmountCard amount={job.amount} commission={job.specialCommission}/>
 
         <CommissionRateCard
-          pct={job.specialRatePct}
+          commission={job.specialCommission}
           style={{ marginTop: job.amount !== null ? 10 : 0 }}
         />
       </ScrollView>

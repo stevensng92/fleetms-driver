@@ -2,6 +2,40 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.0] - 2026-08-07
+
+Requires dispatcher **v0.31.0.0** to already be live on production — the job
+queries now name `jobs.commission_fixed_amount`, and PostgREST rejects the whole
+query if that column doesn't exist, which would empty the job board. Confirm the
+migration has landed before building this.
+
+### Fixed
+
+- **Jobs paid a flat fee showed no pay information at all.** The dispatcher can
+  now agree a fixed fee for a job at booking time — RM 80 for the run — instead
+  of a percentage of the fare. The app didn't know that mode existed. Because a
+  fixed-fee job carries no percentage rate, the app read it as "this one pays
+  your usual rate" and showed nothing, so a RM 80 job sitting under a RM 500
+  fare looked like it paid the company's normal cut of about RM 100. Those jobs
+  now show **RM 80 flat**, and the job screen says in words that the fare is not
+  what your fee comes out of.
+
+- **The same job could show a rate badge on one screen and not another.** On a
+  company whose default commission rate was never set, Earnings correctly
+  treated "not set" as unknown, but the Jobs list and job screen read it as a
+  genuine 0% — so a job with any rate on it was flagged as unusual in one place
+  and ordinary in the other. All three screens now agree.
+
+- **A flat-fee job with no fare showed "RM 0.00 fare" on Earnings.** It now
+  reads *No fare set*. Your take-home on the row is unaffected either way — it
+  has always come from what the dispatcher recorded, never from a calculation
+  against the fare.
+
+### Changed
+
+- The pay badge now says which kind of pay it is: `20% comm` for a rate,
+  `RM 80 flat` for a fee. A fee can no longer be displayed as a percentage.
+
 ## [0.7.0] - 2026-07-31
 
 No backend changes — everything here reads through data the dispatcher already

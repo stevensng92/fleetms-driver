@@ -51,7 +51,7 @@ const summary = (over: Partial<EarningsSummary> = {}): EarningsSummary => ({
     fare: 500,
     commission: 100,
     paymentStatus: 'unpaid',
-    specialRatePct: null,
+    specialCommission: null,
   }],
   commissionTotal: 100,
   fareTotal: 500,
@@ -109,14 +109,53 @@ describe('Earnings — row rendering', () => {
   it('shows the commission pill only on a non-standard rate', async () => {
     mockEarnings(summary({
       rows: [
-        { ...summary().rows[0], jobId: 'u1', jobNumber: 'DEV-J01', specialRatePct: 20 },
-        { ...summary().rows[0], jobId: 'u2', jobNumber: 'DEV-J02', specialRatePct: null },
+        { ...summary().rows[0], jobId: 'u1', jobNumber: 'DEV-J01', specialCommission: { kind: 'rate', pct: 20 } },
+        { ...summary().rows[0], jobId: 'u2', jobNumber: 'DEV-J02', specialCommission: null },
       ],
     }));
     await render(<Earnings/>);
 
     expect(screen.getByText('20% comm')).toBeTruthy();
     expect(screen.queryAllByText(/% comm$/)).toHaveLength(1);
+  });
+
+  it('labels a fixed-fee row as a flat fee, not a percentage', async () => {
+    // The row shows a RM 80 take-home against a RM 500 fare. Without the pill
+    // naming the mode, that reads as a shortfall against the org's ~20% cut
+    // (~RM 100) rather than as the fee that was actually agreed.
+    mockEarnings(summary({
+      rows: [{
+        ...summary().rows[0],
+        commission: 80,
+        specialCommission: { kind: 'fixed', amount: 80 },
+      }],
+    }));
+    await render(<Earnings/>);
+
+    expect(screen.getByText('RM 80 flat')).toBeTruthy();
+    expect(screen.queryAllByText(/% comm$/)).toHaveLength(0);
+  });
+
+  it('says "No fare set" rather than RM 0.00 on a fareless job', async () => {
+    // Newly reachable: a fixed fee resolves even with no fare (fleetms D1), so
+    // a real commission can now sit beside an absent fare. Coercing that to
+    // "RM 0.00 fare" reads as a bug rather than as missing data.
+    mockEarnings(summary({
+      rows: [{
+        ...summary().rows[0],
+        fare: null,
+        commission: 80,
+        specialCommission: { kind: 'fixed', amount: 80 },
+      }],
+      fareTotal: 0,
+    }));
+    await render(<Earnings/>);
+
+    expect(screen.getByText('No fare set')).toBeTruthy();
+    expect(screen.queryByText(/RM 0\.00 fare/)).toBeNull();
+    // The take-home itself is unaffected — it comes from the dispatcher's
+    // snapshot, not from any arithmetic against the missing fare.
+    expect(screen.getByText('RM 80.00')).toBeTruthy();
   });
 
   it('renders an em dash when the dispatcher has not set commission', async () => {
