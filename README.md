@@ -51,9 +51,23 @@ no badge, which meant a RM 80 flat fee on a RM 500 job looked like the org's
 `{kind:'rate'} | {kind:'fixed'}` rather than a bare percentage, so a fee cannot
 be rendered — or multiplied — as a rate; the pill reads `RM 80 flat`, and the
 detail card swaps its caption to say the fare is not what the fee comes out of.
-The app resolves ladder rungs 1, 2 and 5; the per-**driver** default rungs
-(`drivers.commission_fixed_amount` / `drivers.commission_rate`, dispatcher
-v0.30.0.0) are still unread here — see `lib/commissionRate.ts`.
+
+Since v0.9.0 the app resolves **all five rungs** of the dispatcher's commission
+ladder, including the per-driver defaults (`drivers.commission_fixed_amount`,
+`drivers.commission_rate`) it had been blind to. The consequence is what the
+badge is measured *against*: a job is compared to the **driver's** normal pay,
+not the org's. A freelancer on a 75% split no longer sees "different from your
+usual rate" on every job pinned to their own 75%, and one whose personal default
+is a flat fee now sees `RM 120 flat` on jobs that carry no job-level pricing —
+previously the app read "no override" as "pays the org rate" and showed nothing.
+Both baselines are read in one round-trip by `fetchCommissionBaseline()`
+(`lib/queries/driverProfile.ts`), shared by all three read paths so a rate can't
+be the driver's on one screen and the org's on another. The asymmetry to keep in
+mind when editing `lib/commissionRate.ts`: a **fee always surfaces** (the mode
+is what's being disclosed, and it's unusual against the fare every time), while
+a **rate surfaces only when it differs** from the baseline — or when the
+baseline is a fee, since a percentage job for a driver paid per run is genuinely
+different.
 
 v0.8.0 also lets drivers open **any previous month** on Earnings, and in doing
 so fixes the basis those totals are computed on. Periods now bucket by MY-local
@@ -177,13 +191,17 @@ lib/
   auth.ts                  PIN sign-in / sign-out / profile fetch
   devSession.ts            local-dev-only silent sign-in fallback
   semver.ts                force-update version comparator
-  commissionRate.ts        special-vs-standard pay resolution (rate OR flat fee)
-                           + "20%" / "RM 80" formatting
+  commissionRate.ts        the dispatcher's 5-rung commission ladder — what a
+                           job pays, whether that differs from the driver's own
+                           normal pay, + "20%" / "RM 80" formatting
   earningsPeriod.ts        Earnings period model + the instant range each covers
   timeFormat.ts            clock formatting (24h digits + am/pm marker)
   push.ts                  push-token registration
   queryClient.ts           React Query client
-  queries/, mutations/     per-screen data-access layer (React Query hooks)
+  queries/, mutations/     per-screen data-access layer (React Query hooks).
+                           queries/driverProfile.ts also exports
+                           fetchCommissionBaseline() — the driver's normal pay
+                           (ladder rungs 3-5), shared by the three pay surfaces
   realtime/                Supabase Realtime subscriptions (Jobs tab)
 ```
 

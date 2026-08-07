@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
+import { resolveDriverBaseline, type CommissionBasis } from '../commissionRate';
 
 // Full driver profile for the Profile screen + the Jobs tab greeting.
 // Joins drivers → organizations → default vehicle via PostgREST embeds.
@@ -79,6 +80,54 @@ export function useDriverProfile() {
     // Profile data is stable; long stale time avoids hammering on every screen mount
     staleTime: 5 * 60 * 1000,
   });
+}
+
+// The driver's normal pay — ladder rungs 3, 4, 5 — read in ONE round-trip.
+//
+// A plain async function, not a hook, because its three callers are all
+// `queryFn` bodies (Jobs list, Job Detail, Earnings) and cannot call hooks.
+// Each of them used to fetch `organizations.driver_commission_rate` on its own;
+// they now share this, so a driver's own rate can't reach one screen and miss
+// another — the exact split that had `normalizeOrgRate` guarding the value on
+// Earnings only.
+//
+// The org rate rides along on the embed rather than in a second query: the
+// `drivers` row has to be read anyway for rungs 3–4, and its organization is
+// one FK hop away. `drivers_org_id_fkey` is spelled out for the same reason as
+// above — the composite-FK ambiguity that yields PGRST201.
+//
+// Degrades to null on any failure, which reads as "we don't know what normal is
+// for this driver": fees still surface, rate badges go quiet. Losing a badge
+// beats blocking the driver's job board, and this call is deliberately NOT
+// allowed to throw into the queries that depend on it.
+//
+// Both `drivers.commission_rate` (dispatcher v0.30.0.0) and
+// `drivers.commission_fixed_amount` (v0.31.0.0) were verified present on prod
+// before this shipped. That check is not optional: PostgREST fails the ENTIRE
+// query on one unknown column, so selecting a column that hasn't been migrated
+// yet would empty every driver's job board rather than degrade.
+export async function fetchCommissionBaseline(): Promise<CommissionBasis | null> {
+  const { data, error } = await supabase
+    .from('drivers')
+    .select(`
+      commission_rate,
+      commission_fixed_amount,
+      organization:organizations!drivers_org_id_fkey ( driver_commission_rate )
+    `)
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const org = Array.isArray(data.organization)
+    ? (data.organization[0] as any)
+    : (data.organization as any);
+
+  return resolveDriverBaseline(
+    data.commission_fixed_amount == null ? null : Number(data.commission_fixed_amount),
+    data.commission_rate == null ? null : Number(data.commission_rate),
+    org?.driver_commission_rate,
+  );
 }
 
 // Derived display strings for the Profile screen.

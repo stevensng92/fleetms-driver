@@ -14,6 +14,13 @@ Job**, whose pay section (included services + commission rate) is brand new.
 Also confirm the last card isn't clipped by the sticky CTA: `AppFrame` uses
 `bottomInset={120}` while the CTA measures roughly 127px.
 
+Since v0.9.0 this check also needs a **fee-default driver** (one with
+`drivers.commission_fixed_amount` set): the pill now renders on *every* one of
+their jobs rather than occasionally, which is correct but is a density change
+no test can judge. Check the Jobs list doesn't read as noise, and that
+`CommissionRateCard`'s "Your fee for this job" caption still reads right when
+the fee came from the driver's default rather than from the job.
+
 ### Replace hardcoded `APP_BUILD` with `expo-application`
 **Priority:** P2
 Use `nativeBuildVersion` instead of hand-syncing a string constant. Removes the

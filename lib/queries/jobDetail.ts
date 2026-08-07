@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
-import { resolveSpecialCommission, normalizeOrgRate, type SpecialCommission } from '../commissionRate';
+import { resolveSpecialCommission, type SpecialCommission } from '../commissionRate';
+import { fetchCommissionBaseline } from './driverProfile';
 import type { StatusKind } from '../../components/StatusPill';
 
 // The Job Detail screen expects: trip meta, route stops, instructions, earnings,
@@ -114,17 +115,12 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
   if (jobErr) throw jobErr;
   if (!job) throw new Error('Job not found');
 
-  // Org default rate, to decide whether this job's RATE is worth surfacing.
-  // Scoped by the "drivers can see their own org" RLS policy. A failed lookup
-  // degrades to "no rate badge" (resolveSpecialCommission stays silent without
-  // a baseline) rather than failing the whole screen — and a fixed fee still
-  // surfaces, because a fee needs nothing to compare against.
-  const { data: orgRow, error: orgErr } = await supabase
-    .from('organizations')
-    .select('driver_commission_rate')
-    .limit(1)
-    .maybeSingle();
-  const orgRate = orgErr ? null : normalizeOrgRate(orgRow?.driver_commission_rate);
+  // The driver's normal pay, to decide whether this job's RATE is worth
+  // surfacing. A failed lookup degrades to "no rate badge"
+  // (resolveSpecialCommission stays silent without a baseline) rather than
+  // failing the whole screen — and a fixed fee still surfaces, because a fee
+  // needs nothing to compare against.
+  const baseline = await fetchCommissionBaseline();
 
   const assignment = (job.assignments as any[] | undefined)?.find((a: any) => a.is_current) ?? null;
   const assignedVehicle = (() => {
@@ -182,7 +178,7 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
     specialCommission: resolveSpecialCommission(
       job.commission_fixed_amount == null ? null : Number(job.commission_fixed_amount),
       job.commission_rate_override == null ? null : Number(job.commission_rate_override),
-      orgRate,
+      baseline,
     ),
     specialInstructions: job.special_instructions,
     // job_surcharges has a single FK path to jobs, so no !fkname disambiguator

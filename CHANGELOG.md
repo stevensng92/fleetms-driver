@@ -2,6 +2,47 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.0] - 2026-08-09
+
+Requires dispatcher **v0.31.0.0**, which is now live on production — verified by
+PostgREST probe on 2026-08-07 rather than assumed: `drivers.commission_rate`,
+`drivers.commission_fixed_amount` and `jobs.commission_fixed_amount` all return
+`200`, alongside a deliberately-bogus control column that correctly returns
+`42703`. Both this release and v0.8.0 before it are safe to build.
+
+### Fixed
+
+- **Drivers with their own pay arrangement saw the company's rate instead of
+  theirs.** The dispatcher can set a rate — or a flat fee — that belongs to
+  *you* rather than to the company, and the app didn't read either one. Two
+  things went wrong because of it.
+
+  If you are on your own split, say 75%, every job pinned to that same 75% was
+  flagged **different from your usual rate** — measured against the company's
+  rate, which is not what you are paid. Your normal jobs no longer carry that
+  badge; a job is only flagged when it differs from *your* normal pay.
+
+  If your own default is a flat fee — RM 120 a run — jobs that the dispatcher
+  hadn't priced individually showed nothing at all, because "no rate on this
+  job" was read as "pays the company's standard rate". You now see **RM 120
+  flat** on those jobs, the same as on jobs priced by hand. This is the same
+  silence v0.8.0 fixed one level up, where a RM 80 flat-fee job read as the
+  company's ~20% (~RM 100).
+
+- **A percentage job now shows up for drivers who are normally paid a fee.**
+  If you are usually paid per run and a job carries a percentage instead, that
+  job is flagged — it is the one case where the fee you expect does not apply,
+  and staying quiet would have read as "the usual RM 120".
+
+### Changed
+
+- The badge's comparison point moved from the company's rate to yours. Nothing
+  changes for drivers on the company default, who are the large majority: their
+  own rate *is* the company rate, so every job reads exactly as it did before.
+
+- versionCode stays at **6**. v0.8.0 was never built, so it never consumed the
+  number; confirm with `eas build:version:get` before cutting either way.
+
 ## [0.8.0] - 2026-08-09
 
 Requires dispatcher **v0.31.0.0** to already be live on production — the job

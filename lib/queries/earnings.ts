@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
-import { resolveSpecialCommission, normalizeOrgRate, type SpecialCommission } from '../commissionRate';
+import { resolveSpecialCommission, type SpecialCommission } from '../commissionRate';
+import { fetchCommissionBaseline } from './driverProfile';
 import { myMonthKey, monthKeysDesc } from '../timeFormat';
 import { periodRange, type EarningsPeriod } from '../earningsPeriod';
 
@@ -202,24 +203,20 @@ export function useDriverEarnings(period: EarningsPeriod) {
       if (since) query = query.gte('pickup_datetime', since);
       if (until) query = query.lt('pickup_datetime', until);
 
-      // Org default rate rides alongside so each row can tell "this paid my
-      // normal rate" from "this one didn't". Same pattern as queries/jobs.ts.
-      const [{ data, error, count }, orgRes] = await Promise.all([
+      // The driver's own normal pay rides alongside so each row can tell "this
+      // paid my normal rate" from "this one didn't". Same pattern as
+      // queries/jobs.ts, and the same shared reader, so a rate can no longer be
+      // the driver's on one screen and the org's on another.
+      //
+      // A failed/empty lookup is NOT fatal — resolveSpecialCommission stays
+      // silent on the rate branch without a baseline, so those rows simply
+      // render without a badge. Losing a badge beats blocking the driver's
+      // earnings.
+      const [{ data, error, count }, baseline] = await Promise.all([
         query,
-        supabase.from('organizations').select('driver_commission_rate').limit(1).maybeSingle(),
+        fetchCommissionBaseline(),
       ]);
       if (error) throw error;
-
-      // A failed/empty org lookup is NOT fatal — resolveSpecialCommission
-      // stays silent on the rate branch without a baseline, so those rows
-      // simply render without a badge. Losing a badge beats blocking the
-      // driver's earnings.
-      //
-      // The value-not-just-the-row guard that used to be inlined here now
-      // lives in normalizeOrgRate, shared with the other two read paths — it
-      // was correct only here, so the same job could badge on Earnings and not
-      // on the Jobs list. See lib/commissionRate.ts.
-      const orgRate = orgRes.error ? null : normalizeOrgRate(orgRes.data?.driver_commission_rate);
 
       const rows: EarningsRow[] = (data ?? [])
         .map((j: any) => {
@@ -237,7 +234,7 @@ export function useDriverEarnings(period: EarningsPeriod) {
             specialCommission: resolveSpecialCommission(
               j.commission_fixed_amount == null ? null : Number(j.commission_fixed_amount),
               j.commission_rate_override == null ? null : Number(j.commission_rate_override),
-              orgRate,
+              baseline,
             ),
           };
         })
