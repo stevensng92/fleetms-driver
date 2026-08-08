@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
-import { resolveSpecialCommission, normalizeOrgRate } from '../commissionRate';
+import { resolveSpecialCommission } from '../commissionRate';
+import { fetchCommissionBaseline } from './driverProfile';
 import { formatClock, formatDate, myDateKey, myStartOfDay } from '../timeFormat';
 import type { Job } from '../../components/JobCard';
 import type { StatusKind } from '../../components/StatusPill';
@@ -92,13 +93,11 @@ async function fetchJobs(): Promise<FetchedJobs> {
   // Without branch 2, a job not marked done by local midnight dropped out of
   // the list entirely and the driver could never complete it ("jobs not
   // showing after the next day").
-  // The org's default commission rate rides alongside the jobs query so each
-  // card can tell "this job pays my normal rate" from "this one doesn't". Only
-  // the percentage branch needs it — a flat fee has nothing to compare against.
-  // RLS ("drivers can see their own org") scopes this to exactly the driver's
-  // own org, and `driver_commission_rate` is granted to `authenticated`.
-  // limit(1) guards the theoretical multi-org driver rather than throwing.
-  const [{ data, error }, orgRes] = await Promise.all([
+  // The driver's own normal pay rides alongside the jobs query so each card can
+  // tell "this job pays my normal rate" from "this one doesn't". It is the
+  // DRIVER's baseline, not the org's — see lib/commissionRate.ts for why
+  // comparing a freelancer's jobs against the org rate badged every one of them.
+  const [{ data, error }, baseline] = await Promise.all([
     supabase
       .from('assignments')
       .select(`
@@ -126,17 +125,10 @@ async function fetchJobs(): Promise<FetchedJobs> {
         { foreignTable: 'jobs' },
       )
       .order('pickup_datetime', { foreignTable: 'jobs', ascending: true }),
-    supabase.from('organizations').select('driver_commission_rate').limit(1).maybeSingle(),
+    fetchCommissionBaseline(),
   ]);
 
   if (error) throw error;
-
-  // A failed/empty org lookup is NOT fatal — resolveSpecialCommission stays
-  // silent on the rate branch without a default to compare against, so those
-  // jobs simply render without a badge. Losing a badge beats blocking the
-  // driver's job list. normalizeOrgRate also rejects a 0 baseline; see there
-  // for why Number(null) === 0 makes that necessary.
-  const orgRate = orgRes.error ? null : normalizeOrgRate(orgRes.data?.driver_commission_rate);
 
   type Row = {
     assignment_id: string;
@@ -182,12 +174,12 @@ async function fetchJobs(): Promise<FetchedJobs> {
     pax: r.job.pax ?? 0,
     status: mapStatus(r.job.status),
     // null unless this job pays something other than the driver's normal cut —
-    // a rate override pinned to the default is not "special", but a flat fee
-    // always is.
+    // a rate override pinned to the driver's own rate is not "special", but a
+    // flat fee always is, including the driver's own standing fee.
     specialCommission: resolveSpecialCommission(
       r.job.commission_fixed_amount == null ? null : Number(r.job.commission_fixed_amount),
       r.job.commission_rate_override == null ? null : Number(r.job.commission_rate_override),
-      orgRate,
+      baseline,
     ),
   });
 
