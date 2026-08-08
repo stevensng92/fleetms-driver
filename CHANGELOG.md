@@ -2,14 +2,34 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.8.0] - 2026-08-07
+## [0.8.0] - 2026-08-09
 
 Requires dispatcher **v0.31.0.0** to already be live on production — the job
 queries now name `jobs.commission_fixed_amount`, and PostgREST rejects the whole
 query if that column doesn't exist, which would empty the job board. Confirm the
 migration has landed before building this.
 
+### Added
+
+- **You can now open any previous month in Earnings.** The period selector used
+  to offer only *This Week*, *This Month* and *All Time*, so there was no way to
+  look back at what a finished month paid. It now lists every month you've had
+  work in, newest first, and scrolls sideways. Months you didn't work still
+  appear and simply show no jobs.
+
 ### Fixed
+
+- **Earnings months now match your payslip.** Earnings used to count a job in
+  the month you *marked it done*, while the office pays you based on the month
+  the job *ran*. For most jobs those are the same day, so it never showed — but
+  for a job that ran late in the month and got closed a day or two later, the
+  two disagree. Looking back at July, one driver's app total would have read
+  RM 3,346.90 against a payslip of RM 2,353.00. Every period now counts jobs the
+  same way the office does, so what you see is what you're paid.
+
+  **Your This Week and This Month totals may look slightly different** as a
+  result, and the recent-jobs list now shows each job's own date rather than
+  when it was closed. The new figures are the ones that match your payout.
 
 - **Jobs paid a flat fee showed no pay information at all.** The dispatcher can
   now agree a fixed fee for a job at booking time — RM 80 for the run — instead

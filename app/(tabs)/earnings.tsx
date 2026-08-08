@@ -7,17 +7,42 @@ import { Card } from '../../components/Card';
 import { StatusPill } from '../../components/StatusPill';
 import { CommissionPill } from '../../components/CommissionPill';
 import { useTokens } from '../../theme/ThemeProvider';
-import { useDriverEarnings, ROW_LIMIT, type EarningsPeriod, type EarningsRow, type EarningsPaymentStatus } from '../../lib/queries/earnings';
+import {
+  useDriverEarnings, useEarningsMonths, ROW_LIMIT,
+  type EarningsRow, type EarningsPaymentStatus,
+} from '../../lib/queries/earnings';
+import { monthPeriod, monthKeyOf, type EarningsPeriod } from '../../lib/earningsPeriod';
 import { useDriverProfile } from '../../lib/queries/driverProfile';
-import { formatDate } from '../../lib/timeFormat';
+import { formatDate, formatMonthKey, formatMonthKeyChip } from '../../lib/timeFormat';
 
 const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
 
-const PERIOD_LABEL: Record<EarningsPeriod, { tab: string; headline: string }> = {
-  week:  { tab: 'This Week',  headline: 'This week' },
-  month: { tab: 'This Month', headline: 'This month' },
-  all:   { tab: 'All Time',   headline: 'All time' },
-};
+/** Chip label — what the driver taps. */
+function periodTab(p: EarningsPeriod): string {
+  if (p === 'week')  return 'This Week';
+  if (p === 'month') return 'This Month';
+  if (p === 'all')   return 'All Time';
+  return formatMonthKeyChip(monthKeyOf(p)!);
+}
+
+/** Card heading — the period named in full, since there's room for it here. */
+function periodHeadline(p: EarningsPeriod): string {
+  if (p === 'week')  return 'This week';
+  if (p === 'month') return 'This month';
+  if (p === 'all')   return 'All time';
+  return formatMonthKey(monthKeyOf(p)!, { long: true });
+}
+
+/**
+ * "No completed jobs in July 2026" — built as one sentence rather than by
+ * lowercasing the headline, which turned month names into "july 2026".
+ */
+function emptyStateText(p: EarningsPeriod): string {
+  if (p === 'all')   return 'No completed jobs yet.';
+  if (p === 'week')  return 'No completed jobs this week.';
+  if (p === 'month') return 'No completed jobs this month.';
+  return `No completed jobs in ${periodHeadline(p)}.`;
+}
 
 // Map paymentStatus to a StatusPill kind. Driver-facing rule: a 'paid' job is
 // shown as 'done' (green pill); everything else surfaces as 'pending' (amber).
@@ -45,6 +70,18 @@ export default function Earnings() {
   const [period, setPeriod] = useState<EarningsPeriod>('month');
   const { data: profile } = useDriverProfile();
   const { data, isLoading, isError, error, refetch, isRefetching } = useDriverEarnings(period);
+  const { data: pastMonths } = useEarningsMonths();
+
+  // This Week / This Month first (the everyday questions), then each past month
+  // newest-first, then All Time as the backstop. A month strip that failed to
+  // load simply doesn't render its chips — the three fixed periods still work,
+  // which matters because this list is a nicety and they are the screen.
+  const periods: EarningsPeriod[] = [
+    'week',
+    'month',
+    ...(pastMonths ?? []).map(monthPeriod),
+    'all',
+  ];
 
   const commissionTotal = data?.commissionTotal ?? 0;
   const fareTotal       = data?.fareTotal ?? 0;
@@ -62,35 +99,55 @@ export default function Earnings() {
         }
         contentContainerStyle={{ paddingBottom: 24 }}
       >
-        {/* Period tabs */}
-        <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
+        {/* Period selector.
+            Was three equal-width tabs; a driver with a year of history needs
+            fifteen options, so it scrolls horizontally with content-width chips
+            instead of dividing a phone's width N ways. The selected-chip
+            treatment (raised track, surface-coloured active chip) is unchanged,
+            so the control still reads as the same thing it was. */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          // The track is the scrolling element, so its padding lives on the
+          // content container — putting it on the ScrollView itself clips the
+          // first and last chips instead of insetting them.
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 14, gap: 0 }}
+        >
           <View style={{
             flexDirection: 'row', backgroundColor: T.raised,
-            borderRadius: 8, padding: 4,
+            borderRadius: 8, padding: 4, gap: 2,
           }}>
-            {(['week', 'month', 'all'] as const).map(p => {
+            {periods.map(p => {
               const sel = p === period;
               return (
                 <Pressable
                   key={p}
                   onPress={() => setPeriod(p)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: sel }}
+                  // Named in full for screen readers — "Jul" alone doesn't say
+                  // it's a period, or which year.
+                  accessibilityLabel={periodHeadline(p)}
                   style={{
-                    flex: 1, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 6,
-                    alignItems: 'center',
+                    paddingVertical: 10, paddingHorizontal: 14, borderRadius: 6,
+                    alignItems: 'center', minWidth: 64,
                     backgroundColor: sel ? T.surface : 'transparent',
                   }}
                 >
-                  <Text style={{
-                    fontSize: 13, fontWeight: sel ? '700' : '500',
-                    color: sel ? T.text : T.muted,
-                  }}>
-                    {PERIOD_LABEL[p].tab}
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontSize: 13, fontWeight: sel ? '700' : '500',
+                      color: sel ? T.text : T.muted,
+                    }}
+                  >
+                    {periodTab(p)}
                   </Text>
                 </Pressable>
               );
             })}
           </View>
-        </View>
+        </ScrollView>
 
         {/* Summary */}
         <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
@@ -98,7 +155,7 @@ export default function Earnings() {
             <Text style={{
               fontSize: 12, color: T.muted, fontWeight: '700',
               letterSpacing: 0.4, textTransform: 'uppercase',
-            }}>{PERIOD_LABEL[period].headline}</Text>
+            }}>{periodHeadline(period)}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
               {isLoading ? (
                 <ActivityIndicator color={T.muted} style={{ marginTop: 12 }}/>
@@ -193,7 +250,7 @@ export default function Earnings() {
         {!isError && !isLoading && (data?.rows ?? []).length === 0 && (
           <Card style={{ marginHorizontal: 16, paddingHorizontal: 16, paddingVertical: 22, alignItems: 'center' }}>
             <Text style={{ fontSize: 14, color: T.muted, textAlign: 'center' }}>
-              No completed jobs {period === 'all' ? 'yet' : `in ${PERIOD_LABEL[period].headline.toLowerCase()}`}.
+              {emptyStateText(period)}
             </Text>
           </Card>
         )}
@@ -239,7 +296,7 @@ function EarningsRowItem({ row, isLast }: { row: EarningsRow; isLast: boolean })
           fontSize: 14, fontWeight: '700', color: T.text,
           fontFamily: MONO, letterSpacing: 0.2,
         }}>{row.jobNumber}</Text>
-        <Text style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{formatRowDate(row.completedAt)}</Text>
+        <Text style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{formatRowDate(row.jobDate)}</Text>
         {/* Only the handful of jobs that paid a non-standard rate get this —
             it's the answer to "why is my cut different on this one?". On a
             fixed-fee row it also explains a take-home that bears no relation to

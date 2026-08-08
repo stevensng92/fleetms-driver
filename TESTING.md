@@ -133,9 +133,26 @@ screen tests in `__tests__/screens/` at the repo root.
 - New error path → a test that triggers the error.
 - Never commit code that makes existing tests fail.
 
+## Keep pure decisions out of query modules
+
+Anything under `lib/queries/` imports `lib/supabase.ts`, which constructs a live
+client at import time. A test that only wants to check date arithmetic then has
+to stand up a network client to do it.
+
+So when a query module grows a real decision — a date range, a rule, a
+comparison — put it in its own module beside the query and import it back in.
+`lib/earningsPeriod.ts` was split out of `lib/queries/earnings.ts` on exactly
+this basis, and the period boundaries went from untestable to 18 tests that run
+in a millisecond with no mocks. `lib/commissionRate.ts` and `lib/semver.ts`
+follow the same shape.
+
+The screen test proves the payoff: `__tests__/screens/earnings.test.tsx` mocks
+`lib/queries/earnings` but uses the REAL `lib/earningsPeriod`, so it asserts
+against genuine period values rather than a mock's idea of them.
+
 ## Not covered yet
 
-Screens (`app/`), the React Query data hooks (`lib/queries/`, `lib/mutations/`),
-realtime subscriptions, and auth. These need Supabase mocking and a query-client
-wrapper. The commission-rate and time-format helpers were done first because
-they carry real logic and need no mocking at all.
+The screens other than Earnings, the React Query data hooks (`lib/queries/`,
+`lib/mutations/`), realtime subscriptions, and auth. These need Supabase mocking
+and a query-client wrapper. The commission-rate, earnings-period and time-format
+helpers were done first because they carry real logic and need no mocking at all.

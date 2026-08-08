@@ -1,13 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
 import { resolveSpecialCommission, normalizeOrgRate, type SpecialCommission } from '../commissionRate';
-import { myStartOfDay, myStartOfMonth } from '../timeFormat';
+import { myMonthKey, monthKeysDesc } from '../timeFormat';
+import { periodRange, type EarningsPeriod } from '../earningsPeriod';
 
-// Driver Earnings — driver's own completed jobs, scoped via RLS
-// (private.is_driver_self on assignments → flow through jobs INNER JOIN).
+// The period type and its date arithmetic live in ../earningsPeriod so they can
+// be tested without standing up a Supabase client. Re-exported here so callers
+// that already import the hooks don't need a second import path.
+export {
+  monthPeriod, monthKeyOf, periodRange,
+  type EarningsPeriod, type EarningsMonthPeriod,
+} from '../earningsPeriod';
+
+// Driver Earnings — driver's own completed jobs, scoped via RLS.
 //
 // What's displayed:
-//   - Period selector: This Week / This Month / All Time (client-side filter)
+//   - Period selector: This Week / This Month / each past month / All Time
 //   - Headline RM total = sum of jobs.commission_amount (driver's take-home)
 //   - Fare total shown as supporting context (sum of jobs.amount)
 //   - Jobs count, Pending count, Avg commission per job
@@ -16,16 +24,48 @@ import { myStartOfDay, myStartOfMonth } from '../timeFormat';
 // Why commission-led: matches the industry norm (Grab/Uber/Bolt all show
 // driver take-home as the headline, not the fare). Drivers care about what
 // they're getting paid; fare is supporting info for price verification.
+//
+// PERIODS ARE BUCKETED BY MY-LOCAL PICKUP DATE, NOT COMPLETION TIME.
+//
+// This is the single most load-bearing decision in the file, and it changed in
+// v0.8.0. The screen used to filter on `assignments.completed_at`, while the
+// dispatcher's `create_driver_payout` aggregates over `done` jobs whose
+// MY-local PICKUP date falls in the period. Those disagree whenever a job is
+// marked done on a different day than it ran — which on prod was 185 of 671
+// completed jobs, and 37 of them landed in a different MONTH. In July 2026 the
+// two bases differed by RM 1,429 fleet-wide, ~12% of the month.
+//
+// That gap was survivable while "This month" was a moving window nobody
+// reconciled. It stopped being survivable the moment drivers could open a
+// finished month and compare it against the payslip they were actually paid —
+// which is the entire point of the past-month selector. A screen a driver uses
+// to check they were paid correctly has to bucket money the same way the payer
+// does, so the two now agree by construction.
+//
+// Consequence to expect: This Week / This Month totals moved for drivers who
+// close jobs late. The new numbers are the correct ones; someone may still
+// report the change as a regression, exactly as the v0.7.0 expense-date fix did.
+//
+// Two other divergences from `create_driver_payout` were measured and are NOT
+// bugs today, but would become ones if the data changed:
+//   - the payout attributes money via `jobs.commission_driver_id` (snapshotted
+//     at done, immutable) while this screen attributes via the driver's CURRENT
+//     assignment. 0 of 672 done jobs disagree on prod.
+//   - the payout has no completion requirement at all. 0 done jobs lack a
+//     completed_at on prod, and this query no longer requires one either.
+// Both were re-checked 2026-08-09.
 
-export type EarningsPeriod = 'week' | 'month' | 'all';
 
 export type EarningsPaymentStatus = 'paid' | 'unpaid' | 'waived' | 'refunded';
 
 export type EarningsRow = {
   jobId: string;
   jobNumber: string;
-  completedAt: string;       // ISO — date of completion (assignments.completed_at)
-                              // falls back to pickup_datetime if no completion
+  /** ISO — the job's PICKUP instant, which is both the date shown on the row
+   *  and the date that decided which period the row falls in. Those must be the
+   *  same field: showing a completion date under a month heading the pickup
+   *  date chose is how a July row ends up displaying an August date. */
+  jobDate: string;
   /** RM, jobs.amount (what the client paid the company). Null when the job has
    *  no fare — which a FIXED-FEE job legitimately can (fleetms decision D1: a
    *  fee resolves whatever the fare). This used to coerce to 0, which was
@@ -79,45 +119,88 @@ export type EarningsSummary = {
  *  `truncated` and the banner it drives. */
 export const ROW_LIMIT = 200;
 
-// Boundaries are pinned to Malaysia, matching lib/timeFormat.ts. These used to
-// use setHours(0,0,0,0) and new Date(y, m, 1), both device-local — so a phone
-// outside MY selected a different window than the dates rendered beside it. The
-// month case was the worst: on a UTC-negative device the local month can still
-// be the previous one, so "This month" silently covered an extra month.
-function periodStartIso(p: EarningsPeriod, now = new Date()): string | null {
-  if (p === 'all') return null;
-  // Last 7 days INCLUSIVE — Sunday-start would diverge across locales, so
-  // anchor at "start of the MY day 6 days ago".
-  if (p === 'week') return myStartOfDay(now, -6).toISOString();
-  return myStartOfMonth(now).toISOString();
+/**
+ * The past months this driver actually has completed work in, newest first and
+ * EXCLUDING the current month (the "This month" chip already covers it).
+ *
+ * Derived from one row — the driver's earliest completed job — rather than by
+ * fetching distinct months, because PostgREST has no DISTINCT and the
+ * alternative is pulling every job just to reduce it to a handful of strings.
+ *
+ * Deriving the range instead of listing real months means a month the driver
+ * didn't work still gets a chip, landing on the existing empty state. That is
+ * the right trade: a gap in the strip is honest ("you had no jobs in June"),
+ * whereas a fixed 12-month lookback would offer months from before the driver
+ * joined, and a distinct-month query costs the whole table to avoid it.
+ */
+export function useEarningsMonths() {
+  return useQuery({
+    queryKey: ['driver-earnings-months'],
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('pickup_datetime, assignments!assignments_job_id_fkey!inner ( is_current )')
+        .eq('status', 'done')
+        .eq('assignments.is_current', true)
+        .order('pickup_datetime', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data?.pickup_datetime) return [];
+
+      const earliest = myMonthKey(data.pickup_datetime as string);
+      const current = myMonthKey();
+      // Drop the current month — "This month" is its own chip, and offering it
+      // twice under two different labels invites "why do these disagree?".
+      return monthKeysDesc(earliest, current).filter(k => k !== current);
+    },
+    // The answer only changes when a driver crosses a month boundary or logs
+    // their very first job, so this need not be fresh.
+    staleTime: 60 * 60 * 1000,
+  });
 }
 
 export function useDriverEarnings(period: EarningsPeriod) {
   return useQuery({
     queryKey: ['driver-earnings', period],
     queryFn: async (): Promise<EarningsSummary> => {
-      const since = periodStartIso(period);
+      const { since, until } = periodRange(period);
 
-      // Pull all completed assignments for the driver, joined with the job
-      // for the actual fare + payment status. RLS narrows to this driver only.
+      // Reads FROM `jobs`, not from `assignments` as it used to.
+      //
+      // The period filter and the sort both key on `jobs.pickup_datetime`, and
+      // PostgREST can only apply those natively to the table being selected
+      // from. Ordering through an embed (`{ referencedTable: 'job' }`) sorts the
+      // EMBEDDED rows, not the parent ones — on a to-one embed that is a no-op,
+      // so the `.limit(ROW_LIMIT)` below would have kept an arbitrary 200 jobs
+      // rather than the 200 most recent. Silent, and exactly wrong on the
+      // screen where truncation already needs a banner to be honest.
+      //
+      // Still scoped to this driver, by two independent gates: `jobs` carries a
+      // driver SELECT policy (`private.is_assigned_driver_for_job`), and the
+      // INNER embed on `assignments` is itself filtered by that table's
+      // `private.is_driver_self` policy — so the join can only match the
+      // caller's own current assignment.
+      //
+      // `status = 'done'` moved into the query. It was a client-side skip,
+      // which meant non-done rows consumed ROW_LIMIT slots before being thrown
+      // away, and made `count` answer a different question than the rows did.
       let query = supabase
-        .from('assignments')
+        .from('jobs')
         .select(`
-          completed_at,
-          job:jobs!assignments_job_id_fkey (
-            id, job_number, amount, commission_amount, payment_status,
-            pickup_datetime, status,
-            commission_rate_override, commission_fixed_amount
-          )
+          id, job_number, amount, commission_amount, payment_status,
+          pickup_datetime, status,
+          commission_rate_override, commission_fixed_amount,
+          assignments!assignments_job_id_fkey!inner ( is_current )
         `, { count: 'exact' })
-        .eq('is_current', true)
-        .not('completed_at', 'is', null)
-        .order('completed_at', { ascending: false })
+        .eq('status', 'done')
+        .eq('assignments.is_current', true)
+        .order('pickup_datetime', { ascending: false })
         .limit(ROW_LIMIT);
 
-      if (since) {
-        query = query.gte('completed_at', since);
-      }
+      if (since) query = query.gte('pickup_datetime', since);
+      if (until) query = query.lt('pickup_datetime', until);
 
       // Org default rate rides alongside so each row can tell "this paid my
       // normal rate" from "this one didn't". Same pattern as queries/jobs.ts.
@@ -139,17 +222,15 @@ export function useDriverEarnings(period: EarningsPeriod) {
       const orgRate = orgRes.error ? null : normalizeOrgRate(orgRes.data?.driver_commission_rate);
 
       const rows: EarningsRow[] = (data ?? [])
-        .map((r: any) => {
-          // job may be array-shaped or object-shaped depending on PostgREST
-          // resource resolution; normalise.
-          const j = Array.isArray(r.job) ? r.job[0] : r.job;
+        .map((j: any) => {
           if (!j) return null;
-          // Skip non-done jobs even if assignment is completed — defensive
+          // Belt-and-braces: the query already filters status, so this can only
+          // fire if that filter is ever dropped.
           if (j.status !== 'done') return null;
           return {
             jobId:         j.id as string,
             jobNumber:     j.job_number as string,
-            completedAt:   (r.completed_at as string) ?? (j.pickup_datetime as string),
+            jobDate:       j.pickup_datetime as string,
             fare:          j.amount == null ? null : Number(j.amount),
             commission:    j.commission_amount == null ? null : Number(j.commission_amount),
             paymentStatus: (j.payment_status as EarningsPaymentStatus) ?? 'unpaid',

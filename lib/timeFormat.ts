@@ -143,6 +143,83 @@ export function myMonthStartKey(value: string | Date = new Date(), monthOffset =
   return `${anchor.getUTCFullYear()}-${pad2(anchor.getUTCMonth() + 1)}-01`;
 }
 
+/** "2026-08" — the Malaysian month containing `value`. */
+export function myMonthKey(value: string | Date = new Date()): string {
+  const my = toMyParts(value);
+  if (!my) return '—';
+  return `${my.getUTCFullYear()}-${pad2(my.getUTCMonth() + 1)}`;
+}
+
+/**
+ * "July 2026" / "Jul 2026" from a "2026-07" key.
+ *
+ * Formats the STRING directly for the same reason formatDateKey does — a month
+ * key names a calendar month, which has no instant to apply a timezone to.
+ */
+export function formatMonthKey(key: string, opts: { long?: boolean } = {}): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(key);
+  if (!m) return '—';
+  const monthIdx = Number(m[2]) - 1;
+  if (monthIdx < 0 || monthIdx > 11) return '—';
+  return `${(opts.long ? MONTHS_LONG : MONTHS)[monthIdx]} ${m[1]}`;
+}
+
+/**
+ * "Jul" inside the current Malaysian year, "Jul 2025" outside it — the label
+ * for a month chip, where horizontal room is the scarce thing.
+ *
+ * The year is dropped only when it cannot be ambiguous. A bare "Jul" sitting
+ * beside "Jun" and "May" in December reads as this year's July, and if the list
+ * has reached back past January that is wrong.
+ */
+export function formatMonthKeyChip(key: string, now: string | Date = new Date()): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(key);
+  if (!m) return '—';
+  const monthIdx = Number(m[2]) - 1;
+  if (monthIdx < 0 || monthIdx > 11) return '—';
+  const thisYear = myMonthKey(now).slice(0, 4);
+  return m[1] === thisYear ? MONTHS[monthIdx] : `${MONTHS[monthIdx]} ${m[1]}`;
+}
+
+/**
+ * The INSTANT at which the Malaysian month named by a "YYYY-MM" key begins,
+ * shifted by `monthOffset`. Pass 1 for the exclusive upper bound of that month.
+ *
+ * Returns an Invalid Date on a malformed key rather than guessing — callers
+ * building a query range must not silently get "the epoch" and select
+ * everything ever.
+ */
+export function myStartOfMonthKey(key: string, monthOffset = 0): Date {
+  const m = /^(\d{4})-(\d{2})$/.exec(key);
+  if (!m) return new Date(NaN);
+  const monthIdx = Number(m[2]) - 1;
+  if (monthIdx < 0 || monthIdx > 11) return new Date(NaN);
+  // Month arithmetic via Date.UTC so December + 1 rolls the year correctly.
+  const utcMonthStartMy = Date.UTC(Number(m[1]), monthIdx + monthOffset, 1);
+  return new Date(utcMonthStartMy - MY_UTC_OFFSET_MIN * 60_000);
+}
+
+/**
+ * Month keys from `toKey` back to `fromKey`, inclusive, NEWEST FIRST.
+ *
+ * `cap` bounds the list so a single bad/ancient row can't render a thousand
+ * chips. Returns [] when either key is malformed or the range runs backwards.
+ */
+export function monthKeysDesc(fromKey: string, toKey: string, cap = 24): string[] {
+  const from = /^(\d{4})-(\d{2})$/.exec(fromKey);
+  const to = /^(\d{4})-(\d{2})$/.exec(toKey);
+  if (!from || !to) return [];
+  const fromIdx = Number(from[1]) * 12 + (Number(from[2]) - 1);
+  const toIdx = Number(to[1]) * 12 + (Number(to[2]) - 1);
+  if (!Number.isFinite(fromIdx) || !Number.isFinite(toIdx) || toIdx < fromIdx) return [];
+
+  const out: string[] = [];
+  for (let i = toIdx; i >= fromIdx && out.length < cap; i--) {
+    out.push(`${Math.floor(i / 12)}-${pad2((i % 12) + 1)}`);
+  }
+  return out;
+}
+
 /**
  * The INSTANT at which a Malaysian calendar day begins, offset by `dayOffset`
  * days. Use for range boundaries against a timestamptz column.
