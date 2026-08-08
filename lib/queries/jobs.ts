@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
-import { resolveSpecialRate } from '../commissionRate';
+import { resolveSpecialCommission, normalizeOrgRate } from '../commissionRate';
 import { formatClock, formatDate, myDateKey, myStartOfDay } from '../timeFormat';
 import type { Job } from '../../components/JobCard';
 import type { StatusKind } from '../../components/StatusPill';
@@ -93,7 +93,8 @@ async function fetchJobs(): Promise<FetchedJobs> {
   // the list entirely and the driver could never complete it ("jobs not
   // showing after the next day").
   // The org's default commission rate rides alongside the jobs query so each
-  // card can tell "this job pays my normal rate" from "this one doesn't".
+  // card can tell "this job pays my normal rate" from "this one doesn't". Only
+  // the percentage branch needs it — a flat fee has nothing to compare against.
   // RLS ("drivers can see their own org") scopes this to exactly the driver's
   // own org, and `driver_commission_rate` is granted to `authenticated`.
   // limit(1) guards the theoretical multi-org driver rather than throwing.
@@ -114,7 +115,8 @@ async function fetchJobs(): Promise<FetchedJobs> {
           client_name,
           pax,
           status,
-          commission_rate_override
+          commission_rate_override,
+          commission_fixed_amount
         )
       `)
       .eq('is_current', true)
@@ -129,12 +131,12 @@ async function fetchJobs(): Promise<FetchedJobs> {
 
   if (error) throw error;
 
-  // A failed/empty org lookup is NOT fatal — resolveSpecialRate returns null
-  // without a default to compare against, so every job simply renders without
-  // a rate badge. Losing a badge beats blocking the driver's job list.
-  const orgRate = orgRes.error || !orgRes.data
-    ? null
-    : Number(orgRes.data.driver_commission_rate);
+  // A failed/empty org lookup is NOT fatal — resolveSpecialCommission stays
+  // silent on the rate branch without a default to compare against, so those
+  // jobs simply render without a badge. Losing a badge beats blocking the
+  // driver's job list. normalizeOrgRate also rejects a 0 baseline; see there
+  // for why Number(null) === 0 makes that necessary.
+  const orgRate = orgRes.error ? null : normalizeOrgRate(orgRes.data?.driver_commission_rate);
 
   type Row = {
     assignment_id: string;
@@ -149,6 +151,7 @@ async function fetchJobs(): Promise<FetchedJobs> {
       pax: number | null;
       status: string;
       commission_rate_override: number | null;
+      commission_fixed_amount: number | null;
     };
   };
 
@@ -178,10 +181,12 @@ async function fetchJobs(): Promise<FetchedJobs> {
     client: r.job.client_name,
     pax: r.job.pax ?? 0,
     status: mapStatus(r.job.status),
-    // null unless this job's rate actually differs from the driver's normal
-    // one — an override pinned to the default rate is not "special".
-    specialRatePct: resolveSpecialRate(
-      r.job.commission_rate_override === null ? null : Number(r.job.commission_rate_override),
+    // null unless this job pays something other than the driver's normal cut —
+    // a rate override pinned to the default is not "special", but a flat fee
+    // always is.
+    specialCommission: resolveSpecialCommission(
+      r.job.commission_fixed_amount == null ? null : Number(r.job.commission_fixed_amount),
+      r.job.commission_rate_override == null ? null : Number(r.job.commission_rate_override),
       orgRate,
     ),
   });

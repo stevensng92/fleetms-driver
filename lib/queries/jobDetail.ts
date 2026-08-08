@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
-import { resolveSpecialRate } from '../commissionRate';
+import { resolveSpecialCommission, normalizeOrgRate, type SpecialCommission } from '../commissionRate';
 import type { StatusKind } from '../../components/StatusPill';
 
 // The Job Detail screen expects: trip meta, route stops, instructions, earnings,
@@ -50,11 +50,11 @@ export type JobDetail = {
   vehiclePlate: string | null;
   vehicleModel: string | null;
   amount: number | null;
-  /** Commission rate for this job when it differs from the driver's normal org
-   *  rate (e.g. 20 → "20% comm"). null = standard rate, nothing to show.
-   *  See lib/commissionRate.ts — an override pinned to the org default is not
-   *  treated as special. */
-  specialRatePct: number | null;
+  /** What this job pays when it isn't the driver's normal cut — either a rate
+   *  (20 → "20% comm") or a flat fee (80 → "RM 80 flat"). null = standard rate,
+   *  nothing to show. See lib/commissionRate.ts — a rate override pinned to the
+   *  org default is not treated as special, but a fee always is. */
+  specialCommission: SpecialCommission | null;
   specialInstructions: string | null;
   /** Spec #215 — surcharges attached by the dispatcher. These are services
    *  the driver performs (Overnight, Paging, Accommodation) and money they
@@ -97,7 +97,8 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
       pickup_datetime, pickup_location, pickup_detail, pickup_lat, pickup_lng,
       dropoff_location, dropoff_detail, dropoff_lat, dropoff_lng,
       client_name, passenger_name, passenger_phone,
-      pax, vehicle_type_required, amount, commission_rate_override, special_instructions,
+      pax, vehicle_type_required, amount,
+      commission_rate_override, commission_fixed_amount, special_instructions,
       assignments!assignments_job_id_fkey!inner (
         id, is_current,
         vehicle:vehicles!assignments_vehicle_id_fkey ( plate_number, type, model )
@@ -113,16 +114,17 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
   if (jobErr) throw jobErr;
   if (!job) throw new Error('Job not found');
 
-  // Org default rate, to decide whether this job's rate is worth surfacing.
+  // Org default rate, to decide whether this job's RATE is worth surfacing.
   // Scoped by the "drivers can see their own org" RLS policy. A failed lookup
-  // degrades to "no badge" (resolveSpecialRate returns null without a
-  // baseline) rather than failing the whole screen.
+  // degrades to "no rate badge" (resolveSpecialCommission stays silent without
+  // a baseline) rather than failing the whole screen — and a fixed fee still
+  // surfaces, because a fee needs nothing to compare against.
   const { data: orgRow, error: orgErr } = await supabase
     .from('organizations')
     .select('driver_commission_rate')
     .limit(1)
     .maybeSingle();
-  const orgRate = orgErr || !orgRow ? null : Number(orgRow.driver_commission_rate);
+  const orgRate = orgErr ? null : normalizeOrgRate(orgRow?.driver_commission_rate);
 
   const assignment = (job.assignments as any[] | undefined)?.find((a: any) => a.is_current) ?? null;
   const assignedVehicle = (() => {
@@ -177,8 +179,9 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
     vehiclePlate: assignedVehicle?.plate ?? null,
     vehicleModel: assignedVehicle?.model ?? null,
     amount: job.amount === null ? null : Number(job.amount),
-    specialRatePct: resolveSpecialRate(
-      job.commission_rate_override === null ? null : Number(job.commission_rate_override),
+    specialCommission: resolveSpecialCommission(
+      job.commission_fixed_amount == null ? null : Number(job.commission_fixed_amount),
+      job.commission_rate_override == null ? null : Number(job.commission_rate_override),
       orgRate,
     ),
     specialInstructions: job.special_instructions,

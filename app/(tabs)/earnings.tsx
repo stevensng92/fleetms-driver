@@ -241,8 +241,10 @@ function EarningsRowItem({ row, isLast }: { row: EarningsRow; isLast: boolean })
         }}>{row.jobNumber}</Text>
         <Text style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{formatRowDate(row.completedAt)}</Text>
         {/* Only the handful of jobs that paid a non-standard rate get this —
-            it's the answer to "why is my cut different on this one?". */}
-        <CommissionPill pct={row.specialRatePct} style={{ marginTop: 5 }}/>
+            it's the answer to "why is my cut different on this one?". On a
+            fixed-fee row it also explains a take-home that bears no relation to
+            the fare printed beside it. */}
+        <CommissionPill commission={row.specialCommission} style={{ marginTop: 5 }}/>
       </View>
       <View style={{ alignItems: 'flex-end', minWidth: 96 }}>
         <Text style={{
@@ -250,8 +252,10 @@ function EarningsRowItem({ row, isLast }: { row: EarningsRow; isLast: boolean })
           color: row.commission == null ? T.muted : T.text,
           letterSpacing: -0.3,
         }}>{commissionLabel}</Text>
+        {/* A fixed-fee job can have no fare at all, and "RM 0.00 fare" beside a
+            real commission reads as a bug rather than as an absent figure. */}
         <Text style={{ fontSize: 11, color: T.mutedLight, marginTop: 2 }}>
-          RM {row.fare.toFixed(2)} fare
+          {row.fare == null ? 'No fare set' : `RM ${row.fare.toFixed(2)} fare`}
         </Text>
       </View>
       <StatusPill kind={pillKindFor(row.paymentStatus)}/>

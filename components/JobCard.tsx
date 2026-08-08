@@ -6,6 +6,7 @@ import { Button } from './Button';
 import { Icon } from './Icon';
 import { CommissionPill } from './CommissionPill';
 import { useTokens } from '../theme/ThemeProvider';
+import type { SpecialCommission } from '../lib/commissionRate';
 
 export type Job = {
   /** Human-readable identifier from jobs.job_number, shown on cards. */
@@ -23,11 +24,11 @@ export type Job = {
   client: string;
   pax: number;
   status: StatusKind;
-  /** Commission rate for this job when it differs from the driver's normal
-   *  org rate (e.g. 20 → "20% comm"). null = pays the standard rate, so no
-   *  badge renders. Resolved in lib/commissionRate.ts — an override pinned to
-   *  the default rate is deliberately NOT special. */
-  specialRatePct?: number | null;
+  /** What this job pays when it isn't the driver's normal cut — a rate
+   *  (20 → "20% comm") or a flat fee (80 → "RM 80 flat"). null = pays the
+   *  standard rate, so no badge renders. Resolved in lib/commissionRate.ts —
+   *  a rate override pinned to the default is deliberately NOT special. */
+  specialCommission?: SpecialCommission | null;
 };
 
 const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
@@ -123,11 +124,11 @@ export function JobCard({
             </Text>
           </View>
 
-          {/* Non-default commission rate. Its own row rather than another chip
-              in the crowded meta line above — it only appears on the handful of
-              jobs that carry one, and a pay figure shouldn't be the thing that
-              gets truncated on a narrow phone. */}
-          <CommissionPill pct={job.specialRatePct} style={{ marginTop: 6 }}/>
+          {/* Non-default pay. Its own row rather than another chip in the
+              crowded meta line above — it only appears on the handful of jobs
+              that carry one, and a pay figure shouldn't be the thing that gets
+              truncated on a narrow phone. */}
+          <CommissionPill commission={job.specialCommission} style={{ marginTop: 6 }}/>
         </View>
       </View>
 
