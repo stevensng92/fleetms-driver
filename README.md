@@ -55,6 +55,16 @@ The app resolves ladder rungs 1, 2 and 5; the per-**driver** default rungs
 (`drivers.commission_fixed_amount` / `drivers.commission_rate`, dispatcher
 v0.30.0.0) are still unread here — see `lib/commissionRate.ts`.
 
+v0.8.0 also lets drivers open **any previous month** on Earnings, and in doing
+so fixes the basis those totals are computed on. Periods now bucket by MY-local
+**pickup date**, matching `create_driver_payout`; they previously bucketed by
+`assignments.completed_at`, which disagreed on any job closed on a different day
+than it ran. On prod that was 37 of 671 completed jobs landing in a different
+month — one driver's July would have read RM 3,346.90 against a RM 2,353.00
+payslip. The period model and its boundary arithmetic live in
+`lib/earningsPeriod.ts`, deliberately outside the query module so they are
+testable without a Supabase client.
+
 Clock times render as 24-hour digits with the am/pm marker kept behind them
 (`09:00 am`, `14:30 pm`) via `lib/timeFormat.ts`. The marker is redundant
 after noon by strict notation; it is retained deliberately, so don't
@@ -169,6 +179,7 @@ lib/
   semver.ts                force-update version comparator
   commissionRate.ts        special-vs-standard pay resolution (rate OR flat fee)
                            + "20%" / "RM 80" formatting
+  earningsPeriod.ts        Earnings period model + the instant range each covers
   timeFormat.ts            clock formatting (24h digits + am/pm marker)
   push.ts                  push-token registration
   queryClient.ts           React Query client

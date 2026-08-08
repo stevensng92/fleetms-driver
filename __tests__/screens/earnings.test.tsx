@@ -1,8 +1,8 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import Earnings from '../../app/(tabs)/earnings';
-import { useDriverEarnings, type EarningsSummary } from '../../lib/queries/earnings';
+import { useDriverEarnings, useEarningsMonths, type EarningsSummary } from '../../lib/queries/earnings';
 import { useDriverProfile } from '../../lib/queries/driverProfile';
 
 // NOTE ON LOCATION: screen tests must NOT live under app/. expo-router's
@@ -34,8 +34,12 @@ jest.mock('expo-router', () => ({
 // together and the mismatch is visible in the diff.
 jest.mock('../../lib/queries/earnings', () => ({
   useDriverEarnings: jest.fn(),
+  useEarningsMonths: jest.fn(),
   ROW_LIMIT: 200,
 }));
+// NOT mocked: lib/earningsPeriod is pure (no Supabase client at import), so the
+// screen can use the real monthPeriod/monthKeyOf. That is the reason the period
+// helpers were moved out of the query module.
 jest.mock('../../lib/queries/driverProfile', () => ({
   useDriverProfile: jest.fn(),
 }));
@@ -47,7 +51,7 @@ const summary = (over: Partial<EarningsSummary> = {}): EarningsSummary => ({
   rows: [{
     jobId: JOB_UUID,
     jobNumber: JOB_NUMBER,
-    completedAt: '2026-07-29T02:00:00Z',
+    jobDate: '2026-07-29T02:00:00Z',
     fare: 500,
     commission: 100,
     paymentStatus: 'unpaid',
@@ -71,9 +75,14 @@ function mockEarnings(data: EarningsSummary | undefined, extra: Record<string, u
   });
 }
 
+function mockMonths(months: string[] | undefined) {
+  (useEarningsMonths as jest.Mock).mockReturnValue({ data: months });
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   (useDriverProfile as jest.Mock).mockReturnValue({ data: { org: { name: 'Continental' } } });
+  mockMonths([]);
 });
 
 describe('Earnings — Recent jobs row navigation', () => {
@@ -200,5 +209,86 @@ describe('Earnings — row rendering', () => {
     expect(screen.getByText("Couldn't load earnings")).toBeTruthy();
     expect(screen.getByText('boom')).toBeTruthy();
     expect(screen.getByText('Retry')).toBeTruthy();
+  });
+});
+
+describe('Earnings — past-month selector', () => {
+  // The feature drivers asked for: previous months, not just this one and all
+  // time. The chips come from useEarningsMonths, which lists only months the
+  // driver could have worked in.
+
+  it('offers a chip per past month, newest first, alongside the fixed periods', async () => {
+    mockMonths(['2026-07', '2026-06', '2026-05']);
+    await render(<Earnings/>);
+
+    expect(screen.getByText('This Week')).toBeTruthy();
+    expect(screen.getByText('This Month')).toBeTruthy();
+    expect(screen.getByText('All Time')).toBeTruthy();
+    // Same MY year as the pinned test clock, so the year is dropped for width.
+    expect(screen.getByText('Jul')).toBeTruthy();
+    expect(screen.getByText('Jun')).toBeTruthy();
+    expect(screen.getByText('May')).toBeTruthy();
+  });
+
+  it('switches the headline to the month when one is picked', async () => {
+    mockMonths(['2026-07']);
+    await render(<Earnings/>);
+
+    // Defaults to This Month.
+    expect(screen.getByText('This month')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Jul'));
+
+    // findBy, not getBy: selecting a chip is a setState, and React 19's
+    // concurrent rendering doesn't guarantee the re-render has flushed by the
+    // time fireEvent returns. The row-navigation tests above can use getBy
+    // because they assert on a callback, not on rendered output.
+    // Named in full on the card, where there is room for the year.
+    expect(await screen.findByText('July 2026')).toBeTruthy();
+    expect(screen.queryByText('This month')).toBeNull();
+  });
+
+  it('re-queries with the month period rather than filtering in the screen', async () => {
+    // The totals must come from a scoped query. If the screen filtered a
+    // this-month result set client-side, past months would always be empty.
+    mockMonths(['2026-07']);
+    await render(<Earnings/>);
+
+    fireEvent.press(screen.getByText('Jul'));
+
+    await waitFor(() => expect(useDriverEarnings).toHaveBeenLastCalledWith('m:2026-07'));
+  });
+
+  it('names the month in the empty state instead of lowercasing it', async () => {
+    // Built as a sentence per period — the old code lowercased the headline,
+    // which turned a month name into "in july 2026".
+    mockMonths(['2026-07']);
+    mockEarnings(summary({ rows: [], jobsCount: 0 }));
+    await render(<Earnings/>);
+
+    fireEvent.press(screen.getByText('Jul'));
+
+    expect(await screen.findByText('No completed jobs in July 2026.')).toBeTruthy();
+  });
+
+  it('still works when the month list has not loaded', async () => {
+    // The month strip is a nicety; the three fixed periods are the screen. A
+    // failed or pending months query must not take Earnings down with it.
+    mockMonths(undefined);
+    await render(<Earnings/>);
+
+    expect(screen.getByText('This Week')).toBeTruthy();
+    expect(screen.getByText('This Month')).toBeTruthy();
+    expect(screen.getByText('All Time')).toBeTruthy();
+  });
+
+  it('shows the job date on a row, which is what the period was chosen by', async () => {
+    // Rows are bucketed by MY-local PICKUP date to match create_driver_payout.
+    // Displaying a completion date here would put an August date under a July
+    // heading on every job closed late.
+    mockEarnings(summary());
+    await render(<Earnings/>);
+
+    expect(screen.getByText('29 Jul')).toBeTruthy();
   });
 });

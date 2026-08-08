@@ -21,9 +21,15 @@ Run with `npm test`. Full guide, including the sharp edges that will bite you
 - Never commit code that makes existing tests fail.
 
 Currently covered: pure helpers (`lib/timeFormat.ts`, `lib/commissionRate.ts`,
-`lib/semver.ts`) and shared components. NOT covered: screens, the React Query
-data hooks, realtime, auth. Adding coverage there needs Supabase mocking — worth
-doing, not yet done.
+`lib/semver.ts`, `lib/earningsPeriod.ts`) and shared components, plus the
+Earnings screen. NOT covered: the other screens, the React Query data hooks,
+realtime, auth. Adding coverage there needs Supabase mocking — worth doing, not
+yet done.
+
+Note the shape that makes the covered helpers coverable: anything importing
+`lib/supabase.ts` builds a live client at import time, so pure decisions belong
+in their own module beside the query rather than inside it. `lib/earningsPeriod.ts`
+was split out of `lib/queries/earnings.ts` for exactly this reason.
 
 ## Docs upkeep
 

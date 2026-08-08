@@ -1,7 +1,8 @@
 import {
   formatClock, formatDate, formatDateKey, formatDateLong, formatDateTime,
-  formatDayLong, formatMonthLong,
-  myDateKey, myMonthStartKey, myStartOfDay, myStartOfMonth,
+  formatDayLong, formatMonthLong, formatMonthKey, formatMonthKeyChip,
+  myDateKey, myMonthKey, myMonthStartKey, myStartOfDay, myStartOfMonth,
+  myStartOfMonthKey, monthKeysDesc,
 } from '../timeFormat';
 
 // The house format is 24-hour digits with the am/pm marker KEPT behind them
@@ -282,5 +283,107 @@ describe('formatDateTime', () => {
 
   it('degrades to an em dash on unparseable input', () => {
     expect(formatDateTime('nope')).toBe('—');
+  });
+});
+
+// --- Month keys ---------------------------------------------------------
+//
+// Added for the Earnings past-month selector. A month key is a calendar month,
+// not an instant, so the formatters take the STRING apart rather than routing
+// it through a Date — the same rule formatDateKey follows, and for the same
+// reason: there is no timezone to apply to "July 2026".
+
+describe('myMonthKey', () => {
+  it('reads the MALAYSIAN month, not the UTC one', () => {
+    // 31 Jul 17:00 UTC is already 1 Aug in Malaysia. A UTC read would file a
+    // job from the first evening of the month under the previous one.
+    expect(myMonthKey('2026-07-31T17:00:00Z')).toBe('2026-08');
+    expect(myMonthKey('2026-07-31T15:00:00Z')).toBe('2026-07');
+  });
+
+  it('degrades to an em dash on unparseable input', () => {
+    expect(myMonthKey('nope')).toBe('—');
+  });
+});
+
+describe('formatMonthKey', () => {
+  it('renders short by default and long on request', () => {
+    expect(formatMonthKey('2026-07')).toBe('Jul 2026');
+    expect(formatMonthKey('2026-07', { long: true })).toBe('July 2026');
+  });
+
+  it('rejects an out-of-range month rather than indexing off the end', () => {
+    expect(formatMonthKey('2026-13')).toBe('—');
+    expect(formatMonthKey('2026-00')).toBe('—');
+    expect(formatMonthKey('nope')).toBe('—');
+  });
+});
+
+describe('formatMonthKeyChip', () => {
+  const now = new Date('2026-08-09T06:00:00Z'); // Aug 2026 in MY
+
+  it('drops the year inside the current MY year', () => {
+    expect(formatMonthKeyChip('2026-07', now)).toBe('Jul');
+  });
+
+  it('keeps the year outside it', () => {
+    // A bare "Jul" beside "Jun" and "May" in a list that has reached back past
+    // January reads as THIS year's July, which would be the wrong month.
+    expect(formatMonthKeyChip('2025-07', now)).toBe('Jul 2025');
+  });
+
+  it('decides the year in MY terms, not UTC', () => {
+    // 31 Dec 2026 17:00 UTC is already 1 Jan 2027 in Malaysia, so a Dec 2026
+    // chip must show its year.
+    const nyEve = new Date('2026-12-31T17:00:00Z');
+    expect(formatMonthKeyChip('2026-12', nyEve)).toBe('Dec 2026');
+    expect(formatMonthKeyChip('2027-01', nyEve)).toBe('Jan');
+  });
+});
+
+describe('myStartOfMonthKey', () => {
+  it('resolves a key to the MY month boundary', () => {
+    // 1 Jul 2026 00:00 MY = 30 Jun 16:00 UTC.
+    expect(myStartOfMonthKey('2026-07').toISOString()).toBe('2026-06-30T16:00:00.000Z');
+  });
+
+  it('offsets by whole months, rolling the year', () => {
+    expect(myStartOfMonthKey('2026-12', 1).toISOString()).toBe('2026-12-31T16:00:00.000Z');
+  });
+
+  it('returns an Invalid Date on a malformed key', () => {
+    // Must NOT fall back to the epoch — a query range built from that would
+    // select every job ever recorded.
+    expect(Number.isNaN(myStartOfMonthKey('nope').getTime())).toBe(true);
+    expect(Number.isNaN(myStartOfMonthKey('2026-13').getTime())).toBe(true);
+  });
+});
+
+describe('monthKeysDesc', () => {
+  it('lists months newest first, inclusive of both ends', () => {
+    expect(monthKeysDesc('2026-05', '2026-08'))
+      .toEqual(['2026-08', '2026-07', '2026-06', '2026-05']);
+  });
+
+  it('spans a year boundary', () => {
+    expect(monthKeysDesc('2025-11', '2026-02'))
+      .toEqual(['2026-02', '2026-01', '2025-12', '2025-11']);
+  });
+
+  it('returns a single month when both ends match', () => {
+    expect(monthKeysDesc('2026-08', '2026-08')).toEqual(['2026-08']);
+  });
+
+  it('caps the list so one ancient row cannot render a thousand chips', () => {
+    expect(monthKeysDesc('2000-01', '2026-08', 3)).toEqual(['2026-08', '2026-07', '2026-06']);
+  });
+
+  it('returns nothing when the range runs backwards', () => {
+    expect(monthKeysDesc('2026-08', '2026-05')).toEqual([]);
+  });
+
+  it('returns nothing on a malformed key', () => {
+    expect(monthKeysDesc('nope', '2026-08')).toEqual([]);
+    expect(monthKeysDesc('2026-05', 'nope')).toEqual([]);
   });
 });
