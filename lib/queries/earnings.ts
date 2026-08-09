@@ -2,15 +2,16 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
 import { resolveSpecialCommission, type SpecialCommission } from '../commissionRate';
 import { fetchCommissionBaseline } from './driverProfile';
-import { myMonthKey, monthKeysDesc } from '../timeFormat';
 import { periodRange, type EarningsPeriod } from '../earningsPeriod';
 
 // The period type and its date arithmetic live in ../earningsPeriod so they can
 // be tested without standing up a Supabase client. Re-exported here so callers
 // that already import the hooks don't need a second import path.
 export {
-  monthPeriod, monthKeyOf, periodRange,
-  type EarningsPeriod, type EarningsMonthPeriod,
+  monthPeriod, weekPeriod, keyOf, modeOf, periodRange, periodCount,
+  periodKeysDesc, periodHeadline, emptyStateText, MAX_PERIODS,
+  type EarningsPeriod, type EarningsMode,
+  type EarningsMonthPeriod, type EarningsWeekPeriod,
 } from '../earningsPeriod';
 
 // Driver Earnings — driver's own completed jobs, scoped via RLS.
@@ -134,10 +135,24 @@ export const ROW_LIMIT = 200;
  * whereas a fixed 12-month lookback would offer months from before the driver
  * joined, and a distinct-month query costs the whole table to avoid it.
  */
-export function useEarningsMonths() {
+/**
+ * The pickup instant of this driver's EARLIEST completed job, or null if they
+ * have none. `periodCount` turns it into how many periods the pager offers.
+ *
+ * One row, not a distinct-periods query: PostgREST has no DISTINCT, and the
+ * alternative is pulling every job just to reduce it to a handful of keys. The
+ * pager wants a count anyway, not a list — it generates its own keys from
+ * "now", so all it needs from the server is how far back to go.
+ *
+ * Deriving the span rather than listing real periods means a month the driver
+ * didn't work still gets a page, landing on the empty state. That is the right
+ * trade: a quiet month is a true answer ("you had no jobs in June"), and
+ * skipping it would make the dots misreport how far back you are.
+ */
+export function useEarningsHistoryStart() {
   return useQuery({
-    queryKey: ['driver-earnings-months'],
-    queryFn: async (): Promise<string[]> => {
+    queryKey: ['driver-earnings-history-start'],
+    queryFn: async (): Promise<string | null> => {
       const { data, error } = await supabase
         .from('jobs')
         .select('pickup_datetime, assignments!assignments_job_id_fkey!inner ( is_current )')
@@ -148,16 +163,11 @@ export function useEarningsMonths() {
         .maybeSingle();
 
       if (error) throw error;
-      if (!data?.pickup_datetime) return [];
-
-      const earliest = myMonthKey(data.pickup_datetime as string);
-      const current = myMonthKey();
-      // Drop the current month — "This month" is its own chip, and offering it
-      // twice under two different labels invites "why do these disagree?".
-      return monthKeysDesc(earliest, current).filter(k => k !== current);
+      return (data?.pickup_datetime as string | undefined) ?? null;
     },
-    // The answer only changes when a driver crosses a month boundary or logs
-    // their very first job, so this need not be fresh.
+    // The answer only changes when a driver logs their very first job, so this
+    // need not be fresh. The period COUNT derived from it still moves with the
+    // clock, because that is computed against `now` at render.
     staleTime: 60 * 60 * 1000,
   });
 }

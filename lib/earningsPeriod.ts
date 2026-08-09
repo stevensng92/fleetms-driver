@@ -1,4 +1,7 @@
-import { myStartOfDay, myStartOfMonth, myStartOfMonthKey } from './timeFormat';
+import {
+  myStartOfMonthKey, myStartOfWeekKey, myMonthKey, myMonthStartKey, myWeekKey,
+  formatMonthKey, formatWeekRange, monthsBetween, weeksBetween,
+} from './timeFormat';
 
 // Which slice of time the Earnings screen is showing, and the instant range
 // that slice covers.
@@ -11,28 +14,60 @@ import { myStartOfDay, myStartOfMonth, myStartOfMonthKey } from './timeFormat';
 //
 // PERIODS ARE BUCKETED BY MY-LOCAL PICKUP DATE — see the header of
 // lib/queries/earnings.ts for why that basis, and what it cost to get wrong.
+//
+// THE SHAPE CHANGED IN v0.10.0, and the reason is worth keeping.
+//
+// v0.8.0 offered `week | month | all` plus a chip per past month, in one
+// horizontally-scrolling strip. Steven used it on a device and asked whether
+// drivers could only look back one month — the months were all there, off the
+// right edge of a strip whose scroll indicator I had switched off. A feature
+// nobody can find is not shipped, and that failure is invisible to tests.
+//
+// So the axes are now separate: the segmented control picks the MODE
+// (`Week | Month | All Time`) and the summary card itself pages backwards
+// through periods in that mode. The card is the biggest touch target on the
+// screen, the chevrons and dots make the gesture discoverable at rest, and the
+// control no longer has to grow a chip per period.
+//
+// The literal `'week'` and `'month'` period values are gone with it. They meant
+// "the current one", which paging made ambiguous — every period is now named
+// absolutely (`m:2026-07`, `w:2026-08-03`) so an app left open across midnight
+// cannot silently re-point a query at a different range than the one labelled.
 
-/** A specific past calendar month, keyed "m:YYYY-MM" (e.g. `m:2026-07`). */
+/** Which kind of slice the screen is paging through. */
+export type EarningsMode = 'week' | 'month' | 'all';
+
+/** A specific calendar month, keyed "m:YYYY-MM". */
 export type EarningsMonthPeriod = `m:${string}`;
+/** A specific Malaysian week, keyed "w:YYYY-MM-DD" — always a MONDAY. */
+export type EarningsWeekPeriod = `w:${string}`;
 
-export type EarningsPeriod = 'week' | 'month' | 'all' | EarningsMonthPeriod;
-
-/** Wraps a "YYYY-MM" key into the period value the hook takes. */
-export const monthPeriod = (monthKey: string): EarningsMonthPeriod => `m:${monthKey}`;
+export type EarningsPeriod = 'all' | EarningsMonthPeriod | EarningsWeekPeriod;
 
 /**
- * The "YYYY-MM" inside a month period, or null for the three fixed periods.
+ * How many periods the pager offers, at most — the current one plus two back.
  *
- * Note `'month'` does NOT start with `'m:'`, so "this month" and "a named
- * month" stay cleanly separable despite the shared first letter.
+ * A ceiling, not a target: a driver with one month of history gets one page and
+ * no pager at all, rather than two dead pages inviting a swipe into nothing.
  */
-export function monthKeyOf(p: EarningsPeriod): string | null {
-  return p.startsWith('m:') ? p.slice(2) : null;
+export const MAX_PERIODS = 3;
+
+export const monthPeriod = (monthKey: string): EarningsMonthPeriod => `m:${monthKey}`;
+export const weekPeriod = (weekKey: string): EarningsWeekPeriod => `w:${weekKey}`;
+
+export function modeOf(p: EarningsPeriod): EarningsMode {
+  if (p === 'all') return 'all';
+  return p.startsWith('w:') ? 'week' : 'month';
+}
+
+/** The bare key inside a period, or null for 'all'. */
+export function keyOf(p: EarningsPeriod): string | null {
+  return p === 'all' ? null : p.slice(2);
 }
 
 /**
  * The half-open `[since, until)` instant range a period covers, as ISO strings.
- * `null` means unbounded on that end.
+ * `null` means unbounded — which only 'all' ever is.
  *
  * Boundaries are pinned to Malaysia, matching lib/timeFormat.ts. These used to
  * use setHours(0,0,0,0) and new Date(y, m, 1), both device-local — so a phone
@@ -40,32 +75,107 @@ export function monthKeyOf(p: EarningsPeriod): string | null {
  * month case was the worst: on a UTC-negative device the local month can still
  * be the previous one, so "This month" silently covered an extra month.
  *
- * `until` exists for past months and only for past months. The three original
- * periods all run to "now" and so never needed an upper bound — which is why
- * the query had none, and why adding a past month WITHOUT one would have
- * quietly returned every job from that month onwards, labelled as that month.
+ * The CURRENT period is bounded too, at the start of the next one. That bound
+ * sits in the future and can therefore never exclude a real job, so it costs
+ * nothing — and it means every period is built the same way, rather than the
+ * current one being a special open-ended case that a past period then has to
+ * remember to close. Forgetting that close is the bug that would return a month
+ * "and everything after it" under that month's heading.
  */
 export function periodRange(
   p: EarningsPeriod,
-  now: Date = new Date(),
+  _now: Date = new Date(),
 ): { since: string | null; until: string | null } {
   if (p === 'all') return { since: null, until: null };
-  // Last 7 days INCLUSIVE — a Sunday-start week would diverge across locales,
-  // so anchor at "start of the MY day 6 days ago".
-  if (p === 'week') return { since: myStartOfDay(now, -6).toISOString(), until: null };
-  if (p === 'month') return { since: myStartOfMonth(now).toISOString(), until: null };
 
-  const key = monthKeyOf(p);
-  const start = key === null ? new Date(NaN) : myStartOfMonthKey(key);
+  const key = keyOf(p)!;
+  const isWeek = modeOf(p) === 'week';
+  const start = isWeek ? myStartOfWeekKey(key) : myStartOfMonthKey(key);
   // A malformed key can only come from a caller bug — every key the UI offers
-  // is generated by monthKeysDesc. Throwing surfaces it; both alternatives are
+  // is generated by periodKeysDesc. Throwing surfaces it; both alternatives are
   // worse, because "fall back to all time" and "return an empty range" each
   // render a plausible-looking total that silently answers a different question.
   if (Number.isNaN(start.getTime())) {
-    throw new Error(`Unparseable earnings month period: ${p}`);
+    throw new Error(`Unparseable earnings period: ${p}`);
   }
-  return {
-    since: start.toISOString(),
-    until: myStartOfMonthKey(key!, 1).toISOString(),
-  };
+  const end = isWeek ? myStartOfWeekKey(key, 1) : myStartOfMonthKey(key, 1);
+  return { since: start.toISOString(), until: end.toISOString() };
+}
+
+/**
+ * How many periods the pager should offer, given the driver's earliest
+ * completed job.
+ *
+ * `min(MAX_PERIODS, history)`, floored at 1 so the current period always exists.
+ *
+ * Bounded by real history, never padded up to the ceiling: pages the driver
+ * cannot have worked are dots that promise data and deliver an empty state, and
+ * a pager that lies about its length is worse than a shorter one. A driver with
+ * no completed jobs at all gets exactly one page.
+ */
+export function periodCount(
+  mode: EarningsMode,
+  earliest: string | Date | null | undefined,
+  now: Date = new Date(),
+): number {
+  if (mode === 'all') return 1;
+  if (earliest == null) return 1;
+  const history = mode === 'week' ? weeksBetween(earliest, now) : monthsBetween(earliest, now);
+  if (!Number.isFinite(history)) return 1;
+  return Math.min(MAX_PERIODS, Math.max(1, history));
+}
+
+/**
+ * `count` periods in `mode`, NEWEST FIRST — index 0 is the current one, so the
+ * array index doubles as "how many periods back am I", which is what the pager
+ * and its dots track.
+ */
+export function periodKeysDesc(
+  mode: EarningsMode,
+  count: number,
+  now: Date = new Date(),
+): EarningsPeriod[] {
+  if (mode === 'all') return ['all'];
+  const n = Math.max(0, Math.floor(count));
+  const out: EarningsPeriod[] = [];
+  for (let i = 0; i < n; i++) {
+    // myMonthStartKey gives "YYYY-MM-01"; the month key is its first 7 chars.
+    // Both helpers do their own MY-pinned month/week arithmetic, so December
+    // rolls the year correctly without this loop knowing about calendars.
+    out.push(mode === 'week'
+      ? weekPeriod(myWeekKey(now, -i))
+      : monthPeriod(myMonthStartKey(now, -i).slice(0, 7)));
+  }
+  return out;
+}
+
+/**
+ * The card heading. Index 0 is named relatively ("This month") because that is
+ * how a driver refers to it; everything else is named absolutely, because
+ * "2 months ago" forces arithmetic on the person least able to check it.
+ */
+export function periodHeadline(p: EarningsPeriod, now: Date = new Date()): string {
+  if (p === 'all') return 'All time';
+  const key = keyOf(p)!;
+  if (modeOf(p) === 'week') {
+    if (key === myWeekKey(now)) return 'This week';
+    if (key === myWeekKey(now, -1)) return 'Last week';
+    return formatWeekRange(key, now);
+  }
+  if (key === myMonthKey(now)) return 'This month';
+  return formatMonthKey(key, { long: true });
+}
+
+/**
+ * "No completed jobs in July 2026." — built per period rather than by
+ * lowercasing the headline, which turned month names into "july 2026".
+ */
+export function emptyStateText(p: EarningsPeriod, now: Date = new Date()): string {
+  if (p === 'all') return 'No completed jobs yet.';
+  const head = periodHeadline(p, now);
+  // "This week" / "Last week" / "This month" are already adverbial.
+  if (head.startsWith('This ') || head.startsWith('Last ')) {
+    return `No completed jobs ${head.toLowerCase()}.`;
+  }
+  return `No completed jobs in ${head}.`;
 }

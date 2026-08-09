@@ -221,6 +221,106 @@ export function monthKeysDesc(fromKey: string, toKey: string, cap = 24): string[
 }
 
 /**
+ * The instant at which the Malaysian week containing `value` begins, shifted by
+ * `weekOffset` weeks. Weeks start MONDAY.
+ *
+ * Earnings used to define "this week" as a rolling last-7-days, precisely to
+ * dodge the Sunday-vs-Monday question. That stopped working once the screen
+ * could page BACKWARDS through weeks: rolling windows overlap, so "the week
+ * before last 7 days" is not a week anyone is paid for, and two adjacent pages
+ * would double-count the same job. Paging needs discrete, non-overlapping
+ * buckets, so weeks are now calendar weeks.
+ *
+ * Monday rather than Sunday: Malaysia's working week runs Mon–Fri (Sat–Sun in
+ * Johor/Kedah/Kelantan/Terengganu), and the dispatcher's own payout period is
+ * calendar-based. A Sunday start would split every working week across two
+ * pages, which is exactly the confusion the pager exists to remove.
+ */
+export function myStartOfWeek(value: string | Date = new Date(), weekOffset = 0): Date {
+  const my = toMyParts(value);
+  if (!my) return new Date(NaN);
+  // getUTCDay() on the shifted date reads the MY weekday. Sunday is 0; map it
+  // to 6 so Monday becomes the zero point.
+  const dowMondayZero = (my.getUTCDay() + 6) % 7;
+  return myStartOfDay(value, weekOffset * 7 - dowMondayZero);
+}
+
+/** "2026-08-03" — the Monday of the Malaysian week containing `value`. */
+export function myWeekKey(value: string | Date = new Date(), weekOffset = 0): string {
+  const start = myStartOfWeek(value, weekOffset);
+  if (Number.isNaN(start.getTime())) return '—';
+  // Read the key back out of the instant in MY terms, not UTC — the instant is
+  // 16:00 the previous day in UTC, so a UTC read is off by one day every time.
+  return myDateKey(start);
+}
+
+/**
+ * The instant at which the Malaysian week named by a "YYYY-MM-DD" Monday key
+ * begins, shifted by `weekOffset`. Pass 1 for the exclusive upper bound.
+ *
+ * Returns an Invalid Date on a malformed key rather than guessing, for the same
+ * reason myStartOfMonthKey does: a query range silently starting at the epoch
+ * would select every job ever recorded.
+ */
+export function myStartOfWeekKey(key: string, weekOffset = 0): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!m) return new Date(NaN);
+  const monthIdx = Number(m[2]) - 1;
+  const day = Number(m[3]);
+  if (monthIdx < 0 || monthIdx > 11 || day < 1 || day > 31) return new Date(NaN);
+  const utcMidnightMy = Date.UTC(Number(m[1]), monthIdx, day + weekOffset * 7);
+  return new Date(utcMidnightMy - MY_UTC_OFFSET_MIN * 60_000);
+}
+
+/**
+ * "28 Jul – 3 Aug" from a Monday key — the week's own dates, which is what a
+ * driver checks a payslip against. The year is added only when the week does
+ * not sit in the current MY year, on the same reasoning as formatMonthKeyChip.
+ */
+export function formatWeekRange(key: string, now: string | Date = new Date()): string {
+  const start = myStartOfWeekKey(key);
+  if (Number.isNaN(start.getTime())) return '—';
+  const end = myStartOfWeekKey(key, 1);
+  // The range is half-open, so the last DAY is one day before the next Monday.
+  const lastDay = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+  // Days are NOT zero-padded here, unlike formatDate. That helper pads so job
+  // cards line up in a column; a prose range is read as a sentence, and
+  // "03 Aug – 09 Aug" reads like a serial number.
+  const dayMonth = (d: Date) => {
+    const my = toMyParts(d)!;
+    return `${my.getUTCDate()} ${MONTHS[my.getUTCMonth()]}`;
+  };
+  const core = `${dayMonth(start)} – ${dayMonth(lastDay)}`;
+  const weekYear = key.slice(0, 4);
+  return weekYear === myMonthKey(now).slice(0, 4) ? core : `${core} ${weekYear}`;
+}
+
+/**
+ * Whole Malaysian weeks from the week containing `from` up to the week
+ * containing `to`, inclusive of both. Negative when `to` precedes `from`.
+ */
+export function weeksBetween(from: string | Date, to: string | Date): number {
+  const a = myStartOfWeek(from);
+  const b = myStartOfWeek(to);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 0;
+  // Both are week boundaries so the gap is an exact multiple of 7 days; rounding
+  // absorbs nothing real, it just refuses to trust float division.
+  return Math.round((b.getTime() - a.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+}
+
+/**
+ * Whole Malaysian months from the month containing `from` up to the month
+ * containing `to`, inclusive of both. Negative when `to` precedes `from`.
+ */
+export function monthsBetween(from: string | Date, to: string | Date): number {
+  const a = toMyParts(from);
+  const b = toMyParts(to);
+  if (!a || !b) return 0;
+  return (b.getUTCFullYear() * 12 + b.getUTCMonth())
+       - (a.getUTCFullYear() * 12 + a.getUTCMonth()) + 1;
+}
+
+/**
  * The INSTANT at which a Malaysian calendar day begins, offset by `dayOffset`
  * days. Use for range boundaries against a timestamptz column.
  *

@@ -79,6 +79,23 @@ payslip. The period model and its boundary arithmetic live in
 `lib/earningsPeriod.ts`, deliberately outside the query module so they are
 testable without a Supabase client.
 
+v0.10.0 reshaped how that history is reached, after the v0.8.0 version failed
+its first contact with a real driver. That version put a chip per past month in
+a horizontally-scrolling strip with `showsHorizontalScrollIndicator={false}`, so
+the older months sat off-screen with no cue — and the first person to use it
+concluded the app only went back one month. The axes are now separate: the
+segmented control picks the **mode** (`Week | Month | All Time`) and the summary
+card itself **pages backwards**, with chevrons and dots making the gesture
+discoverable at rest. Periods are bounded by real history and capped at
+`MAX_PERIODS` (3), so there are never dots promising data that doesn't exist.
+
+Two consequences worth knowing. Weeks became **calendar weeks, Monday-start** —
+a rolling last-7-days window cannot be paged, because adjacent pages overlap and
+would double-count a job. And the literal `'week'`/`'month'` period values are
+gone: every period is now named absolutely (`m:2026-07`, `w:2026-08-03`) so an
+app left open across midnight cannot silently re-point a query at a different
+range than the one on the label.
+
 Clock times render as 24-hour digits with the am/pm marker kept behind them
 (`09:00 am`, `14:30 pm`) via `lib/timeFormat.ts`. The marker is redundant
 after noon by strict notation; it is retained deliberately, so don't

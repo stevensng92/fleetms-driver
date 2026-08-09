@@ -51,6 +51,32 @@ Forget the `await` and you get `TypeError: toJSON is not a function` followed by
 `` `render` function has not been called `` — neither message mentions promises,
 so it is easy to lose ten minutes here.
 
+**Await between interactions, or you break the tests that come AFTER.** Firing
+several `fireEvent.press` calls back-to-back leaves React 19 work queued that
+never flushes before the test ends. The unsettled root then breaks *every*
+subsequent render in the file, and the symptom appears nowhere near the cause —
+later tests fail with `Unable to find an element with text: …` on markup that is
+obviously present, and each one passes in isolation under `-t`.
+
+```tsx
+for (let i = 0; i < 4; i++) {
+  fireEvent.press(button);
+  await waitFor(() => expect(someMock).toHaveBeenCalled());
+}
+```
+
+If a test suite passes test-by-test but collapses when run together, look for
+the last test that fires interactions without awaiting — not at the tests that
+are failing.
+
+**Don't freeze the clock with fake timers to pin a date.** React 19's concurrent
+scheduler starves once `Date` stops advancing, producing the same
+passes-alone-fails-together signature as above. When a screen renders
+date-derived labels, derive the *expectations* from the real clock through the
+same pure helper the screen uses, and pin the date arithmetic itself in that
+helper's own test against a fixed instant. `__tests__/screens/earnings.test.tsx`
+and `lib/__tests__/earningsPeriod.test.ts` are the worked example.
+
 **Safe-area is mocked globally, and the `.default` unwrap is load-bearing.**
 `AppFrame` calls `useSafeAreaInsets()` at the top of every screen, so screen
 tests throw "No safe area value available" without a mock. The library ships one

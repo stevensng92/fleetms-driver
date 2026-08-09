@@ -3,6 +3,8 @@ import {
   formatDayLong, formatMonthLong, formatMonthKey, formatMonthKeyChip,
   myDateKey, myMonthKey, myMonthStartKey, myStartOfDay, myStartOfMonth,
   myStartOfMonthKey, monthKeysDesc,
+  myStartOfWeek, myWeekKey, myStartOfWeekKey, formatWeekRange,
+  weeksBetween, monthsBetween,
 } from '../timeFormat';
 
 // The house format is 24-hour digits with the am/pm marker KEPT behind them
@@ -385,5 +387,114 @@ describe('monthKeysDesc', () => {
   it('returns nothing on a malformed key', () => {
     expect(monthKeysDesc('nope', '2026-08')).toEqual([]);
     expect(monthKeysDesc('2026-05', 'nope')).toEqual([]);
+  });
+});
+
+// --- Weeks -------------------------------------------------------------
+//
+// Weeks became calendar (Monday-start) buckets when Earnings gained a pager.
+// A rolling last-7-days window cannot be paged: adjacent pages would overlap
+// and double-count the same job. Monday rather than Sunday because Malaysia's
+// working week is Mon-Fri, so a Sunday start splits every working week across
+// two pages.
+
+describe('myStartOfWeek', () => {
+  it('anchors on the Monday of the MY week', () => {
+    // 9 Aug 2026 is a Sunday; its week began Mon 3 Aug, i.e. 2 Aug 16:00 UTC.
+    expect(myStartOfWeek('2026-08-09T06:00:00Z').toISOString()).toBe('2026-08-02T16:00:00.000Z');
+    // 3 Aug itself (a Monday) anchors on itself.
+    expect(myStartOfWeek('2026-08-03T06:00:00Z').toISOString()).toBe('2026-08-02T16:00:00.000Z');
+  });
+
+  it('treats Sunday as the END of a week, not the start', () => {
+    // The whole reason Monday was chosen. Sunday 9 Aug and Monday 3 Aug are the
+    // same week; Monday 10 Aug is the next one.
+    expect(myWeekKey('2026-08-09T06:00:00Z')).toBe('2026-08-03');
+    expect(myWeekKey('2026-08-10T06:00:00Z')).toBe('2026-08-10');
+  });
+
+  it('offsets by whole weeks', () => {
+    expect(myWeekKey('2026-08-09T06:00:00Z', -1)).toBe('2026-07-27');
+    expect(myWeekKey('2026-08-09T06:00:00Z', -2)).toBe('2026-07-20');
+  });
+
+  it('reads the MY week, not the UTC one', () => {
+    // 2 Aug 17:00 UTC is already Mon 3 Aug 01:00 in Malaysia, so it belongs to
+    // the week starting 3 Aug — a UTC read would file it a week earlier.
+    expect(myWeekKey('2026-08-02T17:00:00Z')).toBe('2026-08-03');
+    expect(myWeekKey('2026-08-02T15:00:00Z')).toBe('2026-07-27');
+  });
+
+  it('ignores the device timezone', () => {
+    const original = process.env.TZ;
+    for (const tz of ['UTC', 'America/New_York', 'Australia/Sydney']) {
+      process.env.TZ = tz;
+      expect(myWeekKey('2026-08-09T06:00:00Z')).toBe('2026-08-03');
+    }
+    process.env.TZ = original;
+  });
+});
+
+describe('myStartOfWeekKey', () => {
+  it('resolves a Monday key to the MY week boundary', () => {
+    expect(myStartOfWeekKey('2026-08-03').toISOString()).toBe('2026-08-02T16:00:00.000Z');
+  });
+
+  it('gives an exclusive upper bound with offset 1', () => {
+    expect(myStartOfWeekKey('2026-08-03', 1).toISOString()).toBe('2026-08-09T16:00:00.000Z');
+  });
+
+  it('rolls across a month and a year boundary', () => {
+    expect(myStartOfWeekKey('2026-12-28', 1).toISOString()).toBe('2027-01-03T16:00:00.000Z');
+  });
+
+  it('returns an Invalid Date on a malformed key', () => {
+    // Must NOT fall back to the epoch — a query range built from that would
+    // select every job ever recorded.
+    expect(Number.isNaN(myStartOfWeekKey('2026-08').getTime())).toBe(true);
+    expect(Number.isNaN(myStartOfWeekKey('nope').getTime())).toBe(true);
+  });
+});
+
+describe('formatWeekRange', () => {
+  it('shows the week own dates, inclusive of the last day', () => {
+    // The range is half-open internally, so the label must step back a day —
+    // showing "3 Aug - 10 Aug" would overlap the next week on screen.
+    expect(formatWeekRange('2026-08-03', new Date('2026-08-09T06:00:00Z'))).toBe('3 Aug – 9 Aug');
+  });
+
+  it('spans a month boundary', () => {
+    expect(formatWeekRange('2026-07-27', new Date('2026-08-09T06:00:00Z'))).toBe('27 Jul – 2 Aug');
+  });
+
+  it('adds the year only outside the current MY year', () => {
+    expect(formatWeekRange('2025-12-29', new Date('2026-08-09T06:00:00Z'))).toBe('29 Dec – 4 Jan 2025');
+  });
+
+  it('degrades to an em dash on a malformed key', () => {
+    expect(formatWeekRange('nope')).toBe('—');
+  });
+});
+
+describe('weeksBetween / monthsBetween', () => {
+  it('counts inclusively, so the same period is 1', () => {
+    expect(monthsBetween('2026-08-01T02:00:00Z', '2026-08-31T02:00:00Z')).toBe(1);
+    expect(weeksBetween('2026-08-03T02:00:00Z', '2026-08-09T02:00:00Z')).toBe(1);
+  });
+
+  it('counts whole periods apart', () => {
+    expect(monthsBetween('2026-06-15T02:00:00Z', '2026-08-09T02:00:00Z')).toBe(3);
+    expect(weeksBetween('2026-07-20T02:00:00Z', '2026-08-09T02:00:00Z')).toBe(3);
+  });
+
+  it('rolls the year', () => {
+    expect(monthsBetween('2025-12-15T02:00:00Z', '2026-02-15T02:00:00Z')).toBe(3);
+    expect(weeksBetween('2025-12-29T02:00:00Z', '2026-01-12T02:00:00Z')).toBe(3);
+  });
+
+  it('is not fooled by a 7-day span crossing a Monday', () => {
+    // Sun 2 Aug to Sun 9 Aug is 7 days but TWO calendar weeks — which is why
+    // the pager counts buckets rather than dividing elapsed days by seven.
+    expect(weeksBetween('2026-08-02T02:00:00Z', '2026-08-09T02:00:00Z')).toBe(2);
   });
 });
