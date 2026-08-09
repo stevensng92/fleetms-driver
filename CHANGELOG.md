@@ -2,6 +2,27 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.10.0] - 2026-08-10
+
+### Changed
+
+- **Looking back at earlier periods is now a swipe, not a hunt.** v0.9.0 added a
+  chip for each past month, but they sat off the right edge of the row with
+  nothing to show they were there — the first driver to try it concluded the app
+  only went back one month. The row now has just three buttons — *Week*, *Month*
+  and *All Time* — and the earnings card itself swipes sideways to step back
+  through periods. Arrows and dots on the card show where you are and that there
+  is more to see.
+
+- **"This week" is now Monday to Sunday**, instead of the last seven days. A
+  rolling window can't be stepped through — two adjacent swipes would have
+  counted the same job twice — and a calendar week is what a work week means
+  anyway. Your current-week total may shift slightly the first time you open it.
+
+- The card goes back **up to three periods**: this one and the two before it. It
+  never offers a period from before your first completed job, so there are no
+  empty pages to swipe into.
+
 ## [0.9.0] - 2026-08-09
 
 Requires dispatcher **v0.31.0.0**, which is now live on production — verified by

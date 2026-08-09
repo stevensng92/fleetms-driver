@@ -2,8 +2,9 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import Earnings from '../../app/(tabs)/earnings';
-import { useDriverEarnings, useEarningsMonths, type EarningsSummary } from '../../lib/queries/earnings';
+import { useDriverEarnings, useEarningsHistoryStart, type EarningsSummary } from '../../lib/queries/earnings';
 import { useDriverProfile } from '../../lib/queries/driverProfile';
+import { periodKeysDesc, periodHeadline } from '../../lib/earningsPeriod';
 
 // NOTE ON LOCATION: screen tests must NOT live under app/. expo-router's
 // require.context regex (see node_modules/expo-router/_ctx.android.js) matches
@@ -34,7 +35,7 @@ jest.mock('expo-router', () => ({
 // together and the mismatch is visible in the diff.
 jest.mock('../../lib/queries/earnings', () => ({
   useDriverEarnings: jest.fn(),
-  useEarningsMonths: jest.fn(),
+  useEarningsHistoryStart: jest.fn(),
   ROW_LIMIT: 200,
 }));
 // NOT mocked: lib/earningsPeriod is pure (no Supabase client at import), so the
@@ -75,14 +76,35 @@ function mockEarnings(data: EarningsSummary | undefined, extra: Record<string, u
   });
 }
 
-function mockMonths(months: string[] | undefined) {
-  (useEarningsMonths as jest.Mock).mockReturnValue({ data: months });
+/** The driver's earliest completed job — periodCount turns this into pages. */
+function mockHistoryStart(iso: string | null | undefined) {
+  (useEarningsHistoryStart as jest.Mock).mockReturnValue({ data: iso });
 }
+
+// The pager names its periods against `new Date()`, so a hardcoded "July 2026"
+// would rot the moment the month turned. Expectations are derived from the real
+// clock through the SAME pure helpers the screen uses.
+//
+// Freezing the clock with fake timers was tried first and is a trap: React 19's
+// concurrent scheduler starves once Date stops advancing, so the suite passed
+// test-by-test under `-t` and collapsed from the sixth render onwards when run
+// together. The date arithmetic itself is pinned exhaustively against a fixed
+// instant in lib/__tests__/earningsPeriod.test.ts — this file's job is wiring.
+const now = () => new Date();
+const monthsBack = (n: number) => periodKeysDesc('month', n + 1, now())[n];
+const weeksBack  = (n: number) => periodKeysDesc('week',  n + 1, now())[n];
+const DAY = 24 * 60 * 60 * 1000;
 
 beforeEach(() => {
   jest.clearAllMocks();
   (useDriverProfile as jest.Mock).mockReturnValue({ data: { org: { name: 'Continental' } } });
-  mockMonths([]);
+  mockHistoryStart(new Date(Date.now() - 150 * DAY).toISOString()); // ~5 months
+  // Every test gets a working baseline and overrides what it cares about.
+  // Without this the suite is order-dependent: clearAllMocks wipes call
+  // records but NOT return values, so a test that skipped mockEarnings only
+  // passed by inheriting the previous test's, and failed the moment it ran
+  // alone under `-t`.
+  mockEarnings(summary());
 });
 
 describe('Earnings — Recent jobs row navigation', () => {
@@ -212,79 +234,137 @@ describe('Earnings — row rendering', () => {
   });
 });
 
-describe('Earnings — past-month selector', () => {
-  // The feature drivers asked for: previous months, not just this one and all
-  // time. The chips come from useEarningsMonths, which lists only months the
-  // driver could have worked in.
+describe('Earnings — period pager', () => {
+  // The feature drivers asked for: look back at finished periods. v0.8.0 put a
+  // chip per month in a scrolling strip and the first person to use it
+  // concluded the app only went back one month — the months were off-screen
+  // with the scroll indicator disabled. The period axis now lives on the card.
 
-  it('offers a chip per past month, newest first, alongside the fixed periods', async () => {
-    mockMonths(['2026-07', '2026-06', '2026-05']);
+  it('offers the three modes as fixed tabs, with no period chips', async () => {
     await render(<Earnings/>);
 
-    expect(screen.getByText('This Week')).toBeTruthy();
-    expect(screen.getByText('This Month')).toBeTruthy();
+    expect(screen.getByText('Week')).toBeTruthy();
+    expect(screen.getByText('Month')).toBeTruthy();
     expect(screen.getByText('All Time')).toBeTruthy();
-    // Same MY year as the pinned test clock, so the year is dropped for width.
-    expect(screen.getByText('Jul')).toBeTruthy();
-    expect(screen.getByText('Jun')).toBeTruthy();
-    expect(screen.getByText('May')).toBeTruthy();
+    // The old strip put period names in the selector. They belong on the card.
+    expect(screen.queryByText('This Month')).toBeNull();
   });
 
-  it('switches the headline to the month when one is picked', async () => {
-    mockMonths(['2026-07']);
+  it('starts on the current month and names it relatively', async () => {
     await render(<Earnings/>);
-
-    // Defaults to This Month.
     expect(screen.getByText('This month')).toBeTruthy();
-
-    fireEvent.press(screen.getByText('Jul'));
-
-    // findBy, not getBy: selecting a chip is a setState, and React 19's
-    // concurrent rendering doesn't guarantee the re-render has flushed by the
-    // time fireEvent returns. The row-navigation tests above can use getBy
-    // because they assert on a callback, not on rendered output.
-    // Named in full on the card, where there is room for the year.
-    expect(await screen.findByText('July 2026')).toBeTruthy();
-    expect(screen.queryByText('This month')).toBeNull();
   });
 
-  it('re-queries with the month period rather than filtering in the screen', async () => {
-    // The totals must come from a scoped query. If the screen filtered a
-    // this-month result set client-side, past months would always be empty.
-    mockMonths(['2026-07']);
+  it('advertises the swipe, because the last design did not', async () => {
+    await render(<Earnings/>);
+    expect(screen.getByText('Swipe for earlier months')).toBeTruthy();
+  });
+
+  it('pages back a month and re-queries for it', async () => {
     await render(<Earnings/>);
 
-    fireEvent.press(screen.getByText('Jul'));
+    fireEvent.press(screen.getByLabelText('Show an earlier period'));
 
-    await waitFor(() => expect(useDriverEarnings).toHaveBeenLastCalledWith('m:2026-07'));
+    expect(await screen.findByText(periodHeadline(monthsBack(1), now()))).toBeTruthy();
+    // Re-queried, not filtered in the screen — a client-side filter over a
+    // this-month result set would leave every past period empty.
+    await waitFor(() => expect(useDriverEarnings).toHaveBeenLastCalledWith(monthsBack(1)));
   });
 
-  it('names the month in the empty state instead of lowercasing it', async () => {
-    // Built as a sentence per period — the old code lowercased the headline,
-    // which turned a month name into "in july 2026".
-    mockMonths(['2026-07']);
+  it('stops at the ceiling of three periods', async () => {
+    // MAX_PERIODS is 3. A fourth press must not walk off the end into a period
+    // the pager never generated — periodRange throws on an unknown key.
+    await render(<Earnings/>);
+    const earlier = screen.getByLabelText('Show an earlier period');
+
+    // Awaited one at a time. Firing four presses back-to-back leaves React 19
+    // work queued that never flushes before the test ends, and the unsettled
+    // root then breaks EVERY subsequent render in the file — the failure shows
+    // up as "unable to find element" in later tests, nowhere near the cause.
+    for (let i = 0; i < 4; i++) {
+      fireEvent.press(earlier);
+      await waitFor(() => expect(useDriverEarnings).toHaveBeenCalled());
+    }
+
+    expect(await screen.findByText(periodHeadline(monthsBack(2), now()))).toBeTruthy();
+    await waitFor(() => expect(useDriverEarnings).toHaveBeenLastCalledWith(monthsBack(2)));
+  });
+
+  it('never offers more periods than the driver has history for', async () => {
+    // Bounded by real history, never padded to the ceiling: a page the driver
+    // cannot have worked is a dot promising data and delivering an empty state.
+    mockHistoryStart(new Date().toISOString()); // first job was today
+    await render(<Earnings/>);
+
+    expect(screen.getByText('This month')).toBeTruthy();
+    expect(screen.queryByLabelText('Show an earlier period')).toBeNull();
+    expect(screen.queryByText(/Swipe for earlier/)).toBeNull();
+  });
+
+  it('switches to calendar weeks and resets to the current one', async () => {
+    await render(<Earnings/>);
+    fireEvent.press(screen.getByLabelText('Show an earlier period'));
+    await screen.findByText(periodHeadline(monthsBack(1), now()));
+
+    fireEvent.press(screen.getByText('Week'));
+
+    // Back to offset 0 in the new mode — carrying the offset across would land
+    // on a week chosen by how far back you had paged the months.
+    expect(await screen.findByText('This week')).toBeTruthy();
+    await waitFor(() => expect(useDriverEarnings).toHaveBeenLastCalledWith(weeksBack(0)));
+  });
+
+  it('names last week relatively and earlier weeks by their dates', async () => {
+    await render(<Earnings/>);
+    fireEvent.press(screen.getByText('Week'));
+    await screen.findByText('This week');
+
+    fireEvent.press(screen.getByLabelText('Show an earlier period'));
+    expect(await screen.findByText('Last week')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Show an earlier period'));
+    // Two weeks back is named by its dates, not "2 weeks ago" — that would put
+    // the arithmetic on the person least able to check it.
+    const label = periodHeadline(weeksBack(2), now());
+    expect(label).toMatch(/^\d{1,2} \w{3} \u2013 \d{1,2} \w{3}/);
+    expect(await screen.findByText(label)).toBeTruthy();
+  });
+
+  it('drops the pager entirely on All Time', async () => {
+    await render(<Earnings/>);
+    fireEvent.press(screen.getByText('All Time'));
+
+    expect(await screen.findByText('All time')).toBeTruthy();
+    expect(screen.queryByLabelText('Show an earlier period')).toBeNull();
+    await waitFor(() => expect(useDriverEarnings).toHaveBeenLastCalledWith('all'));
+  });
+
+  it('names the period in the empty state instead of lowercasing it', async () => {
     mockEarnings(summary({ rows: [], jobsCount: 0 }));
     await render(<Earnings/>);
 
-    fireEvent.press(screen.getByText('Jul'));
+    fireEvent.press(screen.getByLabelText('Show an earlier period'));
 
-    expect(await screen.findByText('No completed jobs in July 2026.')).toBeTruthy();
+    const expected = `No completed jobs in ${periodHeadline(monthsBack(1), now())}.`;
+    // Capitalised month name — the old code lowercased the headline and
+    // produced "in july 2026".
+    expect(expected).toMatch(/in [A-Z]/);
+    expect(await screen.findByText(expected)).toBeTruthy();
   });
 
-  it('still works when the month list has not loaded', async () => {
-    // The month strip is a nicety; the three fixed periods are the screen. A
-    // failed or pending months query must not take Earnings down with it.
-    mockMonths(undefined);
+  it('still works when the history query has not resolved', async () => {
+    // The pager is a nicety; the current period is the screen. A pending or
+    // failed history read must not take Earnings down with it.
+    mockHistoryStart(undefined);
     await render(<Earnings/>);
 
-    expect(screen.getByText('This Week')).toBeTruthy();
-    expect(screen.getByText('This Month')).toBeTruthy();
-    expect(screen.getByText('All Time')).toBeTruthy();
+    expect(screen.getByText('This month')).toBeTruthy();
+    expect(screen.getByText('Month')).toBeTruthy();
   });
 
   it('shows the job date on a row, which is what the period was chosen by', async () => {
     // Rows are bucketed by MY-local PICKUP date to match create_driver_payout.
-    // Displaying a completion date here would put an August date under a July
+    // Displaying a completion date would put an August date under a July
     // heading on every job closed late.
     mockEarnings(summary());
     await render(<Earnings/>);
