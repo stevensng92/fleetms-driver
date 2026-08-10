@@ -18,6 +18,13 @@
     "setupFilesAfterEnv": [
       "<rootDir>/test/setup.ts"
     ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/\\.claude/worktrees/"
+    ],
+    "modulePathIgnorePatterns": [
+      "/\\.claude/worktrees/"
+    ],
     "transformIgnorePatterns": [
       "node_modules/(?!(?:.pnpm/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|react-native-reanimated|react-native-worklets))",
       "/node_modules/react-native-reanimated/plugin/"
