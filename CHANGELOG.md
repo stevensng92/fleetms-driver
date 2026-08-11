@@ -2,6 +2,41 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.11.0] - 2026-08-12
+
+Requires dispatcher **v0.33.0.0** for the `driver_job_client_phone` RPC. Without
+it the call fails, the app retries once, logs to Sentry and falls back to showing
+the passenger number alone — i.e. exactly today's behaviour, no broken screen.
+
+### Fixed
+
+- **You can now see a number to call on most jobs.** The job screen only ever
+  showed a phone when the dispatcher had typed one into the passenger field,
+  which on real jobs is rare — about one job in ten. The rest showed no number
+  at all, even though most of them had a reachable number saved against the
+  client. The card now falls back to the client's number when the passenger has
+  none, which covers roughly three jobs in four.
+
+- When the number shown belongs to the **client rather than the passenger named
+  above it**, the card says whose it is in brackets. Ringing the booking office
+  and asking for Mr Tan is worse than knowing you're ringing the booking office.
+
+- Jobs with no number on file anywhere (roughly one in four) still show no call
+  row, rather than a tap target that goes nowhere.
+
+- The client fallback is served only to the driver currently assigned to the
+  job, and only while they are an active driver on that job's operator. All
+  three conditions are enforced on the server, so a missing number can mean the
+  account no longer qualifies rather than that no number exists — worth checking
+  in the dispatcher before treating it as a bug.
+
+- **A number that is on file but unusable now says so.** If the stored value
+  isn't a dialable number, the card shows "Number on file is not valid" instead
+  of printing the raw text next to a phone icon. Dial-control characters, a
+  number with an extension typed after it, or a note someone left in the phone
+  field are all treated as unusable rather than dialled, because stripping them
+  first can produce a different number than the one on the screen.
+
 ## [0.10.0] - 2026-08-10
 
 ### Changed

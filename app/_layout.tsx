@@ -42,7 +42,7 @@ import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
 // build time. Getting it wrong doesn't break the app — it silently mislabels
 // the Sentry `dist` tag, so crashes get attributed to the wrong binary.
 //
-// v0.4.0 = 2, v0.5.0 = 3, v0.6.0 = 4, v0.7.0 = 5, v0.9.0 = 6.
+// v0.4.0 = 2, v0.5.0 = 3, v0.6.0 = 4, v0.7.0 = 5, v0.9.0 = 6, v0.10.0 = 7.
 //
 // Note the gap: there is no v0.8.0 build. It reached master but was blocked on
 // a prod migration and was superseded by v0.9.0 before ever being cut, so it
@@ -50,11 +50,11 @@ import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
 // were BUILT rather than releases that exist, and why counting tags would have
 // put this one at 8.
 //
-// Remote counter read as 6 via build:version:get on 2026-08-10, so this v0.10.0
-// build lands on 7. Re-run it before cutting rather than trusting this line.
+// Remote counter read as 7 via build:version:get on 2026-08-12, so this v0.11.0
+// build lands on 8. Re-run it before cutting rather than trusting this line.
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
-const APP_BUILD = '7';
+const APP_BUILD = '8';
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
