@@ -21,15 +21,27 @@ Run with `npm test`. Full guide, including the sharp edges that will bite you
 - Never commit code that makes existing tests fail.
 
 Currently covered: pure helpers (`lib/timeFormat.ts`, `lib/commissionRate.ts`,
-`lib/semver.ts`, `lib/earningsPeriod.ts`) and shared components, plus the
-Earnings screen. NOT covered: the other screens, the React Query data hooks,
-realtime, auth. Adding coverage there needs Supabase mocking — worth doing, not
-yet done.
+`lib/semver.ts`, `lib/earningsPeriod.ts`, `lib/jobContact.ts`) and shared
+components, plus the Earnings screen and `fetchClientPhone` in
+`lib/queries/jobDetail.ts`. NOT covered: the other screens, the remaining React
+Query data hooks, realtime, auth.
 
-Note the shape that makes the covered helpers coverable: anything importing
+Note the shape that makes the pure helpers coverable: anything importing
 `lib/supabase.ts` builds a live client at import time, so pure decisions belong
 in their own module beside the query rather than inside it. `lib/earningsPeriod.ts`
-was split out of `lib/queries/earnings.ts` for exactly this reason.
+was split out of `lib/queries/earnings.ts` for exactly this reason, and
+`lib/jobContact.ts` out of `lib/queries/jobDetail.ts`.
+
+**Query modules CAN be tested.** Put
+`jest.mock('../../supabase', () => ({ supabase: { rpc: … } }))` at the top of the
+file and importing the query never constructs a client, so the import-time
+problem above disappears. Reach for this whenever a query carries real logic —
+a degrade path, a retry, a mapping — rather than assuming queries are
+untestable. Export the inner function for the test and say so in a comment;
+going through the hook drags in a React Query provider for no gain.
+Worked example: `lib/queries/__tests__/jobDetail.clientPhone.test.ts`. Note the
+arrow-wrapper indirection around the mock fn — `jest.mock` hoists above `const`
+initialisation, so referencing the mock directly hits the TDZ.
 
 ## Docs upkeep
 

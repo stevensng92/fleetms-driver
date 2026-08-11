@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
 import { resolveSpecialCommission, type SpecialCommission } from '../commissionRate';
+import { resolveJobContact, type JobContact } from '../jobContact';
 import { fetchCommissionBaseline } from './driverProfile';
 import type { StatusKind } from '../../components/StatusPill';
 
@@ -42,8 +43,10 @@ export type JobDetail = {
   /** Name of the actual person the driver is picking up — populated for
    *  corporate + platform-client jobs where the booker isn't the rider. */
   passengerName: string | null;
-  /** Tap-to-call number for the passenger; format may be local or international. */
-  passengerPhone: string | null;
+  /** Tap-to-call number and whose it is: the passenger's own when the
+   *  dispatcher captured one, else the billing client's. Format may be local
+   *  or international. See lib/jobContact.ts. */
+  contact: JobContact;
   pax: number | null;
   /** Type the dispatcher requested (sedan/mpv/etc.) — fallback when no vehicle is assigned yet. */
   vehicleType: string | null;
@@ -80,6 +83,56 @@ export type JobDetail = {
     lng: number | null;
   }>;
 };
+
+// One retry, no backoff. A second immediate attempt covers the dropped-packet
+// case this exists for; anything that fails twice in a row is a real outage or
+// a missing migration, and waiting longer would just delay the screen.
+async function attemptWithOneRetry(jobUuid: string) {
+  const first = await supabase.rpc('driver_job_client_phone', { target_job_id: jobUuid });
+  if (!first.error) return first;
+  return supabase.rpc('driver_job_client_phone', { target_job_id: jobUuid });
+}
+
+// Billing client's phone. Only called when the job carries no usable
+// passenger_phone — on the jobs that DO have one the answer would be thrown
+// away, and this reads the client contact book, so it should not run for
+// nothing. It needs an RPC rather than an embed because drivers have
+// NO select access to `clients` — `private.is_member_of()` is explicitly
+// `role <> 'driver'`, so an embed would come back null with no error. The
+// function (dispatcher migration 20260812000000) is SECURITY DEFINER and
+// returns one scalar to a caller who is ALL THREE of: holder of the job's
+// current assignment, an ACTIVE driver, and in the job's own org. All three
+// are enforced server-side; none is a client-side check this app could be
+// patched to skip. The rationale for each is in the migration header, in the
+// private dispatcher repo where it belongs.
+//
+// A failure here degrades to "no fallback number" rather than failing the whole
+// screen. That swallow has a cost worth naming: React Query sees a SUCCESS, so
+// its `retry: 2` never applies to this leg and the null is cached with the job
+// for the full staleTime. On the jobs that reach here the fallback is the only
+// number there is, so one blip on flaky LTE would silently no-op the feature
+// for the next 30 seconds. Hence the single inline retry below — it buys back
+// the retry the swallow costs, without letting a dead RPC take the screen down.
+//
+// Exported for tests only — nothing else should call it directly, the job
+// detail query is the single consumer. It is exported rather than exercised
+// through the hook because the hook needs a React Query provider and a full
+// job fixture to reach a few lines of degrade logic.
+export async function fetchClientPhone(jobUuid: string): Promise<string | null> {
+  try {
+    const { data, error } = await attemptWithOneRetry(jobUuid);
+    if (error) throw error;
+    // Narrow rather than cast. `as string` would let a changed RPC signature
+    // (composite return, PostgREST shape change) through as a non-string, and
+    // the first thing downstream does is `.trim()` — a TypeError thrown during
+    // mapping, which rejects the WHOLE job-detail query. Anything that isn't a
+    // string degrades to "no fallback number", which is this function's job.
+    return typeof data === 'string' ? data : null;
+  } catch (e) {
+    try { require('@sentry/react-native').captureException(e); } catch {}
+    return null;
+  }
+}
 
 async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
   // Pull the job + the current assignment + stops in a single round-trip.
@@ -120,7 +173,16 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
   // (resolveSpecialCommission stays silent without a baseline) rather than
   // failing the whole screen — and a fixed fee still surfaces, because a fee
   // needs nothing to compare against.
-  const baseline = await fetchCommissionBaseline();
+  //
+  // Paired with the client-phone fallback so the two independent lookups share
+  // one round-trip window instead of stacking. The fallback is skipped outright
+  // when the job already carries a passenger number — its answer would be
+  // discarded by resolveJobContact, and it reads the client contact book.
+  const needsClientPhone = !(job.passenger_phone as string | null)?.trim();
+  const [baseline, clientPhone] = await Promise.all([
+    fetchCommissionBaseline(),
+    needsClientPhone ? fetchClientPhone(job.id) : Promise.resolve(null),
+  ]);
 
   const assignment = (job.assignments as any[] | undefined)?.find((a: any) => a.is_current) ?? null;
   const assignedVehicle = (() => {
@@ -169,7 +231,7 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
     dropoffDetail: job.dropoff_detail,
     client: job.client_name,
     passengerName: (job.passenger_name as string | null) ?? null,
-    passengerPhone: (job.passenger_phone as string | null) ?? null,
+    contact: resolveJobContact(job.passenger_phone as string | null, clientPhone),
     pax: job.pax,
     vehicleType: job.vehicle_type_required,
     vehiclePlate: assignedVehicle?.plate ?? null,

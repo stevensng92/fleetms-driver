@@ -1,7 +1,7 @@
 {
   "name": "fleetms-driver",
   "main": "expo-router/entry",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -17,6 +17,13 @@
     "globalSetup": "<rootDir>/test/globalSetup.js",
     "setupFilesAfterEnv": [
       "<rootDir>/test/setup.ts"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/\\.claude/worktrees/"
+    ],
+    "modulePathIgnorePatterns": [
+      "/\\.claude/worktrees/"
     ],
     "transformIgnorePatterns": [
       "node_modules/(?!(?:.pnpm/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|react-native-reanimated|react-native-worklets))",

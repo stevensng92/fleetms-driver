@@ -96,6 +96,23 @@ gone: every period is now named absolutely (`m:2026-07`, `w:2026-08-03`) so an
 app left open across midnight cannot silently re-point a query at a different
 range than the one on the label.
 
+The contact number on Job Detail and Active Job resolves through a chain rather
+than a single column. It had read `jobs.passenger_phone` alone, which dispatchers
+fill in rarely, so most jobs offered no way to reach anyone while a number sat
+on the billing client all along. Drivers cannot read
+`clients` at all (`private.is_member_of()` excludes the driver role, silently —
+zero rows, no error), so the fallback comes through the SECURITY DEFINER RPC
+`driver_job_client_phone`, which returns that one column to a caller who is all
+three of: holder of the job's current assignment, an **active** driver, and in
+the job's own org. All three are enforced server-side; none of them is a
+client-side check this app could be modified to skip.
+`lib/jobContact.ts` picks passenger-then-client and
+reports which it used, so the card can name the client when the number does not
+belong to the passenger printed above it. The RPC failing degrades to the
+passenger number alone rather than failing the screen. Dispatcher-side
+counterpart: `../fleetms/app/lib/job-contact.ts`, documented in
+`../fleetms/docs/clients.md`.
+
 Clock times render as 24-hour digits with the am/pm marker kept behind them
 (`09:00 am`, `14:30 pm`) via `lib/timeFormat.ts`. The marker is redundant
 after noon by strict notation; it is retained deliberately, so don't

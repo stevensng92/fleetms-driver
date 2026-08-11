@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, Linking, Alert } from 'react-native';
 import { Icon } from './Icon';
 import { useTokens } from '../theme/ThemeProvider';
+import { isDialable, toDialString, type JobContact } from '../lib/jobContact';
 
 const VEHICLE_TYPE_LABEL: Record<string, string> = {
   sedan:           'Sedan',
@@ -14,16 +15,22 @@ const VEHICLE_TYPE_LABEL: Record<string, string> = {
 // Top-of-page client/passenger card shared by Job Detail + Active Job screens.
 //
 // Display rule: if passengerName is set (corporate or platform-client job
-// where the booker isn't the rider), show the passenger as the headline and
-// surface their phone with tap-to-call. Otherwise fall back to the billing
-// client_name and any client-level phone (none today; null-safe).
+// where the booker isn't the rider), show the passenger as the headline.
+// Otherwise show the billing client_name.
+//
+// The tap-to-call number is resolved separately from the headline, by
+// lib/jobContact.ts: the passenger's own line when the dispatcher captured
+// one, else the billing client's. Those two can disagree — a named passenger
+// with only a client number on file — so when the number belongs to someone
+// other than the person named above it, say so rather than implying the
+// headline name will answer.
 //
 // Bottom row: assigned-vehicle line ("MPV · Alphard · WA 1234 B"). When no
 // vehicle is assigned, falls back to the requested vehicle type alone.
 export function ClientCard({
   clientName,
   passengerName,
-  passengerPhone,
+  contact,
   pax,
   vehicleType,
   vehicleModel,
@@ -31,7 +38,7 @@ export function ClientCard({
 }: {
   clientName: string;
   passengerName: string | null;
-  passengerPhone: string | null;
+  contact: JobContact;
   pax: number | null;
   vehicleType: string | null;
   vehicleModel: string | null;
@@ -39,21 +46,22 @@ export function ClientCard({
 }) {
   const T = useTokens();
   const displayName = passengerName ?? clientName;
-  const phone = passengerPhone;
+  const phone = contact.phone;
+  // One predicate gates BOTH the render and the tap. Rendering an unvalidated
+  // value was the sharper half of the problem: the card body is a surface the
+  // driver trusts more than a dialog, so a dispatcher-writable field could put
+  // arbitrary chosen text there in green next to a phone icon.
+  const dialable = isDialable(phone);
+  // Only a caption when the line answers to someone else. With no passenger
+  // name the headline already IS the client, so labelling it would be noise.
+  const phoneNote = contact.source === 'client' && passengerName ? clientName : null;
 
   function call() {
-    if (!phone) return;
-    // Strip everything except digits + leading '+'. Prevents `tel:` from
-    // carrying special characters (comma = pause, * = star key) that a
-    // compromised passenger_phone value could use for auto-dial sequences.
-    // Plus the format sanity-check rejects garbage values early.
-    const cleaned = phone.replace(/[^\d+]/g, '');
-    if (!/^\+?\d{7,15}$/.test(cleaned)) {
-      Alert.alert('Invalid phone number', `Stored value: ${phone}`);
-      return;
-    }
-    Linking.openURL(`tel:${cleaned}`).catch(() =>
-      Alert.alert('Could not start call', `Number: ${phone}`),
+    // `dialable` gates the render below, so this cannot fire from the UI. Kept
+    // so call() is safe if it is ever bound somewhere else.
+    if (!dialable) return;
+    Linking.openURL(`tel:${toDialString(phone!)}`).catch(() =>
+      Alert.alert('Could not start call', 'The dialer would not open.'),
     );
   }
 
@@ -81,7 +89,7 @@ export function ClientCard({
             <Text style={{ fontSize: 18, fontWeight: '700', color: T.text, letterSpacing: -0.3 }} numberOfLines={1}>
               {displayName}
             </Text>
-            {phone && (
+            {dialable && (
               <Pressable
                 onPress={call}
                 style={({ pressed }) => ({
@@ -93,10 +101,27 @@ export function ClientCard({
                 hitSlop={6}
               >
                 <Icon name="phone" size={13} color={T.green}/>
-                <Text style={{ fontSize: 13, color: T.green, fontWeight: '600' }}>
+                {/* numberOfLines caps a stored value that is long or carries
+                    line breaks, so it cannot push the rest of the card around
+                    or trail content below where the driver stops reading. */}
+                <Text style={{ fontSize: 13, color: T.green, fontWeight: '600' }} numberOfLines={1}>
                   {phone}
                 </Text>
+                {phoneNote && (
+                  <Text style={{ fontSize: 12, color: T.muted }} numberOfLines={1}>
+                    ({phoneNote})
+                  </Text>
+                )}
               </Pressable>
+            )}
+            {/* A number IS on file but is not usable. Say so plainly rather
+                than rendering the stored text or showing nothing at all —
+                "no number" and "the number on file is junk" are different
+                problems and dispatch can only fix the second if it is told. */}
+            {phone && !dialable && (
+              <Text style={{ fontSize: 13, color: T.muted, marginTop: 4 }} numberOfLines={1}>
+                Number on file is not valid — contact dispatch
+              </Text>
             )}
           </View>
           {pax != null && (

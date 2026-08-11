@@ -123,7 +123,7 @@ export default function ActiveJob() {
         <ClientCard
           clientName={job.client}
           passengerName={job.passengerName}
-          passengerPhone={job.passengerPhone}
+          contact={job.contact}
           pax={job.pax}
           vehicleType={job.vehicleType}
           vehicleModel={job.vehicleModel}

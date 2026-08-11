@@ -75,6 +75,24 @@ They claim push works and no uninstall is needed. Both were untrue at the time.
 
 ## Completed
 
+### Stop jest collecting `.claude/worktrees/` as source
+**Completed:** 2026-08-10 — every Conductor worktree is a whole duplicate
+checkout, and jest was collecting all of them. With two stale worktrees present,
+`npm test` reported **591 tests / 26 suites** against a tree that actually has
+**225 / 9** — the same suites counted three times. Worse than an inflated
+number, it is a *false* green: a worktree pinned to an older commit passes its
+own outdated copy of a test the main tree has since changed, and the summary
+line cannot tell you which copy answered.
+
+Fixed with `testPathIgnorePatterns` (which also has to restate `/node_modules/`
+— setting it REPLACES jest's default rather than extending it) plus
+`modulePathIgnorePatterns`, because ignoring the test files still leaves
+jest-haste-map crawling each worktree's `package.json` for the module map.
+Scoped to `.claude/worktrees/` rather than all of `.claude/`, matching the call
+the dispatcher repo made for ESLint in v0.27.3.2 — it hit this exact defect one
+tool over (2130 phantom lint errors, all from worktrees) and the reasoning
+transfers unchanged.
+
 ### Fix Earnings row navigation (uuid vs job_number)
 **Completed:** v0.7.0 (2026-07-31)
 
