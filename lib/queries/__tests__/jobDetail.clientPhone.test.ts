@@ -52,9 +52,43 @@ describe('fetchClientPhone', () => {
     // The shape that matters: dispatcher-side migration not applied yet, so
     // the function does not exist. The screen must still render with the
     // passenger number alone.
-    mockRpc.mockResolvedValue({ data: null, error: { message: 'function does not exist' } });
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: 'function does not exist', code: 'PGRST202', details: '', hint: '' },
+      status: 404,
+    });
     await expect(fetchClientPhone(JOB)).resolves.toBeNull();
     expect(captureException).toHaveBeenCalled();
+  });
+
+  it('reports a server error as a real Error naming the RPC', async () => {
+    // Regression: FLEETMS-DRIVER-6. The raw PostgrestError (a plain object)
+    // reached Sentry as "Object captured as exception with keys: code,
+    // details, hint, message" — no message, no call site.
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: 'permission denied for function', code: '42501', details: 'd', hint: 'h' },
+      status: 403,
+    });
+    await fetchClientPhone(JOB);
+    const [reported, context] = (captureException as jest.Mock).mock.calls[0];
+    expect(reported).toBeInstanceOf(Error);
+    expect(reported.message).toBe('driver_job_client_phone failed: permission denied for function');
+    expect(context).toEqual({ extra: { code: '42501', details: 'd', hint: 'h', status: 403 } });
+  });
+
+  it('degrades to null WITHOUT reporting when the request never reached the server', async () => {
+    // postgrest-js resolves (not rejects) a failed fetch as status 0 with
+    // "TypeError: Network request failed". A driver in a dead spot is not a
+    // bug — reporting it opens a Sentry issue per coverage gap.
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: 'TypeError: Network request failed', code: '', details: '', hint: '' },
+      status: 0,
+    });
+    await expect(fetchClientPhone(JOB)).resolves.toBeNull();
+    expect(mockRpc).toHaveBeenCalledTimes(2); // still retried once first
+    expect(captureException).not.toHaveBeenCalled();
   });
 
   it('degrades to null when the call rejects outright', async () => {
