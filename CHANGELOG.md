@@ -2,6 +2,28 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Hotfix] - 2026-09-24
+
+No version bump. JS-only, ships as an EAS Update on the `preview` channel to
+existing 0.11.0 installs. The runtime version follows `appVersion`, so bumping
+the version would strand the update on a build no driver has.
+
+### Fixed
+
+- **Client-phone lookup failures now show up in Sentry with a readable
+  message.** When `driver_job_client_phone` failed, the raw PostgREST error
+  object went to Sentry as "Object captured as exception with keys: code,
+  details, hint, message", with no message and an anonymous frame for a title
+  (Sentry FLEETMS-DRIVER-6, first seen 2026-09-24). It is now wrapped as
+  `driver_job_client_phone failed: <server message>`, with code, details, hint
+  and HTTP status attached as extras.
+- **A driver losing signal no longer raises a Sentry issue.** A request that
+  never reached the server (postgrest-js reports these as status 0) degrades to
+  "no fallback number" quietly after its one retry, the same as before, but is
+  no longer reported. FLEETMS-DRIVER-6 was one of these: the server logs showed
+  no failed request, and the driver's realtime socket reconnected twice in the
+  minute before it. Errors the server actually returns are still reported.
+
 ## [0.11.0] - 2026-08-12
 
 Requires dispatcher **v0.33.0.0** for the `driver_job_client_phone` RPC. Without

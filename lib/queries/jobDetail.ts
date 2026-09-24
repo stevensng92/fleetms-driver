@@ -120,8 +120,17 @@ async function attemptWithOneRetry(jobUuid: string) {
 // job fixture to reach a few lines of degrade logic.
 export async function fetchClientPhone(jobUuid: string): Promise<string | null> {
   try {
-    const { data, error } = await attemptWithOneRetry(jobUuid);
-    if (error) throw error;
+    const { data, error, status } = await attemptWithOneRetry(jobUuid);
+    if (error) {
+      // status 0 = the request never reached PostgREST. postgrest-js turns a
+      // failed fetch (dead spot, airplane mode, abort) into a resolved error
+      // with status 0 rather than rejecting. Two in a row is just a driver out
+      // of coverage — nothing we can fix, and on flaky LTE it would open a
+      // Sentry issue per dead spot. Anything the server actually answered
+      // (missing function, permission, bad signature) is ours and IS reported.
+      if (status !== 0) reportClientPhoneError(error, status);
+      return null;
+    }
     // Narrow rather than cast. `as string` would let a changed RPC signature
     // (composite return, PostgREST shape change) through as a non-string, and
     // the first thing downstream does is `.trim()` — a TypeError thrown during
@@ -132,6 +141,25 @@ export async function fetchClientPhone(jobUuid: string): Promise<string | null> 
     try { require('@sentry/react-native').captureException(e); } catch {}
     return null;
   }
+}
+
+// A PostgrestError is a plain object, not an Error. Handed to captureException
+// raw, Sentry files it as "Object captured as exception with keys: code,
+// details, hint, message" with an anonymous frame for a title (FLEETMS-DRIVER-6)
+// — nothing in the issue says which call failed or why. Wrap it so the title
+// names the RPC and carries the server's message, and keep the structured
+// fields as extras for triage.
+function reportClientPhoneError(
+  error: { message: string; code?: string; details?: string; hint?: string },
+  status: number,
+) {
+  const wrapped = new Error(`driver_job_client_phone failed: ${error.message}`);
+  wrapped.name = 'ClientPhoneLookupError';
+  try {
+    require('@sentry/react-native').captureException(wrapped, {
+      extra: { code: error.code, details: error.details, hint: error.hint, status },
+    });
+  } catch {}
 }
 
 async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
