@@ -71,15 +71,21 @@ an APK, or publishes an over-the-air update.
 
 CI runs the first two on the pull request. I attach the screenshots to each PR.
 
-**Before and after page**: `docs/redesign-compare.html` puts today's app (left,
-live) next to the mock (right) for each of the 13 screens, with that screen's
-numbered changes underneath. It holds no data itself; both sides load when you
-open it. To run it: start the app with `npx expo start --port 8090` from
-`P:/github/fleetms-driver` (not the `C:` shortcut, where the web build stays
-blank), `npm run dev` in `P:/github/design-systems/fleetms`, then serve `docs/`
-(`python -m http.server 3030 --directory docs`) and open
-`http://localhost:3030/redesign-compare.html`. Each phase's PR uses it for the
-look check, so the left side becomes the new app as phases land.
+**Before and after page**: `docs/redesign-compare.html` puts today's app (left)
+next to the mock (right) for each of the 13 screens, with that screen's
+numbered changes underneath. The left side is the real app's own screens fed
+the mock's fake day (Azman, Continental Travel) through a stand-in database,
+`demo/` (see `demo/README.md`): no sign-in and no live data. The stand-in only
+switches on for the web preview, when `EXPO_PUBLIC_DEMO_DATA=1` is set by hand;
+phone builds never see it. To run it:
+
+1. From `P:/github/fleetms-driver` (not the `C:` shortcut, where the web build stays blank): `EXPO_PUBLIC_DEMO_DATA=1 npx expo start --port 8091 --clear`
+2. In `P:/github/design-systems/fleetms`: `npm run dev`
+3. `python -m http.server 3030 --directory docs`, then open `http://localhost:3030/redesign-compare.html`
+
+Each phase's PR uses it for the look check, so the left side becomes the new
+app as phases land. Known gap: the receipt photo on the left's Receipt screen
+stays blank (the stand-in picture doesn't draw); the rest of that screen shows.
 
 ## Phase 1: paint only (changes 1 to 9)
 

@@ -6,11 +6,11 @@
 <title>Driver before and after</title>
 <!--
   Side-by-side check for the driver redesign (docs/redesign-plan.md).
-  Left: today's app, live from Expo web: run `npx expo start --port 8090` from the P:/ path of this repo
-  (from the C:/ shortcut path Metro cannot find node_modules and the page stays blank).
+  Left: today's real app on fake data (demo/README.md): from the P:/ path of this repo run
+  `EXPO_PUBLIC_DEMO_DATA=1 npx expo start --port 8091`. (From the C:/ shortcut path Metro
+  cannot find node_modules and the page stays blank.) No sign-in, no live database.
   Right: the mock (npm run dev in P:/github/design-systems/fleetms, port 3025).
-  The page holds no data of its own: both frames load at view time, so nothing
-  private is written into this file (the repo is public).
+  Both sides show the same fake day: Azman, Continental Travel, the Alphard VKA 2231.
 -->
 <style>
   :root {
@@ -64,7 +64,7 @@
 </header>
 <div class="bar"><div class="bar-in" id="bar" role="toolbar" aria-label="Screens"></div></div>
 <main>
-  <p class="note">The left frame is the real app on live data: sign in once there with a test driver. Screens that need a job or expense open on the list; tap one inside the frame. The left frame follows the app's own Appearance setting (Profile), the right one follows the Light and Dark buttons.</p>
+  <p class="note">Left is today's app, the real screens, fed the same fake day as the mock: no sign-in and no live data. Tapping works on both sides, so you can accept a job or log an expense. Reload the page to start the day over. The left frame follows the app's own Appearance setting (Profile), the right one follows the Light and Dark buttons.</p>
   <div class="pair">
     <figure>
       <figcaption>Today <a id="open-before" target="_blank" rel="noopener">open on its own</a></figcaption>
@@ -81,7 +81,7 @@
   </section>
 </main>
 <script>
-  const BEFORE = new URLSearchParams(location.search).get("before") ?? "http://localhost:8090"
+  const BEFORE = new URLSearchParams(location.search).get("before") ?? "http://localhost:8091"
   const AFTER = "http://localhost:3025/driver.html"
   // Each screen: the real route (left), the mock screen (right) and the numbered changes from driver-inventory.md.
   const SCREENS = [
@@ -91,8 +91,8 @@
       [2, "Capital labels (PHONE NUMBER, PIN) become sentence case."] ] },
     { key: "set-pin", label: "Set PIN", before: "/set-pin", after: "set-pin", changes: [
       [31, "The temporary-PIN-expired screen says its message once."] ] },
-    { key: "update-required", label: "Update required", before: null, after: "update-required", changes: [
-      [30, "A calm card with an ink \"Update now\", not a red error. (Today's screen only shows when the server asks for a newer version, so it can't be opened here.)"] ] },
+    { key: "update-required", label: "Update required", before: "/?version=required", after: "update-required", changes: [
+      [30, "A calm card with an ink \"Update now\", not a red error. "] ] },
     { key: "jobs", label: "Jobs", before: "/", after: "jobs", changes: [
       [1, "Violet buttons become ink; cyan marks become the green accent; pills carry an icon."],
       [4, "Times are 24 hour: 14:30, not 14:30 pm."],
@@ -106,20 +106,20 @@
     { key: "notifications", label: "Notifications", before: "/notifications", after: "notifications", changes: [
       [3, "Lines joined with dots become one plain line."],
       [29, "A row that leads nowhere no longer looks tappable; new items carry a \"New\" pill instead of a red dot."] ] },
-    { key: "job", label: "Job", before: "/", after: "job&id=JOB-138", changes: [
+    { key: "job", label: "Job", before: "/jobs/JOB-138", after: "job&id=JOB-138", changes: [
       [12, "Mark as done asks first."],
       [16, "A stop with no time shows no time line; \"Dropoff\" is written \"Drop-off\"."],
       [17, "\"Route · 1 stops\" is fixed; the count sits beside the Route heading."],
       [18, "Report an issue: open item, today's behaviour kept."],
       [20, "A job that left the list says \"This job is no longer on your list\"."] ] },
-    { key: "trip", label: "Trip", before: "/", after: "trip&id=JOB-137", changes: [
+    { key: "trip", label: "Trip", before: "/jobs/active?id=JOB-137", after: "trip&id=JOB-137", changes: [
       [6, "The trip is the dark card at the top."],
       [13, "The frozen \"Stop 1 of N\" bar is gone; the time window and route show instead."],
       [12, "Mark as done asks first."] ] },
     { key: "expenses", label: "Expenses", before: "/expenses", after: "expenses", changes: [
       [9, "The month total is the screen's one dark card; category colours on rows are dropped."],
       [2, "LOGGED THIS MONTH and other capital labels become sentence case."] ] },
-    { key: "expense", label: "Receipt", before: "/expenses", after: "expense&id=x1", changes: [
+    { key: "expense", label: "Receipt", before: "/expenses/x1", after: "expense&id=x1", changes: [
       [3, "Dot-joined lines become separate items."],
       [2, "Capital labels (CATEGORY, DATE) become sentence case."] ] },
     { key: "log-expense", label: "Log expense", before: "/expenses/log", after: "log-expense", changes: [
