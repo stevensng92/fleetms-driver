@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { PanResponder } from 'react-native';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import Earnings from '../../app/(tabs)/earnings';
 import { useDriverEarnings, useEarningsHistoryStart, type EarningsSummary } from '../../lib/queries/earnings';
@@ -189,15 +190,66 @@ describe('Earnings — row rendering', () => {
     expect(screen.getByText('RM 80.00')).toBeTruthy();
   });
 
-  it('renders an em dash when the dispatcher has not set commission', async () => {
+  it('keeps the cents in fares, the average and the rows (change 21)', async () => {
+    mockEarnings(summary({
+      fareTotal: 1234.5, avgCommissionPerJob: 33.33, commissionTotal: 1068,
+      rows: [{ ...summary().rows[0], fare: 500, commission: 100 }],
+    }));
+    await render(<Earnings/>);
+
+    expect(screen.getByText('RM 1,234.50 in fares')).toBeTruthy();
+    expect(screen.getByText('RM 33.33')).toBeTruthy();
+    expect(screen.getByText('Average per job')).toBeTruthy();
+    expect(screen.getByText('RM 500.00 fare')).toBeTruthy();
+    expect(screen.getByText('RM 100.00')).toBeTruthy();
+    expect(screen.getByText('RM 1,068')).toBeTruthy();
+    expect(screen.getByText('.00')).toBeTruthy();
+  });
+
+  it('words each payment status, with no Invoiced and no Pending (change 22)', async () => {
+    const base = summary().rows[0];
+    mockEarnings(summary({
+      rows: [
+        { ...base, jobId: 'a', jobNumber: 'J-A', paymentStatus: 'paid' },
+        { ...base, jobId: 'b', jobNumber: 'J-B', paymentStatus: 'unpaid' },
+        { ...base, jobId: 'c', jobNumber: 'J-C', paymentStatus: 'waived' },
+        { ...base, jobId: 'd', jobNumber: 'J-D', paymentStatus: 'refunded' },
+      ],
+      pendingCount: 3,
+    }));
+    await render(<Earnings/>);
+
+    expect(screen.getByText('Paid')).toBeTruthy();
+    expect(screen.getByText('Waived')).toBeTruthy();
+    expect(screen.getByText('Refunded')).toBeTruthy();
+    // One on the row, one as the figure's label.
+    expect(screen.getAllByText('Unpaid')).toHaveLength(2);
+    expect(screen.queryByText('Pending')).toBeNull();
+    expect(screen.queryByText('Invoiced')).toBeNull();
+    expect(screen.getByText('3 jobs')).toBeTruthy();
+  });
+
+  it('shows None when nothing is unpaid', async () => {
+    mockEarnings(summary({ pendingCount: 0 }));
+    await render(<Earnings/>);
+    expect(screen.getByText('None')).toBeTruthy();
+  });
+
+  it('has no page dots (change 23)', async () => {
+    await render(<Earnings/>);
+    expect(screen.queryByTestId('page-dot')).toBeNull();
+  });
+
+  it('says "Awaiting commission" on a row the dispatcher has not priced (change 23)', async () => {
     mockEarnings(summary({
       rows: [{ ...summary().rows[0], commission: null }],
       missingCommissionCount: 1,
     }));
     await render(<Earnings/>);
 
-    expect(screen.getByText('—')).toBeTruthy();
-    expect(screen.getByText(/awaiting commission/)).toBeTruthy();
+    expect(screen.getByText('Awaiting commission')).toBeTruthy();
+    expect(screen.queryByText('—')).toBeNull();
+    expect(screen.getByText(/awaiting commission from dispatcher/)).toBeTruthy();
   });
 
   it('shows the empty state when there are no completed jobs', async () => {
@@ -245,7 +297,7 @@ describe('Earnings — period pager', () => {
 
     expect(screen.getByText('Week')).toBeTruthy();
     expect(screen.getByText('Month')).toBeTruthy();
-    expect(screen.getByText('All Time')).toBeTruthy();
+    expect(screen.getByText('All time')).toBeTruthy(); // the tab; the card only says it once All is picked
     // The old strip put period names in the selector. They belong on the card.
     expect(screen.queryByText('This Month')).toBeNull();
   });
@@ -255,9 +307,11 @@ describe('Earnings — period pager', () => {
     expect(screen.getByText('This month')).toBeTruthy();
   });
 
-  it('advertises the swipe, because the last design did not', async () => {
+  it('advertises the swipe, naming the direction', async () => {
     await render(<Earnings/>);
-    expect(screen.getByText('Swipe for earlier months')).toBeTruthy();
+    expect(screen.getByText('Swipe right for earlier months')).toBeTruthy();
+    fireEvent.press(screen.getByText('Week'));
+    expect(await screen.findByText('Swipe right for earlier weeks')).toBeTruthy();
   });
 
   it('pages back a month and re-queries for it', async () => {
@@ -298,7 +352,7 @@ describe('Earnings — period pager', () => {
 
     expect(screen.getByText('This month')).toBeTruthy();
     expect(screen.queryByLabelText('Show an earlier period')).toBeNull();
-    expect(screen.queryByText(/Swipe for earlier/)).toBeNull();
+    expect(screen.queryByText(/Swipe right for earlier/)).toBeNull();
   });
 
   it('switches to calendar weeks and resets to the current one', async () => {
@@ -332,9 +386,10 @@ describe('Earnings — period pager', () => {
 
   it('drops the pager entirely on All Time', async () => {
     await render(<Earnings/>);
-    fireEvent.press(screen.getByText('All Time'));
+    fireEvent.press(screen.getByText('All time'));
 
-    expect(await screen.findByText('All time')).toBeTruthy();
+    // Twice now: the tab and the card heading both read "All time".
+    await waitFor(() => expect(screen.getAllByText('All time')).toHaveLength(2));
     expect(screen.queryByLabelText('Show an earlier period')).toBeNull();
     await waitFor(() => expect(useDriverEarnings).toHaveBeenLastCalledWith('all'));
   });
@@ -370,5 +425,85 @@ describe('Earnings — period pager', () => {
     await render(<Earnings/>);
 
     expect(screen.getByText('29 Jul')).toBeTruthy();
+  });
+});
+
+describe('Earnings — page turn slide (change 37) and swipe (change 38)', () => {
+  // The swipe is a PanResponder. Its release handler is called directly with a
+  // gesture state: simulating touch history is not what is under test.
+  type Release = (e: unknown, g: { dx: number; dy: number }) => void;
+  let spy: jest.SpyInstance;
+  beforeEach(() => { spy = jest.spyOn(PanResponder, 'create'); });
+  afterEach(() => spy.mockRestore());
+  const swipe = async (dx: number, dy = 0) => {
+    const cfg = spy.mock.calls[0][0] as { onPanResponderRelease: Release };
+    await act(async () => { cfg.onPanResponderRelease({}, { dx, dy }); });
+  };
+
+  it('starts still, with nothing sliding', async () => {
+    await render(<Earnings/>);
+    expect(screen.getAllByTestId('page-turn-still').length).toBeGreaterThan(0);
+    expect(screen.queryAllByTestId('page-turn-left')).toHaveLength(0);
+    expect(screen.queryAllByTestId('page-turn-right')).toHaveLength(0);
+  });
+
+  it('Earlier arrow brings the page in from the left, Later from the right', async () => {
+    await render(<Earnings/>);
+    fireEvent.press(screen.getByLabelText('Show an earlier period'));
+    await screen.findByText(periodHeadline(monthsBack(1), now()));
+    // The period name, the figures and the job list.
+    expect(screen.getAllByTestId('page-turn-left')).toHaveLength(3);
+
+    fireEvent.press(screen.getByLabelText('Show a later period'));
+    await screen.findByText('This month');
+    expect(screen.getAllByTestId('page-turn-right')).toHaveLength(3);
+    expect(screen.queryAllByTestId('page-turn-left')).toHaveLength(0);
+  });
+
+  it('a rightward swipe goes earlier and slides in from the left', async () => {
+    await render(<Earnings/>);
+    await swipe(60);
+
+    expect(await screen.findByText(periodHeadline(monthsBack(1), now()))).toBeTruthy();
+    expect(screen.getAllByTestId('page-turn-left')).toHaveLength(3);
+  });
+
+  it('a leftward swipe goes later and slides in from the right', async () => {
+    await render(<Earnings/>);
+    fireEvent.press(screen.getByLabelText('Show an earlier period'));
+    await screen.findByText(periodHeadline(monthsBack(1), now()));
+
+    await swipe(-60);
+    expect(await screen.findByText('This month')).toBeTruthy();
+    expect(screen.getAllByTestId('page-turn-right')).toHaveLength(3);
+  });
+
+  it('a short or mostly vertical drag does nothing', async () => {
+    await render(<Earnings/>);
+    await swipe(30);
+    await swipe(60, 80);
+
+    expect(screen.getByText('This month')).toBeTruthy();
+    expect(screen.queryAllByTestId('page-turn-left')).toHaveLength(0);
+  });
+
+  it('a swipe with nowhere to go does nothing and does not replay the slide', async () => {
+    await render(<Earnings/>);
+    await swipe(-60); // already on the newest page, later has nowhere to go
+
+    expect(screen.queryAllByTestId('page-turn-right')).toHaveLength(0);
+    expect(screen.getByText('This month')).toBeTruthy();
+  });
+
+  it('Week / Month / All switches do not slide', async () => {
+    await render(<Earnings/>);
+    fireEvent.press(screen.getByLabelText('Show an earlier period'));
+    await screen.findByText(periodHeadline(monthsBack(1), now()));
+
+    fireEvent.press(screen.getByText('Week'));
+    await screen.findByText('This week');
+    expect(screen.queryAllByTestId('page-turn-left')).toHaveLength(0);
+    expect(screen.queryAllByTestId('page-turn-right')).toHaveLength(0);
+    expect(screen.getAllByTestId('page-turn-still').length).toBeGreaterThan(0);
   });
 });
