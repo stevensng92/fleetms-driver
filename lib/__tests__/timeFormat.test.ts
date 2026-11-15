@@ -1,5 +1,5 @@
 import {
-  formatClock, formatDate, formatDateKey, formatDateLong, formatDateTime,
+  clockTime, formatClock, formatDate, formatDateKey, formatDateLong, formatDateTime,
   formatDayLong, formatMonthLong, formatMonthKey, formatMonthKeyChip,
   myDateKey, myMonthKey, myMonthStartKey, myStartOfDay, myStartOfMonth,
   myStartOfMonthKey, monthKeysDesc,
@@ -501,5 +501,45 @@ describe('weeksBetween / monthsBetween', () => {
     // Sun 2 Aug to Sun 9 Aug is 7 days but TWO calendar weeks — which is why
     // the pager counts buckets rather than dividing elapsed days by seven.
     expect(weeksBetween('2026-08-02T02:00:00Z', '2026-08-09T02:00:00Z')).toBe(2);
+  });
+});
+
+// Change 33: the Time format setting. Cases ported from the mock's clockTime
+// tests (rules.test.ts), then the same style through formatClock and
+// formatDateTime so every clock in the app can follow the setting.
+describe('clockTime', () => {
+  it('leaves 24-hour times as they are, and 24-hour is the default', () => {
+    expect(clockTime('14:30', '24h')).toBe('14:30');
+    expect(clockTime('09:05')).toBe('09:05');
+  });
+  it('writes the 12-hour style as "2:30 pm"', () => {
+    expect(clockTime('14:30', '12h')).toBe('2:30 pm');
+    expect(clockTime('09:05', '12h')).toBe('9:05 am');
+    expect(clockTime('23:59', '12h')).toBe('11:59 pm');
+  });
+  it('reads midnight as 12 am and noon as 12 pm', () => {
+    expect(clockTime('00:15', '12h')).toBe('12:15 am');
+    expect(clockTime('12:00', '12h')).toBe('12:00 pm');
+    expect(clockTime('11:59', '12h')).toBe('11:59 am');
+  });
+  it('hands back anything that is not HH:MM as it came', () => {
+    expect(clockTime('soon', '12h')).toBe('soon');
+  });
+});
+
+describe('the Time format style through formatClock and formatDateTime', () => {
+  const at = (h: number, m: number) => new Date(Date.UTC(2026, 6, 30, h - 8, m));
+  it('formatClock follows the style, in Malaysian time', () => {
+    expect(formatClock(at(14, 30), '12h')).toBe('2:30 pm');
+    expect(formatClock(at(0, 15), '12h')).toBe('12:15 am');
+    expect(formatClock(at(14, 30), '24h')).toBe('14:30');
+    expect(formatClock(at(14, 30))).toBe('14:30');
+  });
+  it('formatClock keeps the dash for an unreadable time in either style', () => {
+    expect(formatClock('not a date', '12h')).toBe('—');
+  });
+  it('formatDateTime follows the style', () => {
+    expect(formatDateTime(at(9, 22), { weekday: false }, '12h')).toBe('30 Jul, 9:22 am');
+    expect(formatDateTime(at(9, 22), { weekday: false })).toBe('30 Jul, 09:22');
   });
 });
