@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import LogExpense from '../../app/expenses/log';
 import { useMyVehicles } from '../../lib/queries/vehicles';
 import { useLogExpense } from '../../lib/mutations/logExpense';
+import { usePreventRemove } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
 // Screen tests must not live under app/ (see the note in earnings.test.tsx).
@@ -15,6 +16,13 @@ jest.mock('expo-router', () => ({
 // The real modules build a Supabase client at import time.
 jest.mock('../../lib/queries/vehicles', () => ({ useMyVehicles: jest.fn() }));
 jest.mock('../../lib/mutations/logExpense', () => ({ useLogExpense: jest.fn() }));
+// The leave guard: tests read the flag and callback the screen hands it, and
+// call the callback the way navigation would on back or swipe-back.
+const mockDispatch = jest.fn();
+jest.mock('@react-navigation/native', () => ({
+  usePreventRemove: jest.fn(),
+  useNavigation: () => ({ dispatch: mockDispatch }),
+}));
 jest.mock('expo-image-picker', () => ({
   requestCameraPermissionsAsync: jest.fn(),
   requestMediaLibraryPermissionsAsync: jest.fn(),
@@ -263,6 +271,61 @@ describe('Log expense: leaving a filled form asks first (28d)', () => {
     await fireEvent.press(screen.getByText('Save expense'));
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(TITLE)).toBeNull();
+  });
+});
+
+describe('Log expense: back button and swipe-back ask too (28d)', () => {
+  const TITLE = 'Discard this expense?';
+  const ACTION = { type: 'GO_BACK' };
+  const guard = () => (usePreventRemove as jest.Mock).mock.calls.at(-1)! as [boolean, (o: { data: { action: unknown } }) => void];
+
+  it('an empty form is not guarded', async () => {
+    await render(<LogExpense/>);
+    expect(guard()[0]).toBe(false);
+  });
+
+  it('a filled form is guarded; a navigation leave opens the dialog and does not leave', async () => {
+    await render(<LogExpense/>);
+    await fireEvent.changeText(screen.getByPlaceholderText('0.00'), '5');
+    expect(guard()[0]).toBe(true);
+
+    await act(async () => { guard()[1]({ data: { action: ACTION } }); });
+
+    expect(screen.getByText(TITLE)).toBeTruthy();
+    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('Discard after a navigation leave carries on with that same leave, once', async () => {
+    await render(<LogExpense/>);
+    await fireEvent.changeText(screen.getByPlaceholderText('0.00'), '5');
+    await act(async () => { guard()[1]({ data: { action: ACTION } }); });
+    await fireEvent.press(screen.getByText('Discard expense'));
+
+    await waitFor(() => expect(mockDispatch).toHaveBeenCalledWith(ACTION));
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(router.back).not.toHaveBeenCalled();
+    expect(guard()[0]).toBe(false);
+  });
+
+  it('Keep after a navigation leave stays', async () => {
+    await render(<LogExpense/>);
+    await fireEvent.changeText(screen.getByPlaceholderText('0.00'), '5');
+    await act(async () => { guard()[1]({ data: { action: ACTION } }); });
+    await fireEvent.press(screen.getByText('Keep expense'));
+
+    expect(screen.queryByText(TITLE)).toBeNull();
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
+
+  it('after a good save the guard is off, so leaving does not ask', async () => {
+    await render(<LogExpense/>);
+    await fireEvent.changeText(screen.getByPlaceholderText('0.00'), '5');
+    await fireEvent.press(screen.getByText('Save expense'));
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(guard()[0]).toBe(false);
     expect(screen.queryByText(TITLE)).toBeNull();
   });
 });

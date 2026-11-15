@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Image, Alert } from 'react-native';
 import { router } from 'expo-router';
+import { useNavigation, usePreventRemove } from '@react-navigation/native';
+import type { NavigationAction } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Button } from '../../components/Button';
@@ -36,6 +38,11 @@ export default function LogExpense() {
   const [showVehiclePicker, setShowVehiclePicker] = useState(false);
   const [amountFocused, setAmountFocused] = useState(false);
   const [confirmingLeave, setConfirmingLeave] = useState(false);
+  // Set once the driver has chosen to go (saved, or discarded). It switches the
+  // guard off; the effect below then makes the actual move.
+  const [leaving, setLeaving] = useState<{ action: NavigationAction | null } | null>(null);
+  const pendingAction = useRef<NavigationAction | null>(null);
+  const navigation = useNavigation();
   // Messages sit under their field. A pop-up hides the form it is about.
   const [errors, setErrors] = useState<{ amount?: string; vehicle?: string; receipt?: string }>({});
 
@@ -67,6 +74,18 @@ export default function LogExpense() {
   // Saving goes back directly, not through here.
   const draft = hasDraft({ amount, notes, photo: receiptUri != null });
   const leave = () => (draft ? setConfirmingLeave(true) : router.back());
+
+  // Android back and iOS swipe-back come through here. The same dialog opens;
+  // Discard then carries on with the leave that was stopped.
+  usePreventRemove(draft && !leaving, ({ data }) => {
+    pendingAction.current = data.action;
+    setConfirmingLeave(true);
+  });
+  useEffect(() => {
+    if (!leaving) return;
+    if (leaving.action) navigation.dispatch(leaving.action);
+    else router.back();
+  }, [leaving, navigation]);
 
   async function pickReceipt(source: 'camera' | 'library') {
     const perm = source === 'camera'
@@ -130,7 +149,7 @@ export default function LogExpense() {
         notes: notes.trim() || undefined,
         receiptUri,
       });
-      router.back();
+      setLeaving({ action: null });
     } catch (e: any) {
       Alert.alert('Could not save', e?.message ?? 'Unknown error');
     }
@@ -288,8 +307,8 @@ export default function LogExpense() {
         confirmLabel="Discard expense"
         cancelLabel="Keep expense"
         tone="danger"
-        onConfirm={() => { setConfirmingLeave(false); router.back(); }}
-        onCancel={() => setConfirmingLeave(false)}
+        onConfirm={() => { setConfirmingLeave(false); setLeaving({ action: pendingAction.current }); }}
+        onCancel={() => { setConfirmingLeave(false); pendingAction.current = null; }}
       />
 
       <VehicleSheet
