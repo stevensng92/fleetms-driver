@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import Profile from '../../app/(tabs)/profile';
 import { useDriverProfile, type DriverProfile } from '../../lib/queries/driverProfile';
@@ -23,7 +23,7 @@ jest.mock('../../lib/queries/appVersionConfig', () => ({ useAppVersionGate: jest
 jest.mock('../../lib/auth', () => ({ signOut: jest.fn() }));
 
 const profile = (over: Partial<DriverProfile> = {}): DriverProfile => ({
-  id: 'd1', name: 'Azman bin Yusof', phone: '+60 12-345 6789', licenseClass: 'D',
+  id: 'd1', name: 'Azman bin Yusof', initials: 'AB', phone: '+60 12-345 6789', licenseClass: 'D',
   availability: 'available', isActive: true, org: { name: 'Acme Fleet' },
   vehicle: { plate: 'WXY 1234', type: 'mpv', model: 'Alphard' }, ...over,
 });

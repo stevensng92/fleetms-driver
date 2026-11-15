@@ -18,6 +18,8 @@ export type DriverAvailability =
 export type DriverProfile = {
   id: string;
   name: string;
+  /** Not shown any more: the Profile screen builds initials from the name (lib/profile.ts). Kept because demo/ pins it. */
+  initials: string;
   phone: string;
   licenseClass: string | null;
   availability: DriverAvailability;
@@ -29,6 +31,15 @@ export type DriverProfile = {
     model: string | null;
   } | null;
 };
+
+function deriveInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(w => w[0]?.toUpperCase() ?? '')
+    .slice(0, 2)
+    .join('');
+}
 
 export function useDriverProfile() {
   return useQuery({
@@ -56,6 +67,7 @@ export function useDriverProfile() {
       return {
         id: data.id as string,
         name: data.name as string,
+        initials: deriveInitials(data.name as string),
         phone: data.phone as string,
         licenseClass: (data.license_class as string | null) ?? null,
         availability: data.availability as DriverAvailability,
