@@ -29,7 +29,7 @@ jest.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
 }));
 
-// Sentry: lib/queries/*.ts call captureMessage on unknown enum values. Left as
+// Sentry: lib/jobStatus.ts calls captureMessage on an unknown job status. Left as
 // a spy rather than a no-op so a test can assert the warning fired.
 jest.mock('@sentry/react-native', () => ({
   captureMessage: jest.fn(),

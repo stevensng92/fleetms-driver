@@ -1,49 +1,31 @@
-import { statusTone } from '../statusTone';
+import { paymentTone, toKey } from '../statusTone';
+import { jobStatus } from '../jobStatus';
 
-describe('statusTone: job', () => {
-  it.each([
-    ['pending', 'amber', 'Pending', 'clock'],
-    ['confirmed', 'green', 'Confirmed', 'circleCheck'],
-    ['in_progress', 'blue', 'In Progress', 'navigation'],
-  ] as const)('%s -> %s "%s"', (status, tone, label, icon) => {
-    expect(statusTone('job', status)).toEqual({ tone, label, icon });
-  });
+// Job statuses are tested in jobStatus.test.ts, the one place that reads them.
 
-  it('done is neutral and flagged done', () => {
-    expect(statusTone('job', 'done')).toEqual({ tone: 'neutral', label: 'Done', icon: 'check', done: true });
-  });
-
-  it('cancelled is neutral and struck through (never red)', () => {
-    expect(statusTone('job', 'cancelled')).toEqual({ tone: 'neutral', label: 'Cancelled', icon: 'ban', struck: true });
-  });
-
+describe('toKey', () => {
   it.each(['In Progress', 'in-progress', 'IN_PROGRESS', ' in progress '])('normalises %p to in_progress', (raw) => {
-    expect(statusTone('job', raw).label).toBe('In Progress');
-    expect(statusTone('job', raw).tone).toBe('blue');
-  });
-
-  it('an unknown status is neutral and shows the raw word, with no icon', () => {
-    expect(statusTone('job', 'Weird')).toEqual({ tone: 'neutral', label: 'Weird', icon: null });
+    expect(toKey(raw)).toBe('in_progress');
   });
 });
 
-describe('statusTone: payment', () => {
+describe('paymentTone', () => {
   it.each([
     ['paid', 'green', 'Paid', 'badgeCheck'],
     ['unpaid', 'amber', 'Unpaid', 'hourglass'],
     ['waived', 'neutral', 'Waived', 'circleMinus'],
     ['refunded', 'red', 'Refunded', 'undo2'],
   ] as const)('%s -> %s "%s"', (status, tone, label, icon) => {
-    expect(statusTone('payment', status)).toEqual({ tone, label, icon });
+    expect(paymentTone(status)).toEqual({ tone, label, icon });
   });
 
   it('has no Invoiced state: it falls back to neutral with the raw word', () => {
-    expect(statusTone('payment', 'invoiced')).toEqual({ tone: 'neutral', label: 'invoiced', icon: null });
+    expect(paymentTone('invoiced')).toEqual({ tone: 'neutral', label: 'invoiced', icon: null });
   });
 
-  it('keeps the two vocabularies apart', () => {
-    // "paid" is a payment word, not a job word.
-    expect(statusTone('job', 'paid').tone).toBe('neutral');
-    expect(statusTone('payment', 'pending').tone).toBe('neutral');
+  it('keeps the job and payment vocabularies apart', () => {
+    // "paid" is a payment word, not a job word, and "pending" the other way round.
+    expect(jobStatus('paid').unknown).toBe(true);
+    expect(paymentTone('pending').tone).toBe('neutral');
   });
 });

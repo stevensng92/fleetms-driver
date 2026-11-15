@@ -26,16 +26,23 @@ describe('JobCard: lines folded into the card (change 19)', () => {
     expect(screen.getByText('Done')).toBeTruthy();
   });
   it('a cancelled job reads Cancelled, not Voided', async () => {
-    await render(<JobCard job={job({ status: 'voided', rawStatus: 'cancelled' })}/>);
+    await render(<JobCard job={job({ status: 'cancelled' })}/>);
     expect(screen.getByText('Cancelled')).toBeTruthy();
     expect(screen.queryByText('Voided')).toBeNull();
   });
-  it('a voided job with no raw status still reads Voided', async () => {
-    await render(<JobCard job={job({ status: 'voided' })}/>);
-    expect(screen.getByText('Voided')).toBeTruthy();
+  it("an unknown status shows the dispatcher's word and offers no Accept or Reject", async () => {
+    await render(<JobCard job={job({ status: 'on_hold' })} onAccept={jest.fn()} onReject={jest.fn()}/>);
+    expect(screen.getByText('On hold')).toBeTruthy();
+    expect(screen.queryByText('Accept')).toBeNull();
+    expect(screen.queryByText('Reject')).toBeNull();
+  });
+  it('a pending job offers Accept and Reject', async () => {
+    await render(<JobCard job={job({ status: 'pending' })}/>);
+    expect(screen.getByText('Accept')).toBeTruthy();
+    expect(screen.getByText('Reject')).toBeTruthy();
   });
   it('a rejected job reads Rejected', async () => {
-    await render(<JobCard job={job({ status: 'voided', rawStatus: 'rejected' })}/>);
+    await render(<JobCard job={job({ status: 'rejected' })}/>);
     expect(screen.getByText('Rejected')).toBeTruthy();
   });
 });

@@ -8,7 +8,6 @@
 //   - TIME_OFF     -> SELECT * FROM driver_time_off WHERE driver_id = $self
 import type { Job } from '../components/JobCard';
 import type { Stop } from '../components/TimelineStop';
-import type { StatusKind } from '../components/StatusPill';
 
 export const DRIVER = {
   id: 'drv_ahmad',
@@ -60,7 +59,7 @@ export const EXPENSES: Expense[] = [
   { id: 'EXP-086', cat: 'Toll',  date: 'May 6', vehicle: 'WA 1234 B', amt: 60.00,  hasReceipt: false },
 ];
 
-export type Earning = { id: string; date: string; amt: number; status: StatusKind };
+export type Earning = { id: string; date: string; amt: number; status: 'paid' | 'pendingPay' };
 
 export const EARNINGS: Earning[] = [
   { id: 'JOB-047', date: 'May 9', amt: 85.00,  status: 'pendingPay' },

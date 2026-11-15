@@ -152,3 +152,27 @@ describe('ActiveJob with the Time format setting', () => {
     expect(screen.queryByText('09:15')).toBeNull();
   });
 });
+
+describe('Trip screen when the job is no longer In progress', () => {
+  it.each([
+    ['done', 'Done'],
+    ['cancelled', 'Cancelled'],
+    ['rejected', 'Rejected'],
+    ['on_hold', 'On hold'],
+  ])('%s shows the "%s" pill and a Back to jobs button, no Mark as done', async (status, word) => {
+    mockJob(job({ status }));
+    await render(<ActiveJob/>);
+    expect(screen.getByText(word)).toBeTruthy();
+    expect(screen.queryByText('Mark as done')).toBeNull();
+    expect(screen.queryByText(/^Job is/)).toBeNull();
+    await fireEvent.press(screen.getByText('Back to jobs'));
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('In progress still offers Mark as done', async () => {
+    await render(<ActiveJob/>);
+    expect(screen.getByText('In Progress')).toBeTruthy();
+    expect(screen.getByText('Mark as done')).toBeTruthy();
+    expect(screen.queryByText('Back to jobs')).toBeNull();
+  });
+});

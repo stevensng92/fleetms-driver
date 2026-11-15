@@ -12,8 +12,7 @@ export const stop = (over: Partial<JobDetail['stops'][number]>): JobDetail['stop
 export const job = (over: Partial<JobDetail> = {}): JobDetail => ({
   jobUuid: '9f8e7d6c-5b4a-4321-9876-0f1e2d3c4b5a',
   jobNumber: 'JOB-137',
-  status: 'progress',
-  rawStatus: 'in_progress',
+  status: 'in_progress',
   assignmentId: 'asg-1',
   pickupAt: PICKUP_AT,
   pickupLocation: 'KLIA',

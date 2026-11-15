@@ -18,6 +18,7 @@ import { fontFor, space, type } from '../../theme/tokens';
 import { useClockStyle } from '../../lib/clockPref';
 import { routeStops, stopCountLabel } from '../../lib/route';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
+import { jobStatus } from '../../lib/jobStatus';
 import { useStartJob, useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 
 // S3 — Job Detail. Reads the real job by job_number; the route param is the
@@ -55,15 +56,17 @@ export default function JobDetail() {
     kind: r.label, arrive: r.time, place: r.place, lat: r.lat, lng: r.lng,
   }));
 
-  const isPending = job.rawStatus === 'pending';
-  const isConfirmed = job.rawStatus === 'confirmed';
+  // One rule for which buttons a status allows: lib/jobStatus.ts.
+  const { action } = jobStatus(job.status);
+  const isPending = action === 'acceptReject';
+  const isConfirmed = action === 'onMyWay';
 
   return (
     <AppFrame bottomInset={120}>
       <AppHeader
         title={job.jobNumber}
         onBack={() => router.back()}
-        right={<StatusPill kind={job.status}/>}
+        right={<StatusPill kind="job" status={job.status}/>}
       />
 
       <View style={{ paddingHorizontal: space[4], paddingBottom: space[5], gap: space[4] }}>
@@ -148,13 +151,13 @@ export default function JobDetail() {
           </Button>
         )}
 
-        {job.rawStatus === 'in_progress' && (
+        {action === 'openTrip' && (
           <Button full size="lg" onPress={() => router.replace({ pathname: '/jobs/active', params: { id: job.jobNumber } })}>
             Open active job
           </Button>
         )}
 
-        {(job.rawStatus === 'done' || job.rawStatus === 'cancelled' || job.rawStatus === 'rejected') && (
+        {action === 'backToJobs' && (
           <Button variant="secondary" full size="lg" onPress={() => router.back()}>
             Back to jobs
           </Button>

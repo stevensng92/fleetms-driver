@@ -3,7 +3,6 @@ import { supabase } from '../supabase';
 import { resolveSpecialCommission, type SpecialCommission } from '../commissionRate';
 import { resolveJobContact, type JobContact } from '../jobContact';
 import { fetchCommissionBaseline } from './driverProfile';
-import type { StatusKind } from '../../components/StatusPill';
 
 // The Job Detail screen expects: trip meta, route stops, instructions, earnings,
 // status, current assignment id (for confirm/reject).
@@ -11,28 +10,11 @@ import type { StatusKind } from '../../components/StatusPill';
 // Stops live in their own `job_stops` table (added in pr_ms3). The driver app
 // keeps the timeline read-only; the stops table is the source of truth.
 
-// See lib/queries/jobs.ts:mapStatus for the rationale on the default branch —
-// unknown values land in 'voided' (gray) and surface a Sentry warning, never
-// silently mislabeled as Confirmed.
-function mapStatus(s: string): StatusKind {
-  switch (s) {
-    case 'pending':     return 'pending';
-    case 'confirmed':   return 'confirmed';
-    case 'in_progress': return 'progress';
-    case 'done':        return 'done';
-    case 'rejected':
-    case 'cancelled':   return 'voided';
-    default:
-      try { require('@sentry/react-native').captureMessage(`Unknown job_status: ${s}`, 'warning'); } catch {}
-      return 'voided';
-  }
-}
-
 export type JobDetail = {
   jobUuid: string;
   jobNumber: string;
-  status: StatusKind;
-  rawStatus: string;
+  /** As the dispatcher sends it ("in_progress"). Read it through lib/jobStatus.ts. */
+  status: string;
   assignmentId: string | null;
   pickupAt: string;
   pickupLocation: string;
@@ -258,8 +240,7 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail | null> {
   return {
     jobUuid: job.id,
     jobNumber: job.job_number,
-    status: mapStatus(job.status),
-    rawStatus: job.status,
+    status: job.status,
     assignmentId: assignment?.id ?? null,
     pickupAt: job.pickup_datetime,
     pickupLocation: job.pickup_location,

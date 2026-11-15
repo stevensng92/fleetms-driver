@@ -34,7 +34,7 @@ beforeEach(() => {
   (useStartJob as jest.Mock).mockReturnValue(idle);
   (useConfirmAssignment as jest.Mock).mockReturnValue(idle);
   (useRejectAssignment as jest.Mock).mockReturnValue(idle);
-  mockJob(job({ rawStatus: 'confirmed', status: 'confirmed' }));
+  mockJob(job({ status: 'confirmed' }));
 });
 
 describe('Job detail: the route (changes 16 and 17)', () => {
@@ -45,7 +45,7 @@ describe('Job detail: the route (changes 16 and 17)', () => {
   });
 
   it('says "1 stop", not "1 stops"', async () => {
-    mockJob(job({ rawStatus: 'confirmed', stops: [stop({ scheduledAt: PICKUP_AT })] }));
+    mockJob(job({ status: 'confirmed', stops: [stop({ scheduledAt: PICKUP_AT })] }));
     await render(<JobDetail/>);
     expect(screen.getByText('1 stop')).toBeTruthy();
     expect(screen.queryByText('1 stops')).toBeNull();
@@ -97,7 +97,7 @@ describe('Job detail: Reject asks first (matches the Jobs list)', () => {
   beforeEach(() => {
     reject.mockReset().mockResolvedValue(undefined);
     (useRejectAssignment as jest.Mock).mockReturnValue({ mutateAsync: reject, isPending: false });
-    mockJob(job({ rawStatus: 'pending', status: 'pending' }));
+    mockJob(job({ status: 'pending' }));
   });
 
   async function openDialog() {
@@ -142,11 +142,32 @@ describe('Job detail: Reject asks first (matches the Jobs list)', () => {
 describe('JobDetail with the Time format setting', () => {
   afterEach(() => resetClockStyleForTests());
   it('shows the stop time in the chosen style', async () => {
-    mockJob(job({ rawStatus: 'confirmed', stops: [stop({ scheduledAt: PICKUP_AT })] }));
+    mockJob(job({ status: 'confirmed', stops: [stop({ scheduledAt: PICKUP_AT })] }));
     await render(<JobDetail/>);
     expect(screen.getAllByText('09:15').length).toBeGreaterThan(0);
     await act(async () => { setClockStyle('12h'); });
     expect(screen.getAllByText('9:15 am').length).toBeGreaterThan(0);
     expect(screen.queryByText('09:15')).toBeNull();
+  });
+});
+
+describe('Job detail: one Job status rule (lib/jobStatus.ts)', () => {
+  const words = ['Accept', 'Reject', 'On my way', 'Open active job', 'Back to jobs'];
+  const shown = () => words.filter((w) => screen.queryByText(w));
+
+  it.each([
+    ['pending', 'Pending', ['Accept', 'Reject']],
+    ['confirmed', 'Confirmed', ['On my way']],
+    ['in_progress', 'In Progress', ['Open active job']],
+    ['done', 'Done', ['Back to jobs']],
+    ['rejected', 'Rejected', ['Back to jobs']],
+    ['cancelled', 'Cancelled', ['Back to jobs']],
+    ['on_hold', 'On hold', ['Back to jobs']],
+  ])('%s reads "%s" and offers only %j', async (status, word, actions) => {
+    mockJob(job({ status }));
+    await render(<JobDetail/>);
+    expect(screen.getByText(word)).toBeTruthy();
+    expect(screen.queryByText('Voided')).toBeNull();
+    expect(shown()).toEqual(actions);
   });
 });

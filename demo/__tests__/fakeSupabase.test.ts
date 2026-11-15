@@ -355,7 +355,8 @@ describe('real query hooks over the fake client', () => {
   it('job detail carries stops, surcharges, contact and the assignment', async () => {
     const { useJobDetailByNumber } = require('../../lib/queries/jobDetail');
     const d: any = await run(() => useJobDetailByNumber('JOB-137'));
-    expect(d).toMatchObject({ jobNumber: 'JOB-137', rawStatus: 'in_progress', client: 'Nusantara Weddings', vehiclePlate: 'VKA 2231' });
+    expect(d).not.toHaveProperty('rawStatus');
+    expect(d).toMatchObject({ jobNumber: 'JOB-137', status: 'in_progress', client: 'Nusantara Weddings', vehiclePlate: 'VKA 2231' });
     expect(d.stops.map((s: any) => s.kind)).toEqual(['Pickup', 'Stop 1', 'Dropoff']);
     expect(d.surcharges[0]).toMatchObject({ name: 'Decoration', amount: 50, treatment: 'pass_through' });
     expect(d.contact.source).toBe('passenger');
