@@ -6,6 +6,55 @@ as world-readable: never commit `google-services.json`, `.env*`, keystores
 (`*.jks` / `*.key` / `*.p8` / `*.p12`), or the FCM service-account JSON (all
 gitignored — keep it that way). Do not flip the repo private.
 
+## How a change moves through this repo
+
+Matt Pocock's skills cover the front half (agree, specify, build test first).
+gstack's `/ship` covers the back half (check, review, PR). Use them in this
+order. A one-line fix can skip steps 1 and 2.
+
+1. **Agree.** `/grill-with-docs` before any change bigger than a quick fix.
+   It interviews Steven until the plan has no open branches, and records new
+   terms in `GLOSSARY.md` and hard-to-reverse decisions in `docs/adr/`.
+2. **Specify.** `/to-spec` writes the spec to `.scratch/<feature>/spec.md`.
+   For work that needs more than one PR, `/to-tickets` splits it into tickets.
+3. **Build.** `/implement` (or `/tdd` directly): the failing test first, at the
+   seams the spec names, then the code. Bugs go through `/diagnosing-bugs`, with
+   the regression test written before the fix. `/implement` ends with
+   `/code-review` against the spec and the rules in this file.
+4. **Ship.** `/ship` on the feature branch. It runs typecheck and tests,
+   reviews the diff, writes the CHANGELOG entry under `## [Unreleased]`, checks
+   the docs (see Docs upkeep), pushes the branch and opens the PR.
+   It never merges.
+5. **Merge.** Squash-merge once CI is green. Never `gh pr merge --auto` or
+   `--admin`.
+
+Every few days, or after a run of features, `/improve-codebase-architecture`
+looks for modules worth deepening.
+
+**Releasing is separate, and only when Steven asks.** Releasing means bumping
+the version, building an APK, or publishing an over-the-air update. `/ship`
+never bumps the version: `.gstack/ship-policy.json` sets `"bump": "never"`. A
+version bump changes which installed apps can receive over-the-air updates
+(the runtime version follows `appVersion`), so it belongs to the release, not
+to each PR.
+
+## Agent skills
+
+### Issue tracker
+
+Specs and tickets are markdown files under `.scratch/`, committed with the
+code, so they are public. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default roles, written as a `Status:` line in each ticket file. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` at the root and ADRs in `docs/adr/`, both
+created when the first term or decision is settled. See `docs/agents/domain.md`.
+
 ## Testing
 
 Run with `npm test`. Full guide, including the sharp edges that will bite you
