@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
 import { resolveDriverBaseline, type CommissionBasis } from '../commissionRate';
-import { vehicleTypeLabel } from '../route';
 
 // Full driver profile for the Profile screen + the Jobs tab greeting.
 // Joins drivers → organizations → default vehicle via PostgREST embeds.
@@ -19,7 +18,6 @@ export type DriverAvailability =
 export type DriverProfile = {
   id: string;
   name: string;
-  initials: string;
   phone: string;
   licenseClass: string | null;
   availability: DriverAvailability;
@@ -31,15 +29,6 @@ export type DriverProfile = {
     model: string | null;
   } | null;
 };
-
-function deriveInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map(w => w[0]?.toUpperCase() ?? '')
-    .slice(0, 2)
-    .join('');
-}
 
 export function useDriverProfile() {
   return useQuery({
@@ -67,7 +56,6 @@ export function useDriverProfile() {
       return {
         id: data.id as string,
         name: data.name as string,
-        initials: deriveInitials(data.name as string),
         phone: data.phone as string,
         licenseClass: (data.license_class as string | null) ?? null,
         availability: data.availability as DriverAvailability,
@@ -129,23 +117,4 @@ export async function fetchCommissionBaseline(): Promise<CommissionBasis | null>
     data.commission_rate == null ? null : Number(data.commission_rate),
     org?.driver_commission_rate,
   );
-}
-
-// Derived display strings for the Profile screen.
-
-export function formatVehicleLine(v: DriverProfile['vehicle']): string {
-  if (!v) return 'No vehicle assigned';
-  const parts = [v.plate, vehicleTypeLabel(v.type), v.model].filter(Boolean);
-  return parts.join(' · ');
-}
-
-const AVAILABILITY_LABEL: Record<DriverAvailability, { label: string; on: boolean }> = {
-  available:            { label: 'AVAILABLE',     on: true  },
-  pending_confirmation: { label: 'PENDING CONFIRMATION', on: true },
-  on_job:               { label: 'ON SHIFT',      on: true  },
-  unavailable:          { label: 'OFF DUTY',      on: false },
-};
-
-export function availabilityBadge(a: DriverAvailability): { label: string; on: boolean } {
-  return AVAILABILITY_LABEL[a] ?? { label: a.toUpperCase(), on: false };
 }

@@ -1,4 +1,5 @@
 import type { Tone } from './statusTone';
+import { vehicleTypeLabel } from './route';
 
 // Pure words and rules for the Profile identity card (change 26). They live
 // here, not in lib/queries/driverProfile.ts, because that file builds a live
@@ -25,3 +26,9 @@ export const initials = (name: string): string =>
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? '')
     .join('');
+
+/** "WXY 1234, MPV, Alphard": the vehicle line on Profile. */
+export function formatVehicleLine(v: { plate: string; type: string; model: string | null } | null): string {
+  if (!v) return 'No vehicle assigned';
+  return [v.plate, vehicleTypeLabel(v.type), v.model].filter(Boolean).join(', ');
+}

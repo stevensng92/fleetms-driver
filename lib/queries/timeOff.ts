@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
+import type { TimeOffReason } from '../timeOff';
 
-export type TimeOffReason = 'leave' | 'mc' | 'off_duty';
+export { REASON_LABEL, type TimeOffReason } from '../timeOff';
 export type TimeOffStatus = 'pending' | 'approved' | 'rejected';
 
 export type TimeOffEntry = {
@@ -12,12 +13,6 @@ export type TimeOffEntry = {
   notes: string | null;
   status: TimeOffStatus;
   createdAt: string;
-};
-
-export const REASON_LABEL: Record<TimeOffReason, string> = {
-  leave:    'Leave',
-  mc:       'MC',
-  off_duty: 'Off duty',
 };
 
 // Pulls the current driver's time-off windows. RLS scopes results via

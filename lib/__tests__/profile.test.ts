@@ -1,4 +1,4 @@
-import { availabilityPill, initials } from '../profile';
+import { availabilityPill, formatVehicleLine, initials } from '../profile';
 
 // Change 26. Cases ported from the mock's rules.test.ts (availabilityPill and
 // initials), on the real field names (isActive, availability).
@@ -35,5 +35,17 @@ describe('initials', () => {
   it('copes with extra spaces and an empty name', () => {
     expect(initials('  Lim   Wei ')).toBe('LW');
     expect(initials('')).toBe('');
+  });
+});
+
+describe('formatVehicleLine', () => {
+  it('joins plate, type and model with commas, never middle dots', () => {
+    expect(formatVehicleLine({ plate: 'WXY 1234', type: 'mpv', model: 'Alphard' })).toBe('WXY 1234, MPV, Alphard');
+  });
+  it('drops a model that is missing', () => {
+    expect(formatVehicleLine({ plate: 'WXY 1234', type: 'mpv', model: null })).toBe('WXY 1234, MPV');
+  });
+  it('says so when no vehicle is assigned', () => {
+    expect(formatVehicleLine(null)).toBe('No vehicle assigned');
   });
 });
