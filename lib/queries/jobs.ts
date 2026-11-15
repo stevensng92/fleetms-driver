@@ -5,6 +5,7 @@ import { fetchCommissionBaseline } from './driverProfile';
 import { formatClock, formatDate, myDateKey, myStartOfDay, type ClockStyle } from '../timeFormat';
 import { useClockStyle } from '../clockPref';
 import type { Job } from '../../components/JobCard';
+import { FINISHED_STATUSES } from '../jobStatus';
 
 // The job status is kept exactly as the dispatcher sends it. lib/jobStatus.ts
 // is the one place that reads it (words, actions, open or finished) and
@@ -46,10 +47,6 @@ const UPCOMING_DAYS = 14;
  *  don't resurrect ancient stuck rows either. */
 const OVERDUE_LOOKBACK_DAYS = 30;
 
-/** job_status values still actionable by the driver (confirm / start / mark
- *  done). Terminal states (done/cancelled/rejected) are NOT carried over once
- *  their pickup is in the past — only open work follows the driver forward. */
-const OPEN_STATUSES = ['pending', 'confirmed', 'in_progress'] as const;
 
 // Pulls the current driver's upcoming jobs (today + tomorrow + next 14 days).
 // RLS scopes results via private.is_driver_self(driver_id) so the anon JWT
@@ -103,7 +100,7 @@ export async function fetchJobs(clock: ClockStyle = '24h'): Promise<FetchedJobs>
       .eq('is_current', true)
       .or(
         `and(pickup_datetime.gte.${startToday.toISOString()},pickup_datetime.lt.${endWindow.toISOString()}),` +
-        `and(pickup_datetime.gte.${overdueFloor.toISOString()},pickup_datetime.lt.${startToday.toISOString()},status.in.(${OPEN_STATUSES.join(',')}))`,
+        `and(pickup_datetime.gte.${overdueFloor.toISOString()},pickup_datetime.lt.${startToday.toISOString()},status.not.in.(${FINISHED_STATUSES.join(',')}))`,
         { foreignTable: 'jobs' },
       )
       .order('pickup_datetime', { foreignTable: 'jobs', ascending: true }),
@@ -178,8 +175,9 @@ export async function fetchJobs(clock: ClockStyle = '24h'): Promise<FetchedJobs>
     const d = new Date(r.job.pickup_datetime);
     const t = d.getTime();
     if (t < startToday.getTime()) {
-      // Pickup already passed and the job is still open (guaranteed by the
-      // query's status filter) — carry it over so it can still be completed.
+      // Pickup already passed and the job is not finished (guaranteed by the
+      // query's status filter: anything but done, rejected or cancelled,
+      // so a status the app doesn't know yet is carried over too).
       overdue.push(toUi(r));
     } else if (t < startTomorrow.getTime()) {
       today.push(toUi(r));

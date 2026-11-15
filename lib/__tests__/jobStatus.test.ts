@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/react-native';
-import { jobStatus, resetUnknownReported } from '../jobStatus';
+import { FINISHED_STATUSES, jobStatus, resetUnknownReported } from '../jobStatus';
 
 // The one rule for a job status: words, pill look, open or finished, the
 // action a driver may take, and which screen the job opens on. See
@@ -59,6 +59,15 @@ describe('jobStatus: the six known statuses', () => {
   it('known statuses are not reported to Sentry', () => {
     for (const s of ['pending', 'confirmed', 'in_progress', 'done', 'rejected', 'cancelled']) jobStatus(s);
     expect(capture).not.toHaveBeenCalled();
+  });
+});
+
+describe('FINISHED_STATUSES', () => {
+  // The overdue query excludes exactly these, so anything else (an unknown
+  // status included) still follows the driver forward.
+  it('is exactly the finished statuses', () => {
+    expect([...FINISHED_STATUSES].sort()).toEqual(['cancelled', 'done', 'rejected']);
+    for (const s of FINISHED_STATUSES) expect(jobStatus(s).phase).toBe('finished');
   });
 });
 

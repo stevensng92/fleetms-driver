@@ -51,6 +51,11 @@ const JOB: Record<string, Row> = {
   cancelled: { pill: { ...FINISHED_LOOK, label: 'Cancelled' }, phase: 'finished', action: 'backToJobs' },
 };
 
+/** The dispatcher's finished statuses. The overdue query excludes exactly
+ *  these, so an open job, or one with a status the app doesn't know yet,
+ *  follows the driver forward past its pickup day. */
+export const FINISHED_STATUSES: readonly string[] = Object.keys(JOB).filter((k) => JOB[k].phase === 'finished');
+
 // Each unknown word is reported once per app run, not on every render.
 const reported = new Set<string>();
 /** For tests: forget which unknown statuses were already reported. */

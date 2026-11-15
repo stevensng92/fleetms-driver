@@ -2,9 +2,11 @@
 // as sent, so the screen can order today's jobs and lib/jobStatus.ts can read it.
 // supabase is mocked so importing the query builds no live client (AGENTS.md).
 const mockResult = jest.fn();
+const mockOr = jest.fn();
 jest.mock('../../supabase', () => {
   const chain: any = {};
-  for (const m of ['from', 'select', 'eq', 'or']) chain[m] = () => chain;
+  for (const m of ['from', 'select', 'eq']) chain[m] = () => chain;
+  chain.or = (expr: string) => { mockOr(expr); return chain; };
   chain.order = () => Promise.resolve(mockResult());
   return { supabase: chain };
 });
@@ -31,5 +33,13 @@ describe('fetchJobs', () => {
       ['J2', 'in_progress', pickup],
     ]);
     expect(today[0]).not.toHaveProperty('rawStatus');
+  });
+
+  it('carries past jobs forward unless they are finished, so an unknown status is never dropped', async () => {
+    mockResult.mockReturnValue({ data: [], error: null });
+    await fetchJobs();
+    const expr: string = mockOr.mock.calls[0][0];
+    expect(expr).toContain('status.not.in.(done,rejected,cancelled)');
+    expect(expr).not.toContain('status.in.(');
   });
 });
