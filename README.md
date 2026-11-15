@@ -36,8 +36,8 @@ Since v0.7.0 those two pay surfaces are consistent everywhere they appear.
 Included services and the commission rate now also render on **Active Job**
 (previously the one screen that showed neither, despite being where a driver
 sits mid-trip), and the commission rate reaches **Earnings** rows. The rate
-renders through one shared `CommissionPill` — cyan-tinted, labelled
-`20% comm` — so the same fact reads the same way on every screen;
+renders through one shared `CommissionPill`, labelled `20% comm` at the time
+(`20% of the fare` since the 2026 redesign) — so the same fact reads the same way on every screen;
 `CommissionRateCard`, `JobAmountCard` and `SurchargesCard` hold the
 detail-screen treatment shared by Job Detail and Active Job.
 
@@ -135,6 +135,37 @@ after noon by strict notation; it is retained deliberately, so don't
 
 `data/mock.ts` still exists in the repo but nothing under `app/` reads from
 it anymore — safe to treat as legacy fixtures, not current wiring.
+
+### Redesign (on `master`, not yet released)
+
+The 2026 redesign from the design-systems mock (`design-systems/fleetms/src/driver/`)
+landed on `master` on 15 Nov 2026 in PRs 15 to 25; the plan and its 38 numbered
+changes are in `docs/redesign-plan.md`. No build has shipped it yet. What changed
+for a driver:
+
+- **Look**: ink and green palette from `theme/tokens.ts` (the only place colours
+  live; `theme/__tests__/noLiteralColours.test.ts` fails on a raw colour in
+  `app/` or `components/`), Inter loaded before the first screen, the floating
+  tab bar, the job under way as the one dark card, 24-hour times, sentence-case
+  headings. The commission pill now reads `20% of the fare`, not `20% comm`.
+- **Jobs**: "3 jobs to go" heading, the job under way first, done and cancelled
+  jobs in a "Finished today" fold, Reject and Mark done ask first, Accept fades
+  the buttons and gives a haptic, a job that left the list says so instead of
+  an error.
+- **Earnings**: cents everywhere, Paid / Unpaid / Waived / Refunded on rows,
+  swipe right for earlier, a short page-turn slide.
+- **Profile**: Time format setting (24-hour default, or 12-hour; saved on the
+  phone, every clock follows it), one-tap time-off requests, Sign out asks first.
+- **Sign in, notifications, expenses**: field-level messages instead of pop-ups
+  or a disabled button; notification rows that lead nowhere aren't tappable; the
+  expense form refuses "12abc", checks the receipt type and size, names vehicles
+  ("MPV, Toyota Alphard"), and asks before discarding a filled form (including
+  the back gesture).
+
+Pure rules behind these live in their own tested files: `lib/jobGroups.ts`,
+`lib/route.ts`, `lib/money.ts`, `lib/earningsPeriod.ts`, `lib/timeOff.ts`,
+`lib/profile.ts`, `lib/clockPref.ts`, `lib/phone.ts`, `lib/notificationText.ts`,
+`lib/amount.ts`, `lib/expenses.ts`, `lib/statusTone.ts`.
 
 ## Run
 

@@ -13,6 +13,13 @@ Sources, read in this order:
 4. The spec of today's app (`driver-app-spec.md`, 25 known issues).
 5. `fleetms/real-build-plan.md`: the admin app's rollout, whose shape this copies.
 
+## Where it stands (15 Nov 2026)
+
+All phases are merged to `master`: 1a #15, 1b #16 and #17, 1c #18, 1d #19,
+4 #20, 6 #21, 2 #22, 3 #23, 7 #24, 5 #25, and 8 (this final check, README and
+wiki). Nothing is released. Follow-ups found on the way are listed at the end
+under "Left for later".
+
 ## The short version
 
 The good news: this app is in much better shape for a re-skin than the admin
@@ -374,3 +381,14 @@ How I'll run it: one phase per branch (`redesign/phase-N-name`, off `master`), t
 
 1. **Approve the plan?** Including the build order above.
 2. **Release**: hold everything until all 8 phases are done, or release after phase 3 (look plus Jobs fixes)?
+
+## Left for later (found while building, 15 Nov)
+
+- **"New" pills on notifications** clear almost at once, because opening the screen marks everything read (the old red dots did the same).
+- **Withdraw a time-off request** still uses the old pop-up; only Sign out was in scope for phase 5. The mock's "Discard this request?" step isn't built.
+- **Toasts** ("Job accepted", "Expense logged") exist as a piece but no screen shows them yet; no change asked for them.
+- **The Overdue note** on Jobs keeps today's wording; the mock's new wording wasn't in a numbered change.
+- **Sheet** has no exit animation (it vanishes rather than sliding down).
+- **Back gesture on the expense form** is guarded in code and tested in Jest, but not yet tried on a phone.
+- **Not seen on a real phone at all yet**: every check was in Jest and the web preview. A test build on a phone is the step before release.
+

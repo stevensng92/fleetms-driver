@@ -89,7 +89,7 @@ export function formatDateKey(key: string, opts: { year?: boolean; long?: boolea
   const monthIdx = Number(m[2]) - 1;
   if (monthIdx < 0 || monthIdx > 11) return '—';
   const month = opts.long ? MONTHS_LONG[monthIdx] : MONTHS[monthIdx];
-  const core = `${m[3]} ${month}`;
+  const core = `${Number(m[3])} ${month}`;
   return opts.year === false ? core : `${core} ${m[1]}`;
 }
 
