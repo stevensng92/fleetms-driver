@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, {
+  Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming,
+} from 'react-native-reanimated';
 import { AppHeader, SectionLabel } from '../../components/AppHeader';
 import { JobCard, type Job } from '../../components/JobCard';
 import { Band } from '../../components/Band';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
-import { fontFor, space, type } from '../../theme/tokens';
+import { EASE_OUT, fontFor, motionFor, radius, space, type } from '../../theme/tokens';
 import { formatDayLong } from '../../lib/timeFormat';
 import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
@@ -17,24 +21,13 @@ import { useUnreadCount } from '../../lib/queries/notifications';
 import { useDriverProfile } from '../../lib/queries/driverProfile';
 import { useJobsRealtime } from '../../lib/realtime/jobsRealtime';
 import { useAppVersionGate } from '../../lib/queries/appVersionConfig';
+import {
+  countRose, getFinishedSeen, greeting, groupJobs, jobCount, jobScreen, setFinishedSeen, todayHeading,
+} from '../../lib/jobGroups';
 
 const APP_DOWNLOAD_URL = 'https://app.fleetms.my/driver-app';
 
-// Time-of-day greeting that matches the device's local hour. Saturated to the
-// 3 standard buckets so we don't say "Good afternoon" at 1pm and "Good evening"
-// at 5pm — drivers travel a lot and the language stays steady.
-//
-// DELIBERATELY device-local, and the only such reading left in the app. Every
-// other clock and date is pinned to Malaysia (lib/timeFormat.ts) because it
-// describes a JOB, which happens on MY time. A greeting describes the DRIVER,
-// so it should follow the phone they're holding: someone up at 8am elsewhere
-// wants "Good morning", not Malaysia's afternoon. Don't "fix" this to match.
-function timeOfDayGreeting(date = new Date()): string {
-  const h = date.getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
-}
+const CURVE = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
 
 export default function JobsToday() {
   const T = useTokens();
@@ -49,11 +42,16 @@ export default function JobsToday() {
   // AsyncStorage). The Profile tab badge is the persistent signal; this
   // banner is just a soft nudge.
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  // The job the driver tapped Reject on. Nothing is sent until the dialog is confirmed.
+  const [rejecting, setRejecting] = useState<Job | null>(null);
 
-  const overdue = data?.overdue ?? [];
-  const today = data?.today ?? [];
-  const tomorrow = data?.tomorrow ?? [];
-  const upcoming = data?.upcoming ?? [];
+  const groups = groupJobs({
+    overdue: data?.overdue ?? [],
+    today: data?.today ?? [],
+    tomorrow: data?.tomorrow ?? [],
+    upcoming: data?.upcoming ?? [],
+  });
+  const { overdue, today, todayFinished, tomorrow, upcoming } = groups;
   const upcomingTotal = upcoming.reduce((sum, g) => sum + g.jobs.length, 0);
 
   // MY day, matching the MY day boundaries the Today/Tomorrow groups below use
@@ -61,18 +59,15 @@ export default function JobsToday() {
   // which jobs are sitting under 'Today'.
   const headerSubtitle = formatDayLong();
 
-  // Mock RM total — replace with real earnings query once it exists.
-  const sumRM = today.length * 80;
-
   // The group heading's count, on the right of the title.
   const count = { ...type.label, fontFamily: fontFor('600'), fontWeight: '600', color: T.text2 } as const;
 
-  // One job card. An in-progress job opens the trip screen (Upcoming has
-  // always opened the job screen, so it passes `tripFromHere: false`).
-  const card = (j: Job, opts: { dim?: boolean; overdue?: boolean; tripFromHere?: boolean } = {}) => {
-    const open = opts.tripFromHere === false || j.status !== 'progress'
-      ? `/jobs/${j.id}`
-      : { pathname: '/jobs/active' as const, params: { id: j.id } };
+  // One job card. An in-progress job opens the trip screen from every group;
+  // anything else opens the job screen.
+  const card = (j: Job, opts: { dim?: boolean; overdue?: boolean } = {}) => {
+    const open = jobScreen(j) === 'trip'
+      ? { pathname: '/jobs/active' as const, params: { id: j.id } }
+      : `/jobs/${j.id}`;
     return (
       <JobCard
         key={j.id}
@@ -80,19 +75,22 @@ export default function JobsToday() {
         dim={opts.dim}
         overdue={opts.overdue}
         onPress={() => router.push(open as Parameters<typeof router.push>[0])}
-        onView={() => router.push(`/jobs/${j.id}`)}
         onAccept={async () => {
-          if (!j.assignmentId) return;
-          try { await confirmAsg.mutateAsync(j.assignmentId); }
-          catch (e: any) { Alert.alert('Could not accept', e?.message ?? 'Unknown error'); }
+          if (!j.assignmentId) return false;
+          try { await confirmAsg.mutateAsync(j.assignmentId); return true; }
+          catch (e: any) { Alert.alert('Could not accept', e?.message ?? 'Unknown error'); return false; }
         }}
-        onReject={async () => {
-          if (!j.assignmentId) return;
-          try { await rejectAsg.mutateAsync({ assignmentId: j.assignmentId }); }
-          catch (e: any) { Alert.alert('Could not reject', e?.message ?? 'Unknown error'); }
-        }}
+        onReject={() => setRejecting(j)}
       />
     );
+  };
+
+  const confirmReject = async (reason?: string) => {
+    const j = rejecting;
+    setRejecting(null);
+    if (!j?.assignmentId) return;
+    try { await rejectAsg.mutateAsync({ assignmentId: j.assignmentId, reason: reason || undefined }); }
+    catch (e: any) { Alert.alert('Could not reject', e?.message ?? 'Unknown error'); }
   };
 
   return (
@@ -110,7 +108,7 @@ export default function JobsToday() {
         }
       >
         <AppHeader
-          title={`${timeOfDayGreeting()}, ${firstName}`}
+          title={`${greeting(new Date().getHours())}, ${firstName}`}
           subtitle={headerSubtitle}
           right={<BellButton/>}
         />
@@ -122,14 +120,12 @@ export default function JobsToday() {
         {isLoading && <LoadingState/>}
         {isError && <ErrorState message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>}
 
-        {!isLoading && !isError && overdue.length === 0 && today.length === 0 && tomorrow.length === 0 && <EmptyState/>}
+        {!isLoading && !isError && groups.empty && <EmptyState/>}
 
         {!isLoading && !isError && overdue.length > 0 && (
           <>
             <SectionLabel
-              right={<Text style={[count, { color: T.redText }]}>
-                {overdue.length} {overdue.length === 1 ? 'job' : 'jobs'}
-              </Text>}
+              right={<Text style={[count, { color: T.redText }]}>{jobCount(overdue.length)}</Text>}
             >Overdue</SectionLabel>
             <Text style={[type.label, {
               paddingHorizontal: space[5], marginTop: -6, marginBottom: 10, color: T.text2,
@@ -140,14 +136,17 @@ export default function JobsToday() {
           </>
         )}
 
-        {!isLoading && !isError && today.length > 0 && (
+        {!isLoading && !isError && (today.length > 0 || todayFinished.length > 0) && (
           <>
             <SectionLabel
-              right={<Text style={count}>
-                {today.length} {today.length === 1 ? 'job' : 'jobs'} · RM {sumRM}
-              </Text>}
+              right={<Text style={count}>{todayHeading(today.length)}</Text>}
             >Today</SectionLabel>
-            {today.map(j => card(j, { dim: j.status === 'done' || j.status === 'voided' }))}
+            {today.map(j => card(j))}
+            {todayFinished.length > 0 && (
+              <FinishedToday count={todayFinished.length}>
+                {todayFinished.map(j => card(j, { dim: true }))}
+              </FinishedToday>
+            )}
           </>
         )}
 
@@ -155,9 +154,7 @@ export default function JobsToday() {
           <>
             <View style={{ height: space[2] }}/>
             <SectionLabel
-              right={<Text style={count}>
-                {tomorrow.length} {tomorrow.length === 1 ? 'job' : 'jobs'}
-              </Text>}
+              right={<Text style={count}>{jobCount(tomorrow.length)}</Text>}
             >Tomorrow</SectionLabel>
             {tomorrow.map(j => card(j, { dim: true }))}
           </>
@@ -167,9 +164,7 @@ export default function JobsToday() {
           <>
             <View style={{ height: space[2] }}/>
             <SectionLabel
-              right={<Text style={count}>
-                {upcomingTotal} {upcomingTotal === 1 ? 'job' : 'jobs'}
-              </Text>}
+              right={<Text style={count}>{jobCount(upcomingTotal)}</Text>}
             >Upcoming</SectionLabel>
             {upcoming.map(group => (
               <React.Fragment key={group.dateKey}>
@@ -178,13 +173,106 @@ export default function JobsToday() {
                     {group.label}
                   </Text>
                 </View>
-                {group.jobs.map(j => card(j, { dim: true, tripFromHere: false }))}
+                {group.jobs.map(j => card(j, { dim: true }))}
               </React.Fragment>
             ))}
           </>
         )}
       </ScrollView>
+
+      {/* Reject asks first, with an optional reason dispatch will see. */}
+      <ConfirmDialog
+        visible={!!rejecting}
+        title={`Reject ${rejecting?.id ?? ''}?`}
+        body="Dispatch will give it to another driver."
+        reason={{ label: 'Reason (optional)', placeholder: 'Dispatch will see this.', optional: true }}
+        confirmLabel="Reject job"
+        cancelLabel="Keep job"
+        tone="danger"
+        onConfirm={confirmReject}
+        onCancel={() => setRejecting(null)}
+      />
     </SafeAreaView>
+  );
+}
+
+/**
+ * Today's done and cancelled jobs, closed by default so the job under way and
+ * the next pickups lead the list. One tap opens them. The panel opens at once
+ * and its jobs fade in (opacity only, never height); closing fades them out
+ * first. Reduce Motion keeps the fades.
+ */
+function FinishedToday({ count, children }: { count: number; children: React.ReactNode }) {
+  const T = useTokens();
+  const reduced = useReducedMotion();
+  const m = motionFor(reduced);
+  const [open, setOpen] = useState(false);
+  // Closing fades the jobs out first, then the panel shuts. Tapping again mid-fade reopens at once.
+  const [closing, setClosing] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const panel = useSharedValue(0);
+  const panelStyle = useAnimatedStyle(() => ({ opacity: panel.value }));
+  const toggle = () => {
+    clearTimeout(timer.current);
+    if (open && !closing) {
+      setClosing(true);
+      panel.value = withTiming(0, { duration: m.fade1, easing: CURVE });
+      timer.current = setTimeout(() => { setOpen(false); setClosing(false); }, m.fade1);
+    } else {
+      setClosing(false);
+      setOpen(true);
+      panel.value = withTiming(1, { duration: m.fade2, easing: CURVE });
+    }
+  };
+  const shown = open && !closing;
+
+  // The count bumps once when it grew since the driver last saw it, so they see
+  // where a finished job went. The last-seen count lives outside the screen
+  // (lib/jobGroups.ts) because a job is usually marked done on the trip screen,
+  // and this fold is drawn fresh when the driver comes back.
+  const scale = useSharedValue(1);
+  const countStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const lastSeen = useRef(getFinishedSeen());
+  useEffect(() => {
+    if (countRose(lastSeen.current, count) && !reduced) {
+      scale.value = withSequence(
+        withTiming(1.15, { duration: m.fade1 * 0.8, easing: CURVE }),
+        withTiming(1, { duration: m.fade2 * 0.6, easing: CURVE }),
+      );
+    }
+    lastSeen.current = count;
+    setFinishedSeen(count);
+  }, [count, reduced, scale, m.fade1, m.fade2]);
+
+  return (
+    <View style={{
+      marginHorizontal: space[4], marginBottom: space[3], borderRadius: radius.xl,
+      backgroundColor: T.surfaceSunk, borderWidth: 1, borderColor: T.hairlineStrong,
+    }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Finished today"
+        accessibilityState={{ expanded: shown }}
+        onPress={toggle}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 48, paddingHorizontal: space[4] }}
+      >
+        <Text style={[type.label, { flex: 1, fontFamily: fontFor('600'), fontWeight: '600', color: T.text2 }]}>
+          Finished today
+        </Text>
+        <Animated.View style={countStyle}>
+          <Text style={[type.label, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text2 }]}>{jobCount(count)}</Text>
+        </Animated.View>
+        <Icon name={shown ? 'chevUp' : 'chevDown'} size={18} stroke={2.4} color={T.text2}/>
+      </Pressable>
+      {open && (
+        // The cards carry their own side margin; pull the panel in to match the fold's padding.
+        <Animated.View style={[{ marginHorizontal: -(space[4] - space[2]), paddingBottom: space[1] }, panelStyle]}>
+          {children}
+        </Animated.View>
+      )}
+    </View>
   );
 }
 
