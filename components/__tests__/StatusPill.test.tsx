@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 import * as Reanimated from 'react-native-reanimated';
-import { StatusPill, settleFrame, withAlpha } from '../StatusPill';
+import { StatusPill, settleFrame } from '../StatusPill';
 import { FeatureCard } from '../FeatureCard';
 import { makeTokens } from '../../theme/tokens';
 
@@ -30,16 +30,13 @@ beforeEach(() => {
   R.useReducedMotion.mockReturnValue(false);
 });
 
-describe('settleFrame / withAlpha (pure)', () => {
+describe('settleFrame (pure)', () => {
   it('settle starts at 0.4 opacity and 0.96 scale and ends at 1 and 1', () => {
     expect(settleFrame(0, false)).toEqual({ opacity: 0.4, scale: 0.96 });
     expect(settleFrame(1, false)).toEqual({ opacity: 1, scale: 1 });
   });
   it('under Reduce Motion it only fades', () => {
     expect(settleFrame(0, true)).toEqual({ opacity: 0.4, scale: 1 });
-  });
-  it('withAlpha turns a hex into rgba', () => {
-    expect(withAlpha('#008FD6', 0.25)).toBe('rgba(0,143,214,0.25)');
   });
 });
 

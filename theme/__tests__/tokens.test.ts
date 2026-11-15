@@ -1,4 +1,4 @@
-import { FONT, fontFor, makeTokens, motionFor, radius, space, type, type Tokens } from '../tokens';
+import { FONT, fontFor, makeTokens, motionFor, radius, space, type, withAlpha } from '../tokens';
 
 // Pins the redesign palette (design-systems/fleetms/colors_and_type.css) so a
 // stray edit to theme/tokens.ts fails here instead of silently repainting the
@@ -54,23 +54,25 @@ describe('palette', () => {
   });
 });
 
-describe('old token names, kept until phase 1d', () => {
-  // Every screen still reads the old names. Pointing them at the new palette is
-  // what repaints the app without touching a screen.
-  it.each([
-    ['primary', 'ink'], ['primaryFg', 'onInk'], ['page', 'ground'], ['muted', 'text2'], ['mutedLight', 'text3'],
-    ['accent', 'go'], ['accentFg', 'goText'], ['heroBg', 'feature'], ['heroFg', 'onFeature'],
-    ['pendingBg', 'amberSoft'], ['pendingFg', 'amberText'], ['confirmBg', 'greenSoft'], ['confirmFg', 'greenText'],
-    ['progressBg', 'blueSoft'], ['progressFg', 'blueText'], ['redFg', 'redText'], ['amberFg', 'amberText'],
-  ] as const)('%s points at %s in both themes', (oldName, newName) => {
-    for (const t of [light, dark]) expect(t[oldName as keyof Tokens]).toBe(t[newName as keyof Tokens]);
-  });
+describe('old token names', () => {
+  // Phase 1d removed the aliases that pointed old names at the new palette.
+  it.each(['primary', 'primaryFg', 'page', 'muted', 'mutedLight', 'accent', 'accentFg', 'heroBg', 'heroFg',
+    'pendingBg', 'confirmBg', 'progressBg', 'redFg', 'amberFg', 'border', 'raised', 'surfaceAlt', 'pageFadeTo'])(
+    '%s is gone in both themes', name => {
+      for (const t of [light, dark]) expect(t).not.toHaveProperty(name);
+    });
 
   it('no longer has any violet or cyan', () => {
     for (const t of [light, dark]) {
       const values = Object.values(t).filter((v): v is string => typeof v === 'string').map(v => v.toUpperCase());
       for (const old of ['#7C3AED', '#6D28D9', '#06B6D4', '#22D3EE', '#0E7490']) expect(values).not.toContain(old);
     }
+  });
+});
+
+describe('withAlpha', () => {
+  it('turns a hex into rgba', () => {
+    expect(withAlpha('#008FD6', 0.25)).toBe('rgba(0,143,214,0.25)');
   });
 });
 

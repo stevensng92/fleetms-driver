@@ -6,7 +6,7 @@ import Animated, {
 import { PillShell, useToneColors } from './Pill';
 import { statusTone, StatusToneResult } from '../lib/statusTone';
 import { useTokens } from '../theme/ThemeProvider';
-import { EASE_OUT, motionFor, radius } from '../theme/tokens';
+import { EASE_OUT, motionFor, radius, withAlpha } from '../theme/tokens';
 
 /** Today's kinds, still accepted so existing screens keep compiling. */
 export type StatusKind =
@@ -52,12 +52,6 @@ function resolve(props: Props): Resolved {
     : resolveLegacy(props.kind as StatusKind);
   const live = s.tone === 'blue' && s.label === 'In Progress';
   return { ...s, live };
-}
-
-/** 'rgba' of a #RRGGBB colour. */
-export function withAlpha(hex: string, alpha: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
 }
 
 /** The look at `progress` (0 to 1) of the settle: fade up from 0.4, scale up from 0.96. Reduce Motion: fade only. */
