@@ -28,9 +28,12 @@ async function openUrl(url: string) {
 }
 
 export type Stop = {
+  /** The name the driver reads: "Pickup", "Stop 1", "Drop-off" (see lib/route.ts stopLabel). */
   kind: string;
-  arriveLabel: string;
-  arrive: string;
+  /** The stop's time, already formatted. Null or missing: no time shows. */
+  arrive?: string | null;
+  /** Not drawn any more (the time now stands alone beside the name). Kept so data/mock.ts still type-checks. */
+  arriveLabel?: string;
   place: string;
   depart?: string | null;
   /** Optional coords for accurate nav. When absent, Waze/Maps fall back to
@@ -109,12 +112,14 @@ export function TimelineStop({ stop, isLast, state = 'upcoming', pin }: {
         }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space[2] }}>
             <Text style={[type.label, strong, { color: done ? T.text3 : T.text2 }]}>{stop.kind}</Text>
-            <Text style={[
-              type.body, strong, TABULAR,
-              { color: labelColor, textDecorationLine: done ? 'line-through' : 'none' },
-            ]}>
-              {stop.arriveLabel}: {stop.arrive}
-            </Text>
+            {!!stop.arrive && (
+              <Text style={[
+                type.body, strong, TABULAR,
+                { color: labelColor, textDecorationLine: done ? 'line-through' : 'none' },
+              ]}>
+                {stop.arrive}
+              </Text>
+            )}
           </View>
 
           <Text style={[

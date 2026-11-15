@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
 import { resolveDriverBaseline, type CommissionBasis } from '../commissionRate';
+import { vehicleTypeLabel } from '../route';
 
 // Full driver profile for the Profile screen + the Jobs tab greeting.
 // Joins drivers → organizations → default vehicle via PostgREST embeds.
@@ -132,17 +133,9 @@ export async function fetchCommissionBaseline(): Promise<CommissionBasis | null>
 
 // Derived display strings for the Profile screen.
 
-const VEHICLE_TYPE_LABEL: Record<string, string> = {
-  sedan:           'Sedan',
-  sedan_executive: 'Executive',
-  mpv:             'MPV',
-  van:             'Van',
-  coach:           'Coach',
-};
-
 export function formatVehicleLine(v: DriverProfile['vehicle']): string {
   if (!v) return 'No vehicle assigned';
-  const parts = [v.plate, VEHICLE_TYPE_LABEL[v.type] ?? v.type, v.model].filter(Boolean);
+  const parts = [v.plate, vehicleTypeLabel(v.type), v.model].filter(Boolean);
   return parts.join(' · ');
 }
 

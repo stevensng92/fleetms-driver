@@ -42,7 +42,7 @@ export function JobAmountCard({ amount, commission, style, bare }: {
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <Text style={[type.body, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text }]}>Job amount</Text>
         <Text style={[type.label, { color: T.text2 }]}>
-          {isFixed ? "What the client pays — not your fee" : 'Before commission'}
+          {isFixed ? "What the client pays, not your fee" : 'Before commission'}
         </Text>
       </View>
       <Text style={[type.figure, TABULAR, { color: T.text }]}>

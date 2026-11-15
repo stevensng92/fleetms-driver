@@ -8,28 +8,31 @@ import { Band } from '../../components/Band';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { FeatureCard } from '../../components/FeatureCard';
-import { GoFill } from '../../components/GoFill';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { RouteLine } from '../../components/JobCard';
 import { TimelineStop, Stop, pinFor } from '../../components/TimelineStop';
 import { ClientCard } from '../../components/ClientCard';
 import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
 import { SurchargesCard } from '../../components/SurchargesCard';
 import { PayCard } from '../../components/JobAmountCard';
-import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { fontFor, space, type, TABULAR } from '../../theme/tokens';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { formatClock } from '../../lib/timeFormat';
+import { routeStops, stopCountLabel } from '../../lib/route';
 import { useCompleteJob } from '../../lib/mutations/jobActions';
 
-// S4 — Active Job. Same shape as Job Detail but UI emphasises progress and
-// surfaces the Mark as Done CTA. Currently treats stop 1 as "current"; a real
-// implementation would track per-stop progress in job_stops.
+// S4 — Active Job. Same shape as Job Detail, with the trip in one dark card at
+// the top and the Mark as done button below. There is no progress bar and no
+// "current stop": the app does not track which stop the driver is at, so the
+// old "Stop 1 of N" bar never moved (redesign change 13).
 export default function ActiveJob() {
   const T = useTokens();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: job, isLoading, isError, error, refetch } = useJobDetailByNumber(id);
   const completeJob = useCompleteJob();
+  // Mark as done asks first. Nothing is sent until the driver confirms.
+  const [askingDone, setAskingDone] = useState(false);
 
   if (isLoading || !job) {
     return (
@@ -37,6 +40,8 @@ export default function ActiveJob() {
         <AppHeader title={String(id ?? '—')} onBack={() => router.back()}/>
         {isError ? (
           <ErrorBox message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>
+        ) : job === null ? (
+          <NotFound/>
         ) : (
           <View style={{ paddingTop: 60, alignItems: 'center' }}>
             <ActivityIndicator color={T.text2}/>
@@ -46,41 +51,9 @@ export default function ActiveJob() {
     );
   }
 
-  // Same stop derivation as Job Detail. Could be DRYed once both screens settle.
-  const stopsForUi: Stop[] = job.stops.map(s => ({
-    kind: s.kind,
-    arriveLabel: s.scheduledAt ? 'Arrive' : '—',
-    arrive: s.scheduledAt ? formatClock(s.scheduledAt) : '—',
-    place: s.location + (s.detail ? `, ${s.detail}` : ''),
-    depart: undefined,
-    lat: s.lat,
-    lng: s.lng,
+  const stopsForUi: Stop[] = routeStops(job.stops).map(r => ({
+    kind: r.label, arrive: r.time, place: r.place, lat: r.lat, lng: r.lng,
   }));
-  if (stopsForUi.length === 0) {
-    stopsForUi.push(
-      {
-        kind: 'Pickup',
-        arriveLabel: 'Pickup',
-        arrive: formatClock(job.pickupAt),
-        place: job.pickupLocation + (job.pickupDetail ? `, ${job.pickupDetail}` : ''),
-        depart: undefined,
-      },
-      {
-        kind: 'Dropoff',
-        arriveLabel: 'Arrive',
-        arrive: '—',
-        place: job.dropoffLocation + (job.dropoffDetail ? `, ${job.dropoffDetail}` : ''),
-        depart: undefined,
-      },
-    );
-  }
-
-  // Naive "current = first non-done". Per-stop state machine isn't built yet.
-  const currentIdx = 0;
-  const states: ('done' | 'current' | 'upcoming')[] = stopsForUi.map((_, i) =>
-    i < currentIdx ? 'done' : i === currentIdx ? 'current' : 'upcoming',
-  );
-  const progressPct = stopsForUi.length > 1 ? Math.round(((currentIdx + 0.5) / stopsForUi.length) * 100) : 50;
 
   const isInProgress = job.rawStatus === 'in_progress';
   const firstStop = stopsForUi[0];
@@ -109,12 +82,12 @@ export default function ActiveJob() {
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: space[4], paddingBottom: space[5], gap: space[4] }}>
         {/* The trip in one dark card: the time window, where it runs and,
-            while the job is live, how far along the stops it is. */}
+            what it is doing now. */}
         <FeatureCard style={{ padding: space[5], gap: space[4] }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3] }}>
             <Text style={[type.figure, TABULAR, { color: T.onFeature, flexShrink: 1 }]}>
-              {firstStop.arrive}
-              {stopsForUi.length > 1 && lastStop.arrive !== '—' && (
+              {firstStop.arrive ?? formatClock(job.pickupAt)}
+              {stopsForUi.length > 1 && !!lastStop.arrive && (
                 <Text style={[type.heading, { fontFamily: fontFor('600'), fontWeight: '600', color: T.onFeature2 }]}>
                   {' '}to {lastStop.arrive}
                 </Text>
@@ -123,23 +96,6 @@ export default function ActiveJob() {
             <StatusPill kind={job.status}/>
           </View>
           <RouteLine from={firstStop.place} to={lastStop.place} onFeature/>
-          {isInProgress && (
-            <View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                <Text style={[type.caption, { fontFamily: fontFor('600'), fontWeight: '600', color: T.onFeature2 }]}>
-                  Stop {currentIdx + 1} of {stopsForUi.length}
-                </Text>
-                <Text style={[type.caption, { fontFamily: fontFor('600'), fontWeight: '600', color: T.goLime }]}>
-                  In progress
-                </Text>
-              </View>
-              <View style={{ height: 6, borderRadius: 3, backgroundColor: T.featureTrack, overflow: 'hidden' }}>
-                <View style={{ width: `${progressPct}%`, height: '100%' }}>
-                  <GoFill radius={3}/>
-                </View>
-              </View>
-            </View>
-          )}
         </FeatureCard>
 
         <ClientCard
@@ -159,10 +115,12 @@ export default function ActiveJob() {
         <Card style={{ padding: space[5], gap: space[4] }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space[3] }}>
             <Text style={[type.title, { color: T.text }]}>Route</Text>
-            <Text style={[type.label, { color: T.text2 }]}>{stopsForUi.length} stops</Text>
+            <Text style={[type.label, { color: T.text2 }]}>{stopCountLabel(stopsForUi.length)}</Text>
           </View>
           <View>
-            <RouteWithCollapsedDoneStops stops={stopsForUi} states={states}/>
+            {stopsForUi.map((s, i) => (
+              <TimelineStop key={i} stop={s} isLast={i === stopsForUi.length - 1} pin={pinFor(i, stopsForUi.length)}/>
+            ))}
           </View>
         </Card>
 
@@ -184,8 +142,8 @@ export default function ActiveJob() {
         backgroundColor: T.ground,
       }}>
         {isInProgress ? (
-          <Button full size="lg" icon="check" onPress={onMarkDone}>
-            {completeJob.isPending ? 'Marking…' : 'Mark as Done'}
+          <Button full size="lg" icon="check" onPress={() => setAskingDone(true)}>
+            {completeJob.isPending ? 'Marking…' : 'Mark as done'}
           </Button>
         ) : (
           <Button variant="secondary" full size="lg" onPress={() => router.back()}>
@@ -197,110 +155,21 @@ export default function ActiveJob() {
             <Text style={[type.label, {
               fontFamily: fontFor('600'), fontWeight: '600', color: T.text2, textDecorationLine: 'underline',
             }]}>
-              Report an Issue
+              Report an issue
             </Text>
           </Pressable>
         </View>
       </View>
+      <ConfirmDialog
+        visible={askingDone}
+        title={`Mark ${job.jobNumber} done?`}
+        body="Do this once the last passenger is dropped off. Dispatch is told at once."
+        cancelLabel="Keep job open"
+        confirmLabel="Mark done"
+        onCancel={() => setAskingDone(false)}
+        onConfirm={() => { setAskingDone(false); onMarkDone(); }}
+      />
     </AppFrame>
-  );
-}
-
-// Renders the route timeline with completed stops collapsed into a single
-// summary row by default. Tap to expand the group and show each completed
-// stop normally; tap again to re-collapse.
-type StopState = 'done' | 'current' | 'upcoming';
-function RouteWithCollapsedDoneStops({
-  stops, states,
-}: { stops: Stop[]; states: StopState[] }) {
-  const T = useTokens();
-  const [expanded, setExpanded] = useState(false);
-
-  const doneCount = states.filter(s => s === 'done').length;
-  // No completed stops yet → render the full timeline normally.
-  if (doneCount === 0) {
-    return (
-      <>
-        {stops.map((s, i) => (
-          <TimelineStop key={i} stop={s} isLast={i === stops.length - 1} state={states[i]} pin={pinFor(i, stops.length)}/>
-        ))}
-      </>
-    );
-  }
-
-  // Completed stops are always at the start (states transition done → current → upcoming
-  // in order). Find the split index.
-  const firstNonDone = states.findIndex(s => s !== 'done');
-  const doneStops = stops.slice(0, firstNonDone === -1 ? stops.length : firstNonDone);
-  const restStops = stops.slice(firstNonDone === -1 ? stops.length : firstNonDone);
-  const restStates = states.slice(firstNonDone === -1 ? stops.length : firstNonDone);
-
-  // Build the summary text: time range + place chain abbreviated.
-  const firstDone = doneStops[0];
-  const lastDone = doneStops[doneStops.length - 1];
-  const timeRange = `${firstDone.arrive} to ${lastDone.arrive}`;
-  const placeChain = doneStops.map(s => s.place.split(',')[0]).join(' · ');
-
-  return (
-    <>
-      {expanded ? (
-        <>
-          {doneStops.map((s, i) => (
-            <TimelineStop key={`done-${i}`} stop={s} isLast={false} state="done" pin={pinFor(i, stops.length)}/>
-          ))}
-          <Pressable
-            onPress={() => setExpanded(false)}
-            style={({ pressed }) => ({
-              paddingVertical: space[2], marginBottom: 6,
-              flexDirection: 'row', alignItems: 'center', gap: 6,
-              opacity: pressed ? 0.5 : 1,
-            })}
-            hitSlop={8}
-          >
-            <Icon name="chevUp" size={14} stroke={2.4} color={T.text2}/>
-            <Text style={[type.label, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text2 }]}>
-              Hide completed
-            </Text>
-          </Pressable>
-        </>
-      ) : (
-        <Pressable
-          onPress={() => setExpanded(true)}
-          style={({ pressed }) => ({
-            paddingVertical: space[3], paddingHorizontal: space[3], borderRadius: 12,
-            backgroundColor: T.surfaceSunk, marginBottom: space[3],
-            flexDirection: 'row', alignItems: 'center', gap: space[3],
-            opacity: pressed ? 0.7 : 1,
-          })}
-        >
-          <Icon name="checkCirc" size={18} color={T.goText}/>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space[2] }}>
-              <Text style={[type.label, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text }]}>
-                {doneCount} {doneCount === 1 ? 'stop' : 'stops'} completed
-              </Text>
-              <Text style={[type.caption, TABULAR, { color: T.text2 }]} numberOfLines={1}>
-                {timeRange}
-              </Text>
-            </View>
-            <Text style={[type.caption, { color: T.text2, marginTop: 2 }]} numberOfLines={1}>
-              {placeChain}
-            </Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <Text style={[type.caption, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text2 }]}>Show</Text>
-            <Icon name="chevDown" size={14} stroke={2.4} color={T.text2}/>
-          </View>
-        </Pressable>
-      )}
-
-      {restStops.map((s, i) => (
-        <TimelineStop
-          key={`rest-${i}`} stop={s} isLast={i === restStops.length - 1} state={restStates[i]}
-          pin={pinFor(doneStops.length + i, stops.length)}
-        />
-      ))}
-    </>
   );
 }
 
@@ -314,5 +183,20 @@ function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }
         <Button variant="secondary" onPress={onRetry}>Retry</Button>
       </View>
     </Band>
+  );
+}
+
+// The job is no longer this driver's: cancelled, reassigned or hidden. Not a
+// failure, so there is no Retry. Words are the design mock's.
+function NotFound() {
+  const T = useTokens();
+  return (
+    <Card style={{ marginHorizontal: space[4], padding: space[5], gap: space[3] }}>
+      <Text style={[type.heading, { color: T.text }]}>This job is no longer on your list</Text>
+      <Text style={[type.body, { color: T.text2 }]}>Dispatch may have cancelled or reassigned it.</Text>
+      <View style={{ marginTop: space[2], alignSelf: 'flex-start' }}>
+        <Button variant="secondary" onPress={() => router.replace('/(tabs)')}>Back to jobs</Button>
+      </View>
+    </Card>
   );
 }
