@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Pressable, ScrollView, Image, Alert } from 'react-native';
 import { router } from 'expo-router';
+import { useNavigation, usePreventRemove } from '@react-navigation/native';
+import type { NavigationAction } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Button } from '../../components/Button';
@@ -10,12 +12,14 @@ import { Input } from '../../components/Input';
 import { Segmented } from '../../components/Segmented';
 import { Sheet } from '../../components/Sheet';
 import { Pill } from '../../components/Pill';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useTokens } from '../../theme/ThemeProvider';
 import { fontFor, radius, space, TABULAR, type } from '../../theme/tokens';
 import { useMyVehicles } from '../../lib/queries/vehicles';
 import { useLogExpense } from '../../lib/mutations/logExpense';
 import type { ExpenseCategory } from '../../lib/queries/expenses';
 import { formatDateLong, myDateKey } from '../../lib/timeFormat';
+import { amountValue, checkExpense, checkReceiptFile, receiptFileOf, vehicleOptionLine, hasDraft } from '../../lib/expenses';
 
 const CATS: { value: ExpenseCategory; label: string; icon: IconName }[] = [
   { value: 'fuel',  label: 'Fuel',  icon: 'fuel' },
@@ -33,6 +37,14 @@ export default function LogExpense() {
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const [showVehiclePicker, setShowVehiclePicker] = useState(false);
   const [amountFocused, setAmountFocused] = useState(false);
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
+  // Set once the driver has chosen to go (saved, or discarded). It switches the
+  // guard off; the effect below then makes the actual move.
+  const [leaving, setLeaving] = useState<{ action: NavigationAction | null } | null>(null);
+  const pendingAction = useRef<NavigationAction | null>(null);
+  const navigation = useNavigation();
+  // Messages sit under their field. A pop-up hides the form it is about.
+  const [errors, setErrors] = useState<{ amount?: string; vehicle?: string; receipt?: string }>({});
 
   const { data: vehicles, isLoading: vehiclesLoading } = useMyVehicles();
   const logExpense = useLogExpense();
@@ -58,6 +70,23 @@ export default function LogExpense() {
   const todayLocal = formatDateLong(now);
   const todayIso = myDateKey(now);
 
+  // Leaving a form with something in it asks first; an empty one just leaves.
+  // Saving goes back directly, not through here.
+  const draft = hasDraft({ amount, notes, photo: receiptUri != null });
+  const leave = () => (draft ? setConfirmingLeave(true) : router.back());
+
+  // Android back and iOS swipe-back come through here. The same dialog opens;
+  // Discard then carries on with the leave that was stopped.
+  usePreventRemove(draft && !leaving, ({ data }) => {
+    pendingAction.current = data.action;
+    setConfirmingLeave(true);
+  });
+  useEffect(() => {
+    if (!leaving) return;
+    if (leaving.action) navigation.dispatch(leaving.action);
+    else router.back();
+  }, [leaving, navigation]);
+
   async function pickReceipt(source: 'camera' | 'library') {
     const perm = source === 'camera'
       ? await ImagePicker.requestCameraPermissionsAsync()
@@ -73,7 +102,16 @@ export default function LogExpense() {
       ? await ImagePicker.launchCameraAsync({ quality: 0.9 })
       : await ImagePicker.launchImageLibraryAsync({ quality: 0.9, mediaTypes: ImagePicker.MediaTypeOptions.Images });
     if (!result.canceled && result.assets[0]) {
-      setReceiptUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      // Checked here, on the file the driver chose, before the upload step
+      // shrinks it to a JPEG and hides what it was.
+      const problem = checkReceiptFile(receiptFileOf(asset));
+      if (problem) {
+        setErrors(x => ({ ...x, receipt: problem }));
+        return;
+      }
+      setErrors(x => ({ ...x, receipt: undefined }));
+      setReceiptUri(asset.uri);
     }
   }
 
@@ -82,7 +120,7 @@ export default function LogExpense() {
       Alert.alert('Receipt photo', undefined, [
         { text: 'Replace with camera',   onPress: () => pickReceipt('camera') },
         { text: 'Replace from library',  onPress: () => pickReceipt('library') },
-        { text: 'Remove',                style: 'destructive', onPress: () => setReceiptUri(null) },
+        { text: 'Remove',                style: 'destructive', onPress: () => { setReceiptUri(null); setErrors(x => ({ ...x, receipt: undefined })); } },
         { text: 'Cancel',                style: 'cancel' },
       ]);
     } else {
@@ -95,15 +133,13 @@ export default function LogExpense() {
   }
 
   async function onSave() {
-    const num = parseFloat(amount);
-    if (!num || num <= 0) {
-      Alert.alert('Amount required', 'Enter an amount greater than zero.');
+    const found = checkExpense(amount, vehicleId);
+    if (found.amount || found.vehicle) {
+      setErrors({ amount: found.amount, vehicle: found.vehicle });
       return;
     }
-    if (!vehicleId) {
-      Alert.alert('Vehicle required', 'Pick a vehicle for this expense.');
-      return;
-    }
+    const num = amountValue(amount);
+    if (num === null || !vehicleId) return;
     try {
       await logExpense.mutateAsync({
         category: cat,
@@ -113,7 +149,7 @@ export default function LogExpense() {
         notes: notes.trim() || undefined,
         receiptUri,
       });
-      router.back();
+      setLeaving({ action: null });
     } catch (e: any) {
       Alert.alert('Could not save', e?.message ?? 'Unknown error');
     }
@@ -130,7 +166,7 @@ export default function LogExpense() {
           Log expense
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={leave}
           accessibilityRole="button"
           accessibilityLabel="Close"
           style={{
@@ -152,17 +188,18 @@ export default function LogExpense() {
           />
         </FormField>
 
-        <FormField label="Amount">
+        <FormField label="Amount" error={errors.amount}>
           <View style={{
             flexDirection: 'row', alignItems: 'center',
             backgroundColor: T.surfaceSunk, borderRadius: radius.md, borderWidth: 2,
-            borderColor: amountFocused ? T.ink : 'transparent',
+            borderColor: errors.amount ? T.red : amountFocused ? T.ink : 'transparent',
             paddingLeft: space[4],
           }}>
             <Text style={[type.title, { color: T.text2, marginRight: space[2] }]}>RM</Text>
             <Input
               value={amount}
-              onChangeText={setAmount}
+              onChangeText={(t) => { setAmount(t); if (errors.amount) setErrors(x => ({ ...x, amount: undefined })); }}
+              invalid={!!errors.amount}
               keyboardType="decimal-pad"
               placeholder="0.00"
               onFocus={() => setAmountFocused(true)}
@@ -186,15 +223,15 @@ export default function LogExpense() {
           </View>
         </FormField>
 
-        <FormField label="Vehicle">
+        <FormField label="Vehicle" error={errors.vehicle}>
           <Pressable
             onPress={() => setShowVehiclePicker(true)}
-            disabled={vehiclesLoading || !vehicles?.length}
+            disabled={vehiclesLoading}
             accessibilityRole="button"
             style={{
               flexDirection: 'row', alignItems: 'center', gap: space[2],
               minHeight: 44, paddingHorizontal: space[5], borderRadius: radius.pill,
-              backgroundColor: T.surface, borderWidth: 1, borderColor: T.controlRing,
+              backgroundColor: T.surface, borderWidth: 1, borderColor: errors.vehicle ? T.red : T.controlRing,
               boxShadow: T.shadow1,
             }}
           >
@@ -210,7 +247,7 @@ export default function LogExpense() {
           </Pressable>
         </FormField>
 
-        <FormField label="Receipt photo">
+        <FormField label="Receipt photo" error={errors.receipt}>
           <Pressable
             onPress={showReceiptOptions}
             accessibilityRole="button"
@@ -255,7 +292,7 @@ export default function LogExpense() {
         paddingHorizontal: space[5], paddingVertical: space[4], paddingBottom: 30,
         borderTopWidth: 1, borderTopColor: T.hairline, backgroundColor: T.surface,
       }}>
-        <Button variant="secondary" style={{ flex: 1 }} onPress={() => router.back()} >
+        <Button variant="secondary" style={{ flex: 1 }} onPress={leave}>
           Cancel
         </Button>
         <Button style={{ flex: 2 }} onPress={onSave}>
@@ -263,11 +300,22 @@ export default function LogExpense() {
         </Button>
       </View>
 
+      <ConfirmDialog
+        visible={confirmingLeave}
+        title="Discard this expense?"
+        body="What you typed will be lost."
+        confirmLabel="Discard expense"
+        cancelLabel="Keep expense"
+        tone="danger"
+        onConfirm={() => { setConfirmingLeave(false); setLeaving({ action: pendingAction.current }); }}
+        onCancel={() => { setConfirmingLeave(false); pendingAction.current = null; }}
+      />
+
       <VehicleSheet
         visible={showVehiclePicker}
         vehicles={vehicles ?? []}
         selectedId={vehicleId}
-        onPick={id => { setVehicleId(id); setShowVehiclePicker(false); }}
+        onPick={id => { setVehicleId(id); setErrors(x => ({ ...x, vehicle: undefined })); setShowVehiclePicker(false); }}
         onClose={() => setShowVehiclePicker(false)}
       />
     </SafeAreaView>
@@ -288,8 +336,7 @@ function VehicleSheet({
     <Sheet visible={visible} onClose={onClose} title="Pick vehicle">
       {vehicles.length === 0 ? (
         <View style={{ padding: space[5], alignItems: 'center' }}>
-          <ActivityIndicator color={T.text2}/>
-          <Text style={[type.label, { marginTop: space[3], color: T.text2 }]}>
+          <Text style={[type.label, { color: T.text2 }]}>
             No active vehicles in your org.
           </Text>
         </View>
@@ -317,7 +364,7 @@ function VehicleSheet({
                     {v.isDefault && <Pill tone="neutral">Default</Pill>}
                   </View>
                   <Text style={[type.caption, { color: T.text2 }]}>
-                    {v.type}{v.model ? `, ${v.model}` : ''}
+                    {vehicleOptionLine(v)}
                   </Text>
                 </View>
                 {sel && <Icon name="check" size={20} stroke={2.6} color={T.text}/>}
