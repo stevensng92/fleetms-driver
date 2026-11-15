@@ -146,7 +146,7 @@ display only:
 | 1 | Violet becomes ink, cyan becomes green, pills get icons | everywhere, via 1a and 1b |
 | 2 | Capital labels become sentence case | every `SectionLabel` and field label |
 | 3 | Dot-joined lines become separate items with icons | job card meta, client card vehicle line, expense rows, notifications |
-| 4 | Times in 24 hour: "14:30", not "14:30 pm" | `formatClock` in `lib/timeFormat.ts` (tests updated first) |
+| 4 | Times in 24 hour: "14:30", not "14:30 pm". Applies to the 24-hour choice only. Drivers can now pick 12-hour ("2:30 pm") on Profile, added 15 Nov outside the redesign; that option stays as is | `formatClock` in `lib/timeFormat.ts` (tests updated first) |
 | 5 | "Sat, 12 Dec" and "Saturday, 12 December 2026"; ranges say "to" | `lib/timeFormat.ts` (`formatDate`, `formatWeekRange`) |
 | 6 | Nothing pulses; the job being driven is the dark card | `JobCard`, `active.tsx` |
 | 7 | Floating tab bar | `app/(tabs)/_layout.tsx` |
@@ -219,6 +219,8 @@ Extends the existing `lib/earningsPeriod.ts` (already tested) and adds
 | 24 | One tap is a one-day request; Submit always on and says what is missing | `pickDay` port, missing-day message |
 | 26 | An inactive driver never shows a green pill; initials skip "bin" and "binti" | `availabilityPill`, `initials` ports |
 | 27 | Sign out asks first | nothing happens until confirmed |
+
+The mock's Profile has no Time format setting. The real app now has one (24-hour or 12-hour, under Appearance). The repaint keeps it, styled like the Theme setting beside it.
 
 New pure files: `lib/timeOff.ts`, `lib/profile.ts`.
 
