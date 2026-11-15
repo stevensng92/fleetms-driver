@@ -368,7 +368,7 @@ describe('formatSpecialCommission', () => {
     // "RM 80" with no qualifier is the ambiguous case — beside a RM 500 fare it
     // reads as a discount, a deposit, or a cut. "flat" is what makes it pay.
     expect(formatSpecialCommission({ kind: 'fixed', amount: 80 })).toBe('RM 80 flat');
-    expect(formatSpecialCommission({ kind: 'rate', pct: 20 })).toBe('20% comm');
+    expect(formatSpecialCommission({ kind: 'rate', pct: 20 })).toBe('20% of the fare');
   });
 
   it('drops the qualifier in compact mode', () => {

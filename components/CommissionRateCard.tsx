@@ -48,7 +48,7 @@ export function CommissionRateCard({ commission, style, bare }: {
             isn't an error, so it keeps the stronger of the two greys. */}
         <Text style={[type.label, { color: T.text2 }]}>
           {isFixed
-            ? 'Flat fee — not a percentage of the fare'
+            ? 'A flat fee, not a share of the fare'
             : 'Different from your usual rate'}
         </Text>
       </View>

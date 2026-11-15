@@ -146,8 +146,8 @@ describe('Earnings — row rendering', () => {
     }));
     await render(<Earnings/>);
 
-    expect(screen.getByText('20% comm')).toBeTruthy();
-    expect(screen.queryAllByText(/% comm$/)).toHaveLength(1);
+    expect(screen.getByText('20% of the fare')).toBeTruthy();
+    expect(screen.queryAllByText(/% of the fare$/)).toHaveLength(1);
   });
 
   it('labels a fixed-fee row as a flat fee, not a percentage', async () => {
@@ -164,7 +164,7 @@ describe('Earnings — row rendering', () => {
     await render(<Earnings/>);
 
     expect(screen.getByText('RM 80 flat')).toBeTruthy();
-    expect(screen.queryAllByText(/% comm$/)).toHaveLength(0);
+    expect(screen.queryAllByText(/% of the fare$/)).toHaveLength(0);
   });
 
   it('says "No fare set" rather than RM 0.00 on a fareless job', async () => {

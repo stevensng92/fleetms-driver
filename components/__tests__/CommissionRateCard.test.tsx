@@ -30,11 +30,11 @@ describe('CommissionRateCard — percentage', () => {
   });
 
   it('renders the pill in compact mode so "commission" is not said twice', async () => {
-    // The card label already says "Commission rate"; a "20% comm" pill beside
+    // The card label already says "Commission rate"; a "20% of the fare" pill beside
     // it repeats the word. This is the whole reason `compact` exists.
     await render(<CommissionRateCard commission={{ kind: 'rate', pct: 20 }}/>);
     expect(screen.getByText('20%')).toBeTruthy();
-    expect(screen.queryByText('20% comm')).toBeNull();
+    expect(screen.queryByText('20% of the fare')).toBeNull();
   });
 
   it('renders a 0% rate rather than treating it as absent', async () => {
@@ -50,7 +50,7 @@ describe('CommissionRateCard — fixed fee', () => {
     // screen whose other number is a RM 500 fare, and gets read as ~RM 100.
     await render(<CommissionRateCard commission={{ kind: 'fixed', amount: 80 }}/>);
     expect(screen.getByText('Your fee for this job')).toBeTruthy();
-    expect(screen.getByText('Flat fee — not a percentage of the fare')).toBeTruthy();
+    expect(screen.getByText('A flat fee, not a share of the fare')).toBeTruthy();
   });
 
   it('does not reuse the percentage-mode wording', async () => {

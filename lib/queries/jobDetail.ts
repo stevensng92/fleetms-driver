@@ -55,7 +55,7 @@ export type JobDetail = {
   vehicleModel: string | null;
   amount: number | null;
   /** What this job pays when it isn't the driver's normal cut — either a rate
-   *  (20 → "20% comm") or a flat fee (80 → "RM 80 flat"). null = standard rate,
+   *  (20 → "20% of the fare") or a flat fee (80 → "RM 80 flat"). null = standard rate,
    *  nothing to show. See lib/commissionRate.ts — a rate override pinned to the
    *  org default is not treated as special, but a fee always is. */
   specialCommission: SpecialCommission | null;

@@ -47,6 +47,6 @@ describe('JobAmountCard', () => {
     await render(<JobAmountCard amount={500} commission={{ kind: 'fixed', amount: 80 }}/>);
     expect(screen.getByText('RM 500.00')).toBeTruthy();
     expect(screen.queryByText('Before commission')).toBeNull();
-    expect(screen.getByText('What the client pays — not your fee')).toBeTruthy();
+    expect(screen.getByText('What the client pays, not your fee')).toBeTruthy();
   });
 });
