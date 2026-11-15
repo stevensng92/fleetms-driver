@@ -59,3 +59,8 @@ app-example
 
 # jest coverage output
 coverage/
+
+# gstack working files. Only the ship policy and version pointer are shared.
+.gstack/*
+!.gstack/ship-policy.json
+!.gstack/version-path
