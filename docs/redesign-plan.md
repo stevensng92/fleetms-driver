@@ -212,7 +212,7 @@ and `driverProfile.ts`) into one.
 | 22 | Payment words on rows: Paid, Unpaid, Waived, Refunded. "Pending" figure renamed "Unpaid" | each payment value maps to its word |
 | 23 | Page dots go; arrows and swipe stay. No commission yet says "Awaiting commission" | row with null commission |
 | 37 | A page turn slides the period name, figures and job list 16px in and fades them in (200ms, react-native-reanimated). An arrow brings them from its own side; a swipe from the side the finger moved away from. Week/Month/All does not slide; Reduce Motion fades only (added to the mock 15 Nov) | the side picked for each arrow and each swipe direction, as a pure helper; no slide on a mode switch |
-| 38 | Swipe right for earlier, left for later (today it is the other way round), so the swipe agrees with the arrows. Decided 15 Nov | the swipe rule: a rightward drag past 40px is earlier, leftward is later; short or mostly vertical drags do nothing |
+| 38 | Swipe right for earlier, left for later (today it is the other way round), so the swipe agrees with the arrows. The hint reads "Swipe right for earlier months" (or weeks). Decided 15 Nov | the swipe rule: a rightward drag past 40px is earlier, leftward is later; short or mostly vertical drags do nothing; the hint names the direction |
 
 Extends the existing `lib/earningsPeriod.ts` (already tested) and adds
 `lib/money.ts` (`formatRM`, `splitRM`).
