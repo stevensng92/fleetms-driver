@@ -148,9 +148,13 @@ describe('ClientCard — dialling', () => {
 });
 
 describe('ClientCard — vehicle line', () => {
-  it('joins type, model and plate', async () => {
+  it('shows type, model and plate as separate items, not one dot-joined line', async () => {
+    // Redesign change 3: a dot-joined line becomes separate items.
     await render(card({ vehicleType: 'mpv', vehicleModel: 'Alphard', vehiclePlate: 'WA 1234 B' }));
-    expect(screen.getByText('MPV · Alphard · WA 1234 B')).toBeTruthy();
+    expect(screen.getByText('MPV')).toBeTruthy();
+    expect(screen.getByText('Alphard')).toBeTruthy();
+    expect(screen.getByText('WA 1234 B')).toBeTruthy();
+    expect(screen.queryByText(/·/)).toBeNull();
   });
 
   it('falls back to the requested type alone before a vehicle is assigned', async () => {

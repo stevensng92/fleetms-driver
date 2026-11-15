@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleProp, ViewStyle } from 'react-native';
-import { SectionLabel } from './AppHeader';
+import { Card } from './Card';
 import { useTokens } from '../theme/ThemeProvider';
+import { fontFor, space, type, TABULAR } from '../theme/tokens';
 
 export type Surcharge = {
   id: string;
@@ -11,7 +12,7 @@ export type Surcharge = {
   paidInAdvance: boolean;
 };
 
-// Spec #215 — dispatcher-attached surcharges, shared by Job Detail and Active
+// Spec 215 — dispatcher-attached surcharges, shared by Job Detail and Active
 // Job. These are services the driver performs (Overnight, Paging,
 // Accommodation) and the extra money attached to them.
 //
@@ -32,38 +33,32 @@ export function SurchargesCard({ items, style }: {
   const T = useTokens();
   if (items.length === 0) return null;
   return (
-    <View style={style}>
-      <SectionLabel>Included services</SectionLabel>
-      <View style={{
-        backgroundColor: T.surface, borderRadius: 12,
-        paddingHorizontal: 16, paddingVertical: 6, marginBottom: 18,
-        shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-        elevation: 2,
-      }}>
+    <Card style={[{ padding: space[5], gap: space[2] }, style]}>
+      <Text style={[type.title, { color: T.text }]}>Included services</Text>
+      <View>
         {items.map((s, i) => (
           <View
             key={s.id}
             style={{
               flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-              paddingVertical: 10,
-              borderBottomWidth: i === items.length - 1 ? 0 : 1,
-              borderBottomColor: T.border,
+              gap: space[4], minHeight: 56, paddingVertical: space[2],
+              borderTopWidth: i === 0 ? 0 : 1,
+              borderTopColor: T.hairline,
             }}
           >
-            <View style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: T.text }}>{s.name}</Text>
-              <Text style={{
-                fontSize: 11.5, marginTop: 2, fontWeight: '600',
-                color: s.paidInAdvance ? T.mutedLight : T.muted,
-              }}>
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text style={[type.body, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text }]}>{s.name}</Text>
+              <Text style={[type.label, { color: T.text2 }]}>
                 {s.paidInAdvance
                   ? 'Paid in advance'
                   : s.treatment === 'pass_through' ? 'Added to your pay' : 'Counts toward fare'}
               </Text>
             </View>
+            {/* One flat style object (not an array): the tests read textDecorationLine off it. */}
             <Text style={{
-              fontSize: 15, fontWeight: '700', letterSpacing: -0.3,
-              color: s.paidInAdvance ? T.mutedLight : T.text,
+              ...type.body, ...TABULAR,
+              fontFamily: fontFor('600'), fontWeight: '600',
+              color: s.paidInAdvance ? T.text3 : T.text,
               textDecorationLine: s.paidInAdvance ? 'line-through' : 'none',
             }}>
               RM {s.amount.toFixed(2)}
@@ -71,6 +66,6 @@ export function SurchargesCard({ items, style }: {
           </View>
         ))}
       </View>
-    </View>
+    </Card>
   );
 }
