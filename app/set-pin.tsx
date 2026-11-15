@@ -12,6 +12,7 @@ import { Input } from '../components/Input';
 import { useTokens } from '../theme/ThemeProvider';
 import { TABULAR, fontFor, space, type } from '../theme/tokens';
 import { completeDriverPinSetup, signOut } from '../lib/auth';
+import { pinDigits } from '../lib/phone';
 
 const APP_VERSION = Constants.expoConfig?.version ?? '';
 
@@ -47,8 +48,8 @@ export default function SetPin() {
       return;
     }
     if (result.reason === 'expired') {
+      // The card's own line says it; a red band with the same words would be a second copy.
       setExpired(true);
-      setError(result.message);
       return;
     }
     setError(result.message);
@@ -127,7 +128,7 @@ function PinInput({
   return (
     <Input
       value={value}
-      onChangeText={(t) => onChange(t.replace(/\D/g, '').slice(0, 6))}
+      onChangeText={(t) => onChange(pinDigits(t))}
       keyboardType="number-pad"
       placeholder="••••••"
       maxLength={6}
