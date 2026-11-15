@@ -20,13 +20,15 @@ export function AppHeader({ title, subtitle, onBack, right }: Props) {
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: 12,
-      backgroundColor: T.page,
+      backgroundColor: T.ground,
     }}>
       {onBack && (
         <Pressable
           onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
           style={{
-            width: 40, height: 40, marginLeft: -8, marginTop: -4,
+            width: 44, height: 44, marginLeft: -10, marginTop: -6,
             borderRadius: 9999, alignItems: 'center', justifyContent: 'center',
           }}
         >
@@ -35,13 +37,13 @@ export function AppHeader({ title, subtitle, onBack, right }: Props) {
       )}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{
-          fontSize: 26, fontWeight: '700', color: T.text,
-          letterSpacing: -0.6, lineHeight: 30,
+          fontSize: 28, fontWeight: '700', color: T.text,
+          letterSpacing: -0.56, lineHeight: 32,
         }}>
           {title}
         </Text>
         {subtitle && (
-          <Text style={{ marginTop: 4, fontSize: 14, color: T.muted, fontWeight: '500' }}>
+          <Text style={{ marginTop: 4, fontSize: 14, color: T.text2, fontWeight: '500' }}>
             {subtitle}
           </Text>
         )}
@@ -51,7 +53,7 @@ export function AppHeader({ title, subtitle, onBack, right }: Props) {
   );
 }
 
-// Compact section label used between cards in the scroll views.
+// Section heading used between cards in the scroll views. Sentence case.
 export function SectionLabel({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   const T = useTokens();
   return (
@@ -62,10 +64,7 @@ export function SectionLabel({ children, right }: { children: React.ReactNode; r
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingHorizontal: 20, paddingTop: 4, paddingBottom: 10,
     }}>
-      <Text style={{
-        fontSize: 12, fontWeight: '700', color: T.muted,
-        letterSpacing: 0.8, textTransform: 'uppercase',
-      }}>
+      <Text style={{ fontSize: 16, fontWeight: '600', color: T.text }}>
         {children}
       </Text>
       {right}
