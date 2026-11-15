@@ -204,7 +204,7 @@ New pure file: `lib/route.ts` (stop names, stop count, surcharge note, vehicle
 line). This also merges the two copies of the vehicle type names (`ClientCard.tsx`
 and `driverProfile.ts`) into one.
 
-### Phase 4: Earnings (changes 21, 22, 23, 37)
+### Phase 4: Earnings (changes 21, 22, 23, 37, 38)
 
 | # | Change | Test first |
 |---|---|---|
@@ -212,6 +212,7 @@ and `driverProfile.ts`) into one.
 | 22 | Payment words on rows: Paid, Unpaid, Waived, Refunded. "Pending" figure renamed "Unpaid" | each payment value maps to its word |
 | 23 | Page dots go; arrows and swipe stay. No commission yet says "Awaiting commission" | row with null commission |
 | 37 | A page turn slides the period name, figures and job list 16px in and fades them in (200ms, react-native-reanimated). An arrow brings them from its own side; a swipe from the side the finger moved away from. Week/Month/All does not slide; Reduce Motion fades only (added to the mock 15 Nov) | the side picked for each arrow and each swipe direction, as a pure helper; no slide on a mode switch |
+| 38 | Swipe right for earlier, left for later (today it is the other way round), so the swipe agrees with the arrows. Decided 15 Nov | the swipe rule: a rightward drag past 40px is earlier, leftward is later; short or mostly vertical drags do nothing |
 
 Extends the existing `lib/earningsPeriod.ts` (already tested) and adds
 `lib/money.ts` (`formatRM`, `splitRM`).
@@ -311,7 +312,6 @@ From "For you to decide" in `driver-inventory.md`. None of these block a phase.
 4. **Required version**: comes from the server, as today. The mock's "0.12.0" isn't used.
 5. **Shared pill fix**: the admin mock's struck "Cancelled" pill is a little faint. This app gets its own pill, so I draw it at full contrast here. The admin mock's shared file isn't touched.
 6. **One data set** (mock jobs JOB-137 to JOB-144): mock-only, nothing to do here.
-7. **Earnings swipe direction** (added 15 Nov): a swipe to the left goes to the earlier period, as today, though the Earlier arrow is on the left. Kept as today until you decide whether to flip it.
 
 Also noted from the spec's 25 known issues, outside the 31 changes and not in
 this plan: notifications not marked read when the list is full (16), the
