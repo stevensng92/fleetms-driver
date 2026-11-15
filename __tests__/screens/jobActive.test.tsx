@@ -1,6 +1,7 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { resetClockStyleForTests, setClockStyle } from '../../lib/clockPref';
 import ActiveJob from '../../app/jobs/active';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { useCompleteJob } from '../../lib/mutations/jobActions';
@@ -136,5 +137,18 @@ describe('Active job: not found and failed (change 20)', () => {
     await render(<ActiveJob/>);
     expect(screen.queryByText('This job is no longer on your list')).toBeNull();
     expect(screen.queryByText('Retry')).toBeNull();
+  });
+});
+
+// Change 33: every clock follows the Time format setting.
+describe('ActiveJob with the Time format setting', () => {
+  afterEach(() => resetClockStyleForTests());
+  it('shows the pickup time in the chosen style', async () => {
+    mockJob(job({ stops: [stop({ scheduledAt: PICKUP_AT })] }));
+    await render(<ActiveJob/>);
+    expect(screen.getAllByText(formatClock(PICKUP_AT, '24h')).length).toBeGreaterThan(0);
+    await act(async () => { setClockStyle('12h'); });
+    expect(screen.getAllByText('9:15 am').length).toBeGreaterThan(0);
+    expect(screen.queryByText('09:15')).toBeNull();
   });
 });

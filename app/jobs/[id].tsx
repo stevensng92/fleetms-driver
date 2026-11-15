@@ -15,6 +15,7 @@ import { SurchargesCard } from '../../components/SurchargesCard';
 import { PayCard } from '../../components/JobAmountCard';
 import { useTokens } from '../../theme/ThemeProvider';
 import { fontFor, space, type } from '../../theme/tokens';
+import { useClockStyle } from '../../lib/clockPref';
 import { routeStops, stopCountLabel } from '../../lib/route';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { useStartJob, useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
@@ -25,6 +26,7 @@ export default function JobDetail() {
   const T = useTokens();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: job, isLoading, isError, error, refetch } = useJobDetailByNumber(id);
+  const clock = useClockStyle();
 
   const startJob = useStartJob();
   const confirmAsg = useConfirmAssignment();
@@ -49,7 +51,7 @@ export default function JobDetail() {
     );
   }
 
-  const stopsForUi: Stop[] = routeStops(job.stops).map(r => ({
+  const stopsForUi: Stop[] = routeStops(job.stops, clock).map(r => ({
     kind: r.label, arrive: r.time, place: r.place, lat: r.lat, lng: r.lng,
   }));
 

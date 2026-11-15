@@ -50,11 +50,22 @@ function toMyParts(value: string | Date): Date | null {
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-/** "14:30" / "09:00", in Malaysian time. Em dash on unparseable input. */
-export function formatClock(value: string | Date): string {
+/** The Time format setting (change 33): 24-hour ("14:30", the default) or 12-hour ("2:30 pm"). */
+export type ClockStyle = '24h' | '12h';
+
+/** An "HH:MM" time in the chosen style. Anything that is not HH:MM comes back as it was. */
+export function clockTime(hhmm: string, style: ClockStyle = '24h'): string {
+  const m = /^(\d{2}):(\d{2})$/.exec(hhmm);
+  if (!m || style === '24h') return hhmm;
+  const h = Number(m[1]);
+  return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h < 12 ? 'am' : 'pm'}`;
+}
+
+/** "14:30" / "09:00" in Malaysian time, or "2:30 pm" on the 12-hour style. Em dash on unparseable input. */
+export function formatClock(value: string | Date, style: ClockStyle = '24h'): string {
   const my = toMyParts(value);
   if (!my) return '—';
-  return `${pad2(my.getUTCHours())}:${pad2(my.getUTCMinutes())}`;
+  return clockTime(`${pad2(my.getUTCHours())}:${pad2(my.getUTCMinutes())}`, style);
 }
 
 /** "30 Jul" / "Sat, 12 Dec" — Malaysian calendar date, no year, day not padded. */
@@ -349,10 +360,11 @@ export function myStartOfMonth(value: string | Date = new Date(), monthOffset = 
 export function formatDateTime(
   value: string | Date,
   opts: { weekday?: boolean } = { weekday: true },
+  style: ClockStyle = '24h',
 ): string {
   // Pass the ORIGINAL value down, never the shifted one — formatDate and
   // formatClock each apply the offset themselves, so handing them an
   // already-shifted Date would land 16 hours ahead.
   if (!toMyParts(value)) return '—';
-  return `${formatDate(value, opts)}, ${formatClock(value)}`;
+  return `${formatDate(value, opts)}, ${formatClock(value, style)}`;
 }

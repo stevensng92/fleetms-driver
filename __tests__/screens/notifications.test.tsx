@@ -1,6 +1,7 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { act, render, screen, fireEvent } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { resetClockStyleForTests, setClockStyle } from '../../lib/clockPref';
 import Notifications from '../../app/notifications';
 import { useNotifications, useMarkNotificationsRead, type NotificationItem } from '../../lib/queries/notifications';
 import { makeTokens } from '../../theme/tokens';
@@ -77,5 +78,18 @@ describe('Notifications', () => {
     expect(screen.getAllByRole('button')).toHaveLength(2);
     await fireEvent.press(screen.getByText('Job cancelled'));
     expect(router.push).not.toHaveBeenCalled();
+  });
+});
+
+// Change 33: the sent time follows the Time format setting.
+describe('Notifications with the Time format setting', () => {
+  afterEach(() => resetClockStyleForTests());
+  it('shows the sent time in the chosen style', async () => {
+    mockList([item()]);
+    await render(<Notifications/>);
+    expect(screen.getByText('12 Dec, 09:22')).toBeTruthy();
+    await act(async () => { setClockStyle('12h'); });
+    expect(screen.getByText('12 Dec, 9:22 am')).toBeTruthy();
+    expect(screen.queryByText('12 Dec, 09:22')).toBeNull();
   });
 });

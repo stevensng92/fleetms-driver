@@ -1,6 +1,7 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { resetClockStyleForTests, setClockStyle } from '../../lib/clockPref';
 import JobDetail from '../../app/jobs/[id]';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { useStartJob, useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
@@ -134,5 +135,18 @@ describe('Job detail: Reject asks first (matches the Jobs list)', () => {
     await fireEvent.press(screen.getByText('Reject job'));
     await waitFor(() => expect(reject).toHaveBeenCalledWith({ assignmentId: 'asg-1', reason: undefined }));
     await waitFor(() => expect(router.back).toHaveBeenCalled());
+  });
+});
+
+// Change 33: every clock follows the Time format setting.
+describe('JobDetail with the Time format setting', () => {
+  afterEach(() => resetClockStyleForTests());
+  it('shows the stop time in the chosen style', async () => {
+    mockJob(job({ rawStatus: 'confirmed', stops: [stop({ scheduledAt: PICKUP_AT })] }));
+    await render(<JobDetail/>);
+    expect(screen.getAllByText('09:15').length).toBeGreaterThan(0);
+    await act(async () => { setClockStyle('12h'); });
+    expect(screen.getAllByText('9:15 am').length).toBeGreaterThan(0);
+    expect(screen.queryByText('09:15')).toBeNull();
   });
 });

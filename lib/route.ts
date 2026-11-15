@@ -1,4 +1,4 @@
-import { formatClock } from './timeFormat';
+import { formatClock, type ClockStyle } from './timeFormat';
 
 // Plain decisions about a job's route, charges and vehicle, kept apart from the
 // screens and the query so they can be tested without a database client.
@@ -79,10 +79,10 @@ export type RouteStop = {
   lng: number | null;
 };
 
-export function routeStops(stops: RawStop[]): RouteStop[] {
+export function routeStops(stops: RawStop[], clock: ClockStyle = '24h'): RouteStop[] {
   return stops.map((s, i) => ({
     label: stopLabel(stops, i),
-    time: s.scheduledAt ? formatClock(s.scheduledAt) : null,
+    time: s.scheduledAt ? formatClock(s.scheduledAt, clock) : null,
     place: s.location + (s.detail ? `, ${s.detail}` : ''),
     lat: s.lat,
     lng: s.lng,

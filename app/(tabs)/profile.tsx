@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Pressable, Linking, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { AppFrame } from '../../components/AppFrame';
@@ -9,17 +9,18 @@ import { Icon } from '../../components/Icon';
 import { Button } from '../../components/Button';
 import { Pill } from '../../components/Pill';
 import { Segmented } from '../../components/Segmented';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useTokens, useThemeControls } from '../../theme/ThemeProvider';
 import { fontFor, radius, space, TABULAR, type } from '../../theme/tokens';
-import { useDriverProfile, formatVehicleLine, availabilityBadge } from '../../lib/queries/driverProfile';
-import { useDriverTimeOff, REASON_LABEL, type TimeOffEntry, type TimeOffStatus } from '../../lib/queries/timeOff';
+import { useDriverProfile } from '../../lib/queries/driverProfile';
+import { useDriverTimeOff, type TimeOffEntry, type TimeOffStatus } from '../../lib/queries/timeOff';
 import { useCancelTimeOff } from '../../lib/mutations/timeOff';
 import { useAppVersionGate } from '../../lib/queries/appVersionConfig';
 import { signOut } from '../../lib/auth';
-import { formatDate, myDateKey } from '../../lib/timeFormat';
-
-/** 'AVAILABLE' becomes 'Available': the words stay, the capitals go (change 2). */
-const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+import { myDateKey } from '../../lib/timeFormat';
+import { availabilityPill, formatVehicleLine, initials } from '../../lib/profile';
+import { entryDays, rangeLabel, timeOffMeta, upcomingTimeOff } from '../../lib/timeOff';
+import { setClockStyle, useClockStyle } from '../../lib/clockPref';
 
 const APP_DOWNLOAD_URL = 'https://app.fleetms.my/driver-app';
 
@@ -28,8 +29,11 @@ export default function Profile() {
   const { preference, setPreference } = useThemeControls();
   const { data: profile, isLoading } = useDriverProfile();
   const versionGate = useAppVersionGate();
+  const clock = useClockStyle();
+  // Sign out asks first; nothing happens until the driver confirms.
+  const [signingOut, setSigningOut] = useState(false);
 
-  const badge = profile ? availabilityBadge(profile.availability) : null;
+  const pill = profile ? availabilityPill(profile) : null;
 
   return (
     <AppFrame bg={T.ground}>
@@ -46,7 +50,7 @@ export default function Profile() {
               <ActivityIndicator color={T.onFeature}/>
             ) : (
               <Text style={[type.title, { color: T.onFeature }]}>
-                {profile?.initials ?? '—'}
+                {profile ? initials(profile.name) : '—'}
               </Text>
             )}
           </View>
@@ -57,10 +61,10 @@ export default function Profile() {
             <Text style={[type.label, TABULAR, { color: T.text2 }]}>
               {profile?.phone ?? '—'}
             </Text>
-            {badge && (
+            {pill && (
               <View style={{ marginTop: space[1] }}>
-                <Pill tone={badge.on && profile?.isActive !== false ? 'green' : 'neutral'} icon={badge.on && profile?.isActive !== false ? 'circleCheck' : 'circleAlert'}>
-                  {profile?.isActive === false ? 'Inactive' : sentenceCase(badge.label)}
+                <Pill tone={pill.tone} icon={pill.tone === 'green' ? 'circleCheck' : pill.tone === 'amber' ? 'clock' : 'circleAlert'}>
+                  {pill.label}
                 </Pill>
               </View>
             )}
@@ -106,17 +110,41 @@ export default function Profile() {
           onChange={setPreference}
         />
       </Card>
+      <Card style={{ marginHorizontal: space[4], marginBottom: space[3], padding: space[5], gap: space[3] }}>
+        <Text style={[type.label, { color: T.text2 }]}>
+          Time format
+        </Text>
+        <Segmented
+          block
+          options={[
+            { value: '24h', label: '24-hour' },
+            { value: '12h', label: '12-hour' },
+          ]}
+          value={clock}
+          onChange={setClockStyle}
+        />
+      </Card>
 
       <View style={{ marginHorizontal: space[4], marginVertical: space[6] }}>
         <Button
           variant="secondary"
           full
           icon="logOut"
-          onPress={async () => { await signOut(); router.replace('/sign-in'); }}
+          onPress={() => setSigningOut(true)}
         >
           Sign out
         </Button>
       </View>
+
+      <ConfirmDialog
+        visible={signingOut}
+        title="Sign out?"
+        body="You'll need your phone number and PIN to sign in again."
+        confirmLabel="Sign out"
+        cancelLabel="Stay signed in"
+        onConfirm={async () => { setSigningOut(false); await signOut(); router.replace('/sign-in'); }}
+        onCancel={() => setSigningOut(false)}
+      />
     </AppFrame>
   );
 }
@@ -185,12 +213,16 @@ function TimeOffList() {
       </Band>
     );
   }
-  const rows = (data ?? []).filter(r => new Date(r.endsAt) > new Date());
+  // Days, in Malaysian time; a request that has ended is hidden.
+  const rows = upcomingTimeOff(
+    (data ?? []).map(r => ({ ...r, ...entryDays(r.startsAt, r.endsAt) })),
+    myDateKey(),
+  );
   if (rows.length === 0) {
     return (
       <Card style={{ marginHorizontal: space[4], marginBottom: space[5], paddingHorizontal: space[4], paddingVertical: space[5] }}>
         <Text style={[type.label, { color: T.text2, textAlign: 'center' }]}>
-          No upcoming time off. Tap &ldquo;Request time off&rdquo; to plan a day.
+          No upcoming time off. Tap Request time off to plan a day.
         </Text>
       </Card>
     );
@@ -238,27 +270,11 @@ const STATUS_PILL: Record<TimeOffStatus, { label: string; tone: 'amber' | 'green
   rejected: { label: 'Rejected', tone: 'red',   icon: 'circleX' },
 };
 
-function formatRange(startsAt: string, endsAt: string): { range: string; days: number } {
-  const s = new Date(startsAt);
-  // ends_at is the exclusive end (next day 00:00). Subtract a millisecond for
-  // a human-friendly "to" date.
-  const eExclusive = new Date(endsAt);
-  const eInclusive = new Date(eExclusive.getTime() - 1);
-  // MY-pinned: these ranges were submitted as MY days (lib/mutations/timeOff.ts),
-  // so rendering them device-local could show a different day than was booked.
-  const fmt = (d: Date) => formatDate(d);
-  const sameDay = myDateKey(s) === myDateKey(eInclusive);
-  const range = sameDay ? fmt(s) : `${fmt(s)} to ${fmt(eInclusive)}`;
-  const days = Math.max(1, Math.round((eExclusive.getTime() - s.getTime()) / 86400000));
-  return { range, days };
-}
-
 function TimeOffRow({
   entry, last, onCancel, cancelling,
-}: { entry: TimeOffEntry; last: boolean; onCancel: () => void; cancelling: boolean }) {
+}: { entry: TimeOffEntry & { start: string; end: string }; last: boolean; onCancel: () => void; cancelling: boolean }) {
   const T = useTokens();
   const v = STATUS_PILL[entry.status];
-  const { range, days } = formatRange(entry.startsAt, entry.endsAt);
   const canCancel = entry.status === 'pending';
 
   return (
@@ -268,14 +284,8 @@ function TimeOffRow({
       borderBottomWidth: last ? 0 : 1, borderBottomColor: T.hairline,
     }}>
       <View style={{ flex: 1, minWidth: 0, gap: space[1] }}>
-        <Text style={[type.title, { color: T.text }]}>{range}</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], rowGap: space[1] }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>
-            <Icon name="calendarDays" size={13} color={T.text3}/>
-            <Text style={[type.caption, { color: T.text2 }]}>{days} {days === 1 ? 'day' : 'days'}</Text>
-          </View>
-          <Text style={[type.caption, { color: T.text2 }]}>{REASON_LABEL[entry.reason]}</Text>
-        </View>
+        <Text style={[type.title, { color: T.text }]}>{rangeLabel(entry.start, entry.end)}</Text>
+        <Text style={[type.caption, { color: T.text2 }]}>{timeOffMeta({ start: entry.start, end: entry.end, reason: entry.reason })}</Text>
       </View>
       <View style={{ alignItems: 'flex-end', gap: space[2] }}>
         <Pill tone={v.tone} icon={v.icon}>{v.label}</Pill>

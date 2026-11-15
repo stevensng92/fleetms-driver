@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
 import { resolveDriverBaseline, type CommissionBasis } from '../commissionRate';
-import { vehicleTypeLabel } from '../route';
 
 // Full driver profile for the Profile screen + the Jobs tab greeting.
 // Joins drivers → organizations → default vehicle via PostgREST embeds.
@@ -19,6 +18,7 @@ export type DriverAvailability =
 export type DriverProfile = {
   id: string;
   name: string;
+  /** Not shown any more: the Profile screen builds initials from the name (lib/profile.ts). Kept because demo/ pins it. */
   initials: string;
   phone: string;
   licenseClass: string | null;
@@ -129,23 +129,4 @@ export async function fetchCommissionBaseline(): Promise<CommissionBasis | null>
     data.commission_rate == null ? null : Number(data.commission_rate),
     org?.driver_commission_rate,
   );
-}
-
-// Derived display strings for the Profile screen.
-
-export function formatVehicleLine(v: DriverProfile['vehicle']): string {
-  if (!v) return 'No vehicle assigned';
-  const parts = [v.plate, vehicleTypeLabel(v.type), v.model].filter(Boolean);
-  return parts.join(' · ');
-}
-
-const AVAILABILITY_LABEL: Record<DriverAvailability, { label: string; on: boolean }> = {
-  available:            { label: 'AVAILABLE',     on: true  },
-  pending_confirmation: { label: 'PENDING CONFIRMATION', on: true },
-  on_job:               { label: 'ON SHIFT',      on: true  },
-  unavailable:          { label: 'OFF DUTY',      on: false },
-};
-
-export function availabilityBadge(a: DriverAvailability): { label: string; on: boolean } {
-  return AVAILABILITY_LABEL[a] ?? { label: a.toUpperCase(), on: false };
 }

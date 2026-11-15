@@ -12,15 +12,17 @@ import { useTokens } from '../../theme/ThemeProvider';
 import { FONT, fontFor, radius, space, type } from '../../theme/tokens';
 import { useRequestTimeOff } from '../../lib/mutations/timeOff';
 import type { TimeOffReason } from '../../lib/queries/timeOff';
-import { formatDateKey, myDateKey, myStartOfDay } from '../../lib/timeFormat';
+import { formatDate, myDateKey, myStartOfDay } from '../../lib/timeFormat';
+import { dayCount, MISSING_DAY_MESSAGE, pickDay, requestNote, type DayRange } from '../../lib/timeOff';
 
 // S8b — Request Time Off. Inline calendar picker → reason → notes → submit.
 //
 // Range semantics: both endpoints INCLUSIVE in the UI ("17 to 19 May = 3 days").
 // The mutation converts to the schema's half-open range internally.
 //
-// Tap behaviour: first tap = start, second tap = end (or new start if before
-// current start). Third tap restarts.
+// Tap behaviour (change 24): one tap is a one-day request. A second tap on a
+// later day makes it the last day; any other tap starts again (lib/timeOff.ts,
+// pickDay). Submit is always on: with no day picked it says what is missing.
 
 const REASONS: { key: TimeOffReason; label: string; help: string }[] = [
   { key: 'leave',    label: 'Leave',    help: 'Planned paid leave' },
@@ -35,55 +37,37 @@ const REASONS: { key: TimeOffReason; label: string; help: string }[] = [
 // the driver the wrong first selectable day.
 const myMidnight = (key: string) => `${key}T00:00:00+08:00`;
 
-function daysBetweenInclusive(start: string, end: string): number {
-  // Both are exact MY midnights and Malaysia has no DST, so the day count is
-  // exact rather than rounded-and-hoped.
-  const s = myStartOfDay(myMidnight(start));
-  const e = myStartOfDay(myMidnight(end));
-  return Math.round((e.getTime() - s.getTime()) / 86400000) + 1;
-}
-
-// The key is already a calendar day, so format the string — putting it through
-// a Date only invites a timezone onto a value that doesn't have one.
-const formatDate = formatDateKey;
+// "5 Mar 2030": the day not padded, as the mock writes it. The key is a calendar
+// day, so it is read as that Malaysian day rather than put through the device zone.
+const formatDay = (key: string) => `${formatDate(myMidnight(key))} ${key.slice(0, 4)}`;
 
 export default function TimeOff() {
   const T = useTokens();
   const today = myDateKey(new Date());
 
-  const [startDate, setStartDate] = useState<string | null>(null);
-  const [endDate, setEndDate]     = useState<string | null>(null);
+  const [range, setRange]       = useState<DayRange>({ start: null, end: null });
+  const [missing, setMissing]     = useState<string | null>(null);
+  const { start: startDate, end: endDate } = range;
   const [reason, setReason]       = useState<TimeOffReason>('leave');
   const [notes, setNotes]         = useState('');
 
   const mutate = useRequestTimeOff();
 
   function onDayPress(day: DateData) {
-    const d = day.dateString;
-    if (!startDate || (startDate && endDate)) {
-      // Begin a new range.
-      setStartDate(d); setEndDate(null);
-      return;
-    }
-    // We have startDate but no endDate.
-    if (d < startDate) {
-      // User tapped earlier than start → move start.
-      setStartDate(d);
-      return;
-    }
-    setEndDate(d);
+    setMissing(null);
+    setRange((r) => pickDay(r, day.dateString));
   }
 
   // Build the `markedDates` map react-native-calendars expects for the period
   // marking style. We highlight start, end, and every in-between day.
   const markedDates = useMemo(() => {
-    if (!startDate) return {};
+    if (!startDate || !endDate) return {};
     const marks: Record<string, object> = {};
-    const final = endDate ?? startDate;
+    const final = endDate;
     // Step by MY day index rather than mutating with setDate(), which walks in
     // the DEVICE's local terms and would jump 23 or 25 hours across a DST
     // transition on phones in zones that observe one.
-    const total = daysBetweenInclusive(startDate, final);
+    const total = dayCount(startDate, final);
     for (let i = 0; i < total; i++) {
       const key = myDateKey(myStartOfDay(myMidnight(startDate), i));
       const isStart = key === startDate;
@@ -98,12 +82,14 @@ export default function TimeOff() {
     return marks;
   }, [startDate, endDate, T.ink, T.onInk]);
 
-  const days = startDate && endDate ? daysBetweenInclusive(startDate, endDate)
-              : startDate ? 1 : 0;
-  const canSubmit = !!startDate && !!endDate && !mutate.isPending;
+  const note = requestNote(range);
 
   async function onSubmit() {
-    if (!canSubmit || !startDate || !endDate) return;
+    if (mutate.isPending) return;
+    if (!startDate || !endDate) {
+      setMissing(MISSING_DAY_MESSAGE);
+      return;
+    }
     try {
       await mutate.mutateAsync({ startDate, endDate, reason, notes });
       router.back();
@@ -141,8 +127,8 @@ export default function TimeOff() {
         {/* Selected range summary */}
         <View style={{ flexDirection: 'row', gap: space[3] }}>
           {[
-            ['Start date', startDate ? formatDate(startDate) : '—'],
-            ['End date',   endDate ? formatDate(endDate) : (startDate ? '(tap a later day)' : '—')],
+            ['Start date', startDate ? formatDay(startDate) : '—'],
+            ['End date',   endDate ? formatDay(endDate) : '—'],
           ].map(([k, v]) => (
             <View key={k} style={{
               flex: 1, gap: space[1], paddingVertical: space[3], paddingHorizontal: space[4],
@@ -185,10 +171,17 @@ export default function TimeOff() {
           />
         </View>
 
-        {/* Day count + assignment hint */}
-        {days > 0 && (
+        {missing && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+            <Icon name="circleAlert" size={14} color={T.redText}/>
+            <Text accessibilityRole="alert" style={[type.caption, { color: T.redText, flexShrink: 1 }]}>{missing}</Text>
+          </View>
+        )}
+
+        {/* Day count and the wait for approval */}
+        {note && (
           <Band tone="amber" icon="calendarDays">
-            {`${days} ${days === 1 ? 'day' : 'days'} requested${endDate ? ', awaiting dispatcher approval.' : ', tap a later date for a multi-day range.'}`}
+            {note}
           </Band>
         )}
 
@@ -235,7 +228,7 @@ export default function TimeOff() {
         borderTopWidth: 1, borderTopColor: T.hairline, backgroundColor: T.surface,
       }}>
         <Button variant="secondary" style={{ flex: 1 }} onPress={() => router.back()}>Cancel</Button>
-        <View style={{ flex: 2, opacity: canSubmit ? 1 : 0.5 }}>
+        <View style={{ flex: 2 }}>
           <Button full onPress={onSubmit}>
             {mutate.isPending ? 'Submitting…' : 'Submit request'}
           </Button>

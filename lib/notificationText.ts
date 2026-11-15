@@ -1,4 +1,4 @@
-import { formatDateTime } from './timeFormat';
+import { formatDateTime, type ClockStyle } from './timeFormat';
 
 // Pure words and rules for the notification rows. They live here, not in
 // lib/queries/notifications.ts, because that file builds a live database
@@ -28,10 +28,10 @@ export type NotificationParts = {
 };
 
 /** Title, job number and body from a push_log payload. Parts are joined with commas, never dots. */
-export function notificationText(kind: NotificationKind, payload: any): NotificationParts {
+export function notificationText(kind: NotificationKind, payload: any, clock: ClockStyle = '24h'): NotificationParts {
   const p = payload ?? {};
   const jobNumber: string | null = p.job_number ? String(p.job_number) : null;
-  const when: string | null = p.pickup_datetime ? formatDateTime(p.pickup_datetime, { weekday: false }) : null;
+  const when: string | null = p.pickup_datetime ? formatDateTime(p.pickup_datetime, { weekday: false }, clock) : null;
   const parts = (...xs: (string | null | undefined)[]) => xs.filter(Boolean).join(', ');
   const title = TITLE[kind] ?? kind.replace(/_/g, ' ');
 
@@ -59,6 +59,6 @@ export function notificationLink(deeplink: string | null | undefined): string | 
   return ALLOWED_LINKS.some((p) => deeplink.startsWith(p)) ? deeplink : null;
 }
 
-/** "12 Dec, 09:22": when the notification was sent. */
-export const sentAt = (iso: string): string => formatDateTime(iso, { weekday: false });
+/** "12 Dec, 09:22" (or "12 Dec, 9:22 am" on the 12-hour setting): when the notification was sent. */
+export const sentAt = (iso: string, clock: ClockStyle = '24h'): string => formatDateTime(iso, { weekday: false }, clock);
 

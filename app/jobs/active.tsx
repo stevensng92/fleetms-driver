@@ -19,6 +19,7 @@ import { useTokens } from '../../theme/ThemeProvider';
 import { fontFor, space, type, TABULAR } from '../../theme/tokens';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { formatClock } from '../../lib/timeFormat';
+import { useClockStyle } from '../../lib/clockPref';
 import { routeStops, stopCountLabel } from '../../lib/route';
 import { useCompleteJob } from '../../lib/mutations/jobActions';
 
@@ -30,6 +31,7 @@ export default function ActiveJob() {
   const T = useTokens();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: job, isLoading, isError, error, refetch } = useJobDetailByNumber(id);
+  const clock = useClockStyle();
   const completeJob = useCompleteJob();
   // Mark as done asks first. Nothing is sent until the driver confirms.
   const [askingDone, setAskingDone] = useState(false);
@@ -51,7 +53,7 @@ export default function ActiveJob() {
     );
   }
 
-  const stopsForUi: Stop[] = routeStops(job.stops).map(r => ({
+  const stopsForUi: Stop[] = routeStops(job.stops, clock).map(r => ({
     kind: r.label, arrive: r.time, place: r.place, lat: r.lat, lng: r.lng,
   }));
 
@@ -86,7 +88,7 @@ export default function ActiveJob() {
         <FeatureCard style={{ padding: space[5], gap: space[4] }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3] }}>
             <Text style={[type.figure, TABULAR, { color: T.onFeature, flexShrink: 1 }]}>
-              {firstStop.arrive ?? formatClock(job.pickupAt)}
+              {firstStop.arrive ?? formatClock(job.pickupAt, clock)}
               {stopsForUi.length > 1 && !!lastStop.arrive && (
                 <Text style={[type.heading, { fontFamily: fontFor('600'), fontWeight: '600', color: T.onFeature2 }]}>
                   {' '}to {lastStop.arrive}
