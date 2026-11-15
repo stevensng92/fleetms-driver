@@ -1,13 +1,10 @@
 // Clock and date formatting for the driver app.
 //
-// House format is 24-hour digits with the am/pm marker kept behind them:
-// "09:00 am", "14:30 pm", "23:05 pm".
-//
-// The marker is redundant after 12:00 — the 24h digits already disambiguate.
-// Keep it anyway: this is an explicit product decision (Steven, 2026-07-31),
-// not an oversight. The digits are the unambiguous part a driver reads, and
-// the marker is the familiar anchor that stops "14:30" reading as a typo.
-// Do not "fix" this into strict 24h without asking.
+// House format is plain 24-hour digits with no marker: "09:00", "14:30", "23:05".
+// The old "14:30 pm" format (a product decision of 2026-07-31) was replaced by
+// the approved redesign, change 4 in docs/redesign-plan.md (15 Nov 2026).
+// Dates read "Sat, 12 Dec" (unpadded day) and week ranges say "to", not a dash
+// (change 5).
 //
 // TIMEZONE IS PINNED TO MALAYSIA, NOT THE DEVICE.
 // This used to read the device's local clock via getHours(), which made the
@@ -53,19 +50,18 @@ function toMyParts(value: string | Date): Date | null {
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-/** "14:30 pm" / "09:00 am", in Malaysian time. Em dash on unparseable input. */
+/** "14:30" / "09:00", in Malaysian time. Em dash on unparseable input. */
 export function formatClock(value: string | Date): string {
   const my = toMyParts(value);
   if (!my) return '—';
-  const h = my.getUTCHours();
-  return `${pad2(h)}:${pad2(my.getUTCMinutes())} ${h < 12 ? 'am' : 'pm'}`;
+  return `${pad2(my.getUTCHours())}:${pad2(my.getUTCMinutes())}`;
 }
 
-/** "30 Jul" — Malaysian calendar date, no year. */
+/** "30 Jul" / "Sat, 12 Dec" — Malaysian calendar date, no year, day not padded. */
 export function formatDate(value: string | Date, opts: { weekday?: boolean } = {}): string {
   const my = toMyParts(value);
   if (!my) return '—';
-  const core = `${pad2(my.getUTCDate())} ${MONTHS[my.getUTCMonth()]}`;
+  const core = `${my.getUTCDate()} ${MONTHS[my.getUTCMonth()]}`;
   return opts.weekday ? `${WEEKDAYS[my.getUTCDay()]}, ${core}` : core;
 }
 
@@ -273,7 +269,7 @@ export function myStartOfWeekKey(key: string, weekOffset = 0): Date {
 }
 
 /**
- * "28 Jul – 3 Aug" from a Monday key — the week's own dates, which is what a
+ * "28 Jul to 3 Aug" from a Monday key — the week's own dates, which is what a
  * driver checks a payslip against. The year is added only when the week does
  * not sit in the current MY year, on the same reasoning as formatMonthKeyChip.
  */
@@ -283,14 +279,11 @@ export function formatWeekRange(key: string, now: string | Date = new Date()): s
   const end = myStartOfWeekKey(key, 1);
   // The range is half-open, so the last DAY is one day before the next Monday.
   const lastDay = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-  // Days are NOT zero-padded here, unlike formatDate. That helper pads so job
-  // cards line up in a column; a prose range is read as a sentence, and
-  // "03 Aug – 09 Aug" reads like a serial number.
   const dayMonth = (d: Date) => {
     const my = toMyParts(d)!;
     return `${my.getUTCDate()} ${MONTHS[my.getUTCMonth()]}`;
   };
-  const core = `${dayMonth(start)} – ${dayMonth(lastDay)}`;
+  const core = `${dayMonth(start)} to ${dayMonth(lastDay)}`;
   const weekYear = key.slice(0, 4);
   return weekYear === myMonthKey(now).slice(0, 4) ? core : `${core} ${weekYear}`;
 }
@@ -350,8 +343,8 @@ export function myStartOfMonth(value: string | Date = new Date(), monthOffset = 
 }
 
 /**
- * "Thu, 30 Jul, 14:30 pm" — timestamp label for notification rows.
- * Pass `{ weekday: false }` for the shorter "30 Jul, 14:30 pm".
+ * "Thu, 30 Jul, 14:30" — timestamp label for notification rows.
+ * Pass `{ weekday: false }` for the shorter "30 Jul, 14:30".
  */
 export function formatDateTime(
   value: string | Date,

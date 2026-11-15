@@ -192,7 +192,7 @@ describe('periodHeadline', () => {
     // "2 weeks ago" forces arithmetic on the person least able to check it;
     // dates are what a payslip is checked against.
     expect(periodHeadline(weekPeriod('2026-07-27'), NOW)).toBe('Last week');
-    expect(periodHeadline(weekPeriod('2026-07-20'), NOW)).toBe('20 Jul – 26 Jul');
+    expect(periodHeadline(weekPeriod('2026-07-20'), NOW)).toBe('20 Jul to 26 Jul');
   });
 
   it('names past months absolutely, with the year', () => {

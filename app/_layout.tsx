@@ -17,6 +17,7 @@ import { ensurePushNotifications } from '../lib/push';
 import { reportAppVersion } from '../lib/version';
 import { useAppVersionGate } from '../lib/queries/appVersionConfig';
 import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
+import { ToastHost } from '../components/Toast';
 
 // Keep the splash screen up until Inter has loaded (see RootLayout).
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -229,7 +230,7 @@ function ThemedShell({ session }: { session: DevSessionResult | null }) {
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: T.page },
+          contentStyle: { backgroundColor: T.ground },
           animation: 'slide_from_right',
         }}
       >
@@ -256,6 +257,7 @@ function ThemedShell({ session }: { session: DevSessionResult | null }) {
           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
         />
       </Stack>
+      <ToastHost/>
     </>
   );
 }
