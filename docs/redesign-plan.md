@@ -1,13 +1,13 @@
 # FleetMS Driver: bringing the redesign into the app
 
-Written 15 Nov 2026. **Status: waiting for Steven's approval. No code written yet.**
+Written 15 Nov 2026, updated the same day after the mock review (changes 32 to 38). **Status: waiting for Steven's approval. No app code written yet.**
 
 The design is settled. This plan is about building it in this app, safely, in
 small pieces you can check one at a time.
 
 Sources, read in this order:
 
-1. `P:/github/design-systems/fleetms/driver-inventory.md`: the 31 changes and 6 open items.
+1. `P:/github/design-systems/fleetms/driver-inventory.md`: the 38 changes and 6 open items. Changes 32 to 38 were added on 15 Nov and live on the design-systems branch `claude/time-format-mock` until it is merged (see step 0 below).
 2. The mock: `P:/github/design-systems/fleetms/src/driver/` (`rules.ts`, `screens/*`, `JobPieces.tsx`, `driver.css`).
 3. `fleetms/design.md` (the locked system) and `fleetms/real-build-colour-map.md` (violet becomes ink, cyan becomes the green accent).
 4. The spec of today's app (`driver-app-spec.md`, 25 known issues).
@@ -22,8 +22,10 @@ place and flow to every screen.
 
 The work splits into 8 phases. **Phase 1 changes only the look**: colours,
 type, corners and the shared pieces (buttons, pills, cards, tab bar). Nothing a
-driver can do changes. **Phases 2 to 7 are the fixes** (changes 10 to 31), one
-screen area per phase, each its own pull request. Phase 8 is a final check.
+driver can do changes. **Phases 2 to 7 are the fixes and additions** (changes 10 to 38), one
+screen area per phase, each its own pull request. Changes 32 to 38, added after the
+mock review, sit in the phase for their screen. Phase 8 is a final check.
+About 15 pull requests in all; "Build order" below lists them.
 
 Nothing ships to drivers until you say so. No phase bumps the version, builds
 an APK, or publishes an over-the-air update.
@@ -42,13 +44,17 @@ an APK, or publishes an over-the-air update.
 | Feedback is phone pop-ups (`Alert.alert`) everywhere; no toasts | all screens | Toast, confirm dialog and bottom sheet are new pieces |
 | Tests: 10 files on pure helpers and 5 components, plus Earnings | `lib/__tests__`, `components/__tests__`, `__tests__/screens` | The habit is set. New rules go in pure `lib/` files with tests |
 | CI runs type check and tests on every PR; lint is not in CI | `.github/workflows/test.yml` | I run lint by hand each phase |
-| Signing in on the web preview needs a real driver phone and PIN against live data. The dev shortcut's password is blank | `lib/devSession.ts`, `.env` | **I can't see signed-in screens without you.** See "Before phase 1" |
+| Signing in on the web preview needs a real driver and PIN. But the fake-data preview (`demo/`, built 15 Nov) shows every signed-in screen on the mock's fake day, with no sign-in and no live data | `demo/`, `metro.config.js` | The look check runs on the fake-data preview. No test driver needed |
+| Motion pieces are already installed | `react-native-reanimated` 4.1, `expo-haptics` 15 in `package.json` | The glow, the fold, the Earnings slide and the Accept haptic need no new package |
 
 ## Before phase 1 (needs you, about 10 minutes)
 
-1. **Approve this plan**, and answer the three questions at the end.
-2. **A test driver to look through.** Either fill in `EXPO_PUBLIC_DEV_DRIVER_EMAIL` and `EXPO_PUBLIC_DEV_DRIVER_PASSWORD` in the main checkout's `.env` (a test driver in your test org), or sign in yourself in the preview pane when I ask. Without it I can only check the sign-in screen on the web, and the rest only in tests.
-3. **How you'll see it on a phone.** I'll check whether the app opens in Expo Go. If it doesn't (it has Sentry and push notifications built in, which may need a custom build), the phone check waits for a build you choose to make. I won't start an EAS build or update myself.
+1. **Approve this plan**, and answer the questions at the end.
+2. **Merge the mock (step 0a).** The 15 Nov mock work is on the design-systems branch `claude/time-format-mock` (10 commits). I open its pull request; you merge it, so the mock's `main` is the one source every phase copies.
+3. **Merge the groundwork (step 0b).** This branch holds the plan, the before/after page and the fake-data preview. I open its pull request; you merge it, so every phase branch starts with them. It changes nothing drivers see: the fake data only switches on in the web preview when `EXPO_PUBLIC_DEMO_DATA=1` is set by hand.
+4. **How you'll see it on a phone.** I'll check whether the app opens in Expo Go. If it doesn't (it has Sentry and push notifications built in, which may need a custom build), the phone check waits for a build you choose to make. I won't start an EAS build or update myself.
+
+A test driver is no longer needed: the fake-data preview shows every signed-in screen.
 
 ## How the work is organised
 
@@ -66,7 +72,8 @@ an APK, or publishes an over-the-air update.
 | Type check | `npx tsc --noEmit` | No errors |
 | Lint | `npm run lint` | No new warnings |
 | No literal colours | a test that scans `app/` and `components/` for `#hex` and `rgba(` outside `theme/` | Zero hits (from phase 1 on) |
-| Look, light and dark | Expo web preview at phone width (390px), screenshots of every screen that phase touched, beside the mock at `localhost:3025/driver.html` (add `&theme=dark`) | Matches the mock's layout, words and colours |
+| Look, light and dark | The before/after page: the fake-data preview (left) beside the mock (right), at phone width, screenshots of every screen that phase touched | Matches the mock's layout, words and colours |
+| Motion | Each animation plays, can be interrupted, and with the phone's Reduce Motion on keeps only its fade (or holds still, for the glow) | As described in the change |
 | On a phone | Expo Go or a build you make (see above), light and dark | Touch sizes, keyboard, safe areas and the Android back button behave |
 
 CI runs the first two on the pull request. I attach the screenshots to each PR.
@@ -148,7 +155,7 @@ display only:
 | 3 | Dot-joined lines become separate items with icons | job card meta, client card vehicle line, expense rows, notifications |
 | 4 | Times in 24 hour: "14:30", not "14:30 pm". This is the default; phase 5 adds a 12-hour choice | `formatClock` in `lib/timeFormat.ts` (tests updated first) |
 | 5 | "Sat, 12 Dec" and "Saturday, 12 December 2026"; ranges say "to" | `lib/timeFormat.ts` (`formatDate`, `formatWeekRange`) |
-| 6 | Nothing pulses; the job being driven is the dark card | `JobCard`, `active.tsx` |
+| 6 | Nothing pulses except the In Progress pill's slow glow (change 34); the job being driven is the dark card | `JobCard`, `active.tsx` |
 | 7 | Floating tab bar | `app/(tabs)/_layout.tsx` |
 | 8 | "+60" text prefix instead of the flag emoji | `sign-in.tsx` |
 | 9 | Expenses month total is the dark card; category colours on rows go | `expenses.tsx` |
@@ -169,7 +176,9 @@ all tests pass, and a driver could not tell anything works differently.
 wait for the fixes. I'd wait for at least phases 2 and 3, because the Jobs
 screens are where the look and the fixes meet.
 
-## Phases 2 to 7: the fixes (changes 10 to 31)
+## Phases 2 to 7: the fixes and additions (changes 10 to 38)
+
+Change 34 (the In Progress glow and the dark-card pill tints) is built with `StatusPill` in 1b, not in a later phase.
 
 Each phase is one screen area, one branch, one pull request. Each change is
 test first. Order is by how often drivers use the screen.
@@ -217,7 +226,7 @@ and `driverProfile.ts`) into one.
 Extends the existing `lib/earningsPeriod.ts` (already tested) and adds
 `lib/money.ts` (`formatRM`, `splitRM`).
 
-### Phase 5: Profile and time off (changes 24, 26, 27, plus Time format)
+### Phase 5: Profile and time off (changes 24, 26, 27, 33)
 
 | # | Change | Test first |
 |---|---|---|
@@ -225,7 +234,7 @@ Extends the existing `lib/earningsPeriod.ts` (already tested) and adds
 | 26 | An inactive driver never shows a green pill; initials skip "bin" and "binti" | `availabilityPill`, `initials` ports |
 | 27 | Sign out asks first | nothing happens until confirmed |
 
-**New, added to the mock 15 Nov: Time format.** Profile > Appearance gets a Time format choice under Theme: 24-hour ("14:30", the default) or 12-hour ("2:30 pm", "12:15 am"). It is saved on the phone and every clock follows it: job cards, the job and trip screens, notification text and sent times. Test first: port the mock's `clockTime` cases (`rules.test.ts`) into `lib/__tests__/timeFormat.test.ts`, then add the style to `formatClock`. Job cards and notification rows build their times inside query functions, so a change must also refetch those queries. Today's app does not get this before the redesign.
+**Change 33, added to the mock 15 Nov: Time format.** Profile > Appearance gets a Time format choice under Theme: 24-hour ("14:30", the default) or 12-hour ("2:30 pm", "12:15 am"). It is saved on the phone and every clock follows it: job cards, the job and trip screens, notification text and sent times. Test first: port the mock's `clockTime` cases (`rules.test.ts`) into `lib/__tests__/timeFormat.test.ts`, then add the style to `formatClock`. Job cards and notification rows build their times inside query functions, so a change must also refetch those queries. Today's app does not get this before the redesign.
 
 New pure files: `lib/timeOff.ts`, `lib/profile.ts`.
 
@@ -313,20 +322,50 @@ From "For you to decide" in `driver-inventory.md`. None of these block a phase.
 5. **Shared pill fix**: the admin mock's struck "Cancelled" pill is a little faint. This app gets its own pill, so I draw it at full contrast here. The admin mock's shared file isn't touched.
 6. **One data set** (mock jobs JOB-137 to JOB-144): mock-only, nothing to do here.
 
-Also noted from the spec's 25 known issues, outside the 31 changes and not in
+Also noted from the spec's 25 known issues, outside the 38 changes and not in
 this plan: notifications not marked read when the list is full (16), the
 greeting using the phone's clock beside a Malaysia date (21, deliberate), and
 no WhatsApp (22).
+
+## Build order
+
+Each row is one pull request. A row starts when the rows it waits on are merged.
+Rows with the same wait can run side by side, because they touch different files.
+
+| # | Pull request | Waits on | Size |
+|---|---|---|---|
+| 0a | design-systems: the 15 Nov mock changes (32 to 38) | nothing | ready |
+| 0b | This branch: plan, before/after page, fake-data preview | nothing | ready |
+| 1a | Theme module: new tokens, old names kept as aliases, motion tokens and the Reduce Motion check | 0b | small |
+| 1b | Shared pieces: Button, StatusPill (with the glow and the dark-card tints), Pill, Card, FeatureCard, Sheet, ConfirmDialog, Toast, TabBar, AppHeader, Band, form pieces, icons | 1a | large, may split in two |
+| 1c | Screens wear the new pieces (changes 1 to 9), plus Inter | 1b | large, one screen area per commit |
+| 1d | Aliases removed, no-literal-colour test on | 1c | small |
+| 2 | Jobs tab (10, 11, 14, 15, 19, 32, 35, 36) | 1d | medium |
+| 3 | Job detail and trip (12, 13, 16, 17, 18, 20) | 1d | medium |
+| 4 | Earnings (21, 22, 23, 37, 38) | 1d | medium |
+| 6 | Sign in, PIN, update, notifications (25, 29, 30, 31) | 1d | medium |
+| 5 | Profile and time off (24, 26, 27, 33) | 2 | medium |
+| 7a to 7d | Expenses (28, in four parts) | 3 | small each |
+| 8 | Final check, README and wiki | all | small |
+
+Why the waits:
+
+- **2, 3, 4 and 6 can run side by side** once phase 1 is in. Each owns its own screens and its own new `lib/` file.
+- **5 waits for 2**: Time format (33) changes `formatClock` and the job and notification queries, which phase 2 is also changing. Doing it second avoids two branches editing the same files.
+- **7 waits for 3**: the vehicle names (28c) use `lib/route.ts`, which phase 3 creates.
+- **Release**: nothing ships until you say so. My suggestion stays: release once 1 to 3 are in, then the rest as they land.
+
+How I'll run it: one phase per branch (`redesign/phase-N-name`, off `master`), test first for every logic change, the checks table on every PR, and the before/after page as the look check. I open each PR and stop; you merge. When phases run side by side, each gets its own worktree, so no two touch the same files.
 
 ## Risks
 
 - **A halfway look.** Phase 1 alone puts the new paint on today's layouts. That's why I suggest holding the release until phase 3.
 - **Fonts on Android.** Inter has to load before the first screen draws, or text jumps. Today the splash screen hides by itself; I'll make it wait for the font (`expo-splash-screen` is already installed).
-- **Can't see signed-in screens without a test driver.** If that isn't sorted before phase 1, each phase's look check falls back to tests and the sign-in screen only.
+- **The fake-data preview drifts.** It copies the database's shape by hand. If a phase changes a query, the stand-in may need the same change, or the left side of the before/after page breaks. Each phase checks the preview loads before its PR.
+- **The glow loops forever.** It is the one looping animation, on a phone that may run the trip for hours. It must run on the UI thread (reanimated) and stop when the app is in the background.
 - **New package.** Only `@expo-google-fonts/inter` (fonts, no native code). It changes `package-lock.json`, so worktrees need `npm ci` rather than the shared `node_modules` shortcut.
 
 ## Questions for you
 
-1. **Approve the plan?** Including the order of phases 2 to 7.
-2. **Test driver**: will you add dev driver details to `.env`, or sign in yourself in the preview when needed?
-3. **Release**: hold everything until all 8 phases are done, or release after phase 3 (look plus Jobs fixes)?
+1. **Approve the plan?** Including the build order above.
+2. **Release**: hold everything until all 8 phases are done, or release after phase 3 (look plus Jobs fixes)?
