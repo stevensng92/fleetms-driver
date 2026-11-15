@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor, act } from '@testing-library/react-native';
+import { fireEvent, render, screen, act } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { JobCard, type Job } from '../JobCard';
 
@@ -10,7 +10,8 @@ const job = (over: Partial<Job> = {}): Job => ({
   from: 'KLIA', to: 'Bukit Bintang', client: 'Acme Sdn Bhd', pax: 2, status: 'pending', ...over,
 });
 
-const wait = (ms: number) => act(() => new Promise<void>((r) => setTimeout(r, ms)));
+// Fake timers, so the 120ms fade never races the machine's speed. The async act flushes the awaited onAccept too.
+const advance = (ms: number) => act(async () => { jest.advanceTimersByTime(ms); });
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -40,6 +41,9 @@ describe('JobCard: lines folded into the card (change 19)', () => {
 });
 
 describe('JobCard: Accept (change 35)', () => {
+  beforeEach(() => { jest.useFakeTimers({ doNotFake: ['Date', 'performance'] }); });
+  afterEach(() => { jest.useRealTimers(); });
+
   it('fires a light success haptic on the tap, then accepts once the buttons have faded', async () => {
     const onAccept = jest.fn();
     await render(<JobCard job={job()} onAccept={onAccept}/>);
@@ -47,7 +51,10 @@ describe('JobCard: Accept (change 35)', () => {
     expect(Haptics.notificationAsync).toHaveBeenCalledTimes(1);
     expect(Haptics.notificationAsync).toHaveBeenCalledWith('success');
     expect(onAccept).not.toHaveBeenCalled(); // not before the fade is over
-    await waitFor(() => expect(onAccept).toHaveBeenCalledTimes(1));
+    await advance(119);
+    expect(onAccept).not.toHaveBeenCalled();
+    await advance(1);
+    expect(onAccept).toHaveBeenCalledTimes(1);
   });
 
   it('ignores a second Accept tap during the fade: accept fires once, haptic once', async () => {
@@ -55,7 +62,7 @@ describe('JobCard: Accept (change 35)', () => {
     await render(<JobCard job={job()} onAccept={onAccept}/>);
     await fireEvent.press(screen.getByText('Accept'));
     await fireEvent.press(screen.getByText('Accept'));
-    await wait(300);
+    await advance(300);
     expect(onAccept).toHaveBeenCalledTimes(1);
     expect(Haptics.notificationAsync).toHaveBeenCalledTimes(1);
   });
@@ -65,7 +72,7 @@ describe('JobCard: Accept (change 35)', () => {
     await render(<JobCard job={job()} onAccept={jest.fn()} onReject={onReject}/>);
     await fireEvent.press(screen.getByText('Accept'));
     await fireEvent.press(screen.getByText('Reject'));
-    await wait(200);
+    await advance(200);
     expect(onReject).not.toHaveBeenCalled();
   });
 
@@ -73,10 +80,11 @@ describe('JobCard: Accept (change 35)', () => {
     const onAccept = jest.fn().mockResolvedValue(false);
     await render(<JobCard job={job()} onAccept={onAccept}/>);
     await fireEvent.press(screen.getByText('Accept'));
-    await waitFor(() => expect(onAccept).toHaveBeenCalledTimes(1));
-    await wait(50);
+    await advance(120);
+    expect(onAccept).toHaveBeenCalledTimes(1);
     await fireEvent.press(screen.getByText('Accept'));
-    await waitFor(() => expect(onAccept).toHaveBeenCalledTimes(2));
+    await advance(120);
+    expect(onAccept).toHaveBeenCalledTimes(2);
   });
 
   it('Reject just calls onReject: the screen asks first', async () => {

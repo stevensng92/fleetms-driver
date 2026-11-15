@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import * as Reanimated from 'react-native-reanimated';
 import JobsToday from '../../app/(tabs)/index';
@@ -39,6 +39,13 @@ function mockJobs(d: Data) {
     isLoading: false, isError: false, error: null, refetch: jest.fn(), isRefetching: false,
   });
 }
+
+// Fake timers for the 120ms fades, so they never race the machine's speed.
+const advance = (ms: number) => act(async () => { jest.advanceTimersByTime(ms); });
+const fakeTimers = () => {
+  beforeEach(() => { jest.useFakeTimers({ doNotFake: ['Date', 'performance'] }); });
+  afterEach(() => { jest.useRealTimers(); });
+};
 
 const confirm = jest.fn();
 const reject = jest.fn();
@@ -99,6 +106,7 @@ describe('Today order (change 32)', () => {
 });
 
 describe('Finished today fold (changes 32, 36)', () => {
+  fakeTimers();
   it('starts closed, with the count showing', async () => {
     mockJobs({ today: [PENDING, DONE, CANCELLED] });
     await render(<JobsToday/>);
@@ -121,7 +129,8 @@ describe('Finished today fold (changes 32, 36)', () => {
     await fireEvent.press(screen.getByText('Finished today'));
     expect(screen.getByText('Client JOB-3')).toBeTruthy();
     await fireEvent.press(screen.getByText('Finished today'));
-    await waitFor(() => expect(screen.queryByText('Client JOB-3')).toBeNull());
+    await advance(120);
+    expect(screen.queryByText('Client JOB-3')).toBeNull();
   });
   it('is not drawn when nothing finished today', async () => {
     mockJobs({ today: [PENDING] });
@@ -216,11 +225,15 @@ describe('Reject from the list (change 11)', () => {
 });
 
 describe('Accept from the list (change 35)', () => {
+  fakeTimers();
   it('accepts once after the fade', async () => {
     mockJobs({ today: [PENDING] });
     await render(<JobsToday/>);
     await fireEvent.press(screen.getByText('Accept'));
-    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1));
+    await advance(119);
+    expect(confirm).not.toHaveBeenCalled();
+    await advance(1);
+    expect(confirm).toHaveBeenCalledTimes(1);
     expect(confirm).toHaveBeenCalledWith('asg-JOB-1');
   });
 });
