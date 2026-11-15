@@ -16,7 +16,7 @@ import { useMyVehicles } from '../../lib/queries/vehicles';
 import { useLogExpense } from '../../lib/mutations/logExpense';
 import type { ExpenseCategory } from '../../lib/queries/expenses';
 import { formatDateLong, myDateKey } from '../../lib/timeFormat';
-import { amountValue, checkExpense } from '../../lib/expenses';
+import { amountValue, checkExpense, checkReceiptFile, receiptFileOf } from '../../lib/expenses';
 
 const CATS: { value: ExpenseCategory; label: string; icon: IconName }[] = [
   { value: 'fuel',  label: 'Fuel',  icon: 'fuel' },
@@ -35,7 +35,7 @@ export default function LogExpense() {
   const [showVehiclePicker, setShowVehiclePicker] = useState(false);
   const [amountFocused, setAmountFocused] = useState(false);
   // Messages sit under their field. A pop-up hides the form it is about.
-  const [errors, setErrors] = useState<{ amount?: string; vehicle?: string }>({});
+  const [errors, setErrors] = useState<{ amount?: string; vehicle?: string; receipt?: string }>({});
 
   const { data: vehicles, isLoading: vehiclesLoading } = useMyVehicles();
   const logExpense = useLogExpense();
@@ -76,7 +76,16 @@ export default function LogExpense() {
       ? await ImagePicker.launchCameraAsync({ quality: 0.9 })
       : await ImagePicker.launchImageLibraryAsync({ quality: 0.9, mediaTypes: ImagePicker.MediaTypeOptions.Images });
     if (!result.canceled && result.assets[0]) {
-      setReceiptUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      // Checked here, on the file the driver chose, before the upload step
+      // shrinks it to a JPEG and hides what it was.
+      const problem = checkReceiptFile(receiptFileOf(asset));
+      if (problem) {
+        setErrors(x => ({ ...x, receipt: problem }));
+        return;
+      }
+      setErrors(x => ({ ...x, receipt: undefined }));
+      setReceiptUri(asset.uri);
     }
   }
 
@@ -85,7 +94,7 @@ export default function LogExpense() {
       Alert.alert('Receipt photo', undefined, [
         { text: 'Replace with camera',   onPress: () => pickReceipt('camera') },
         { text: 'Replace from library',  onPress: () => pickReceipt('library') },
-        { text: 'Remove',                style: 'destructive', onPress: () => setReceiptUri(null) },
+        { text: 'Remove',                style: 'destructive', onPress: () => { setReceiptUri(null); setErrors(x => ({ ...x, receipt: undefined })); } },
         { text: 'Cancel',                style: 'cancel' },
       ]);
     } else {
@@ -212,7 +221,7 @@ export default function LogExpense() {
           </Pressable>
         </FormField>
 
-        <FormField label="Receipt photo">
+        <FormField label="Receipt photo" error={errors.receipt}>
           <Pressable
             onPress={showReceiptOptions}
             accessibilityRole="button"

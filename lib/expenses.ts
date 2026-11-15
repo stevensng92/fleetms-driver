@@ -28,3 +28,25 @@ export function checkExpense(amount: string, vehicleId: string | null): { amount
   if (!out.amount && !vehicleId) out.vehicle = 'Pick a vehicle for this expense.';
   return out;
 }
+
+const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
+
+/** The words under the Receipt field when a chosen file will not do; null when it is fine. */
+export function checkReceiptFile(f: { type: string; size: number }): string | null {
+  if (f.type !== 'image/jpeg' && f.type !== 'image/png') return 'Choose a JPG or PNG photo.';
+  if (f.size > MAX_RECEIPT_BYTES) return 'This photo is over 10 MB. Choose a smaller one.';
+  return null;
+}
+
+const TYPE_BY_ENDING: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png' };
+
+/**
+ * What the image picker handed back, as the kind and size checkReceiptFile
+ * wants. When the picker names no type, the file ending decides; a type we
+ * cannot tell comes back empty so the check refuses it. A missing size counts
+ * as 0 (nothing to measure).
+ */
+export function receiptFileOf(asset: { uri: string; mimeType?: string | null; fileSize?: number | null }): { type: string; size: number } {
+  const ending = asset.uri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+  return { type: asset.mimeType ?? TYPE_BY_ENDING[ending] ?? '', size: asset.fileSize ?? 0 };
+}

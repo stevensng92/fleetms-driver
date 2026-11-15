@@ -1,4 +1,4 @@
-import { amountValue, checkExpense } from '../expenses';
+import { amountValue, checkExpense, checkReceiptFile, receiptFileOf } from '../expenses';
 
 describe('checkExpense', () => {
   it('needs an amount over zero', () => {
@@ -29,5 +29,38 @@ describe('amountValue', () => {
     expect(amountValue(' 12 ')).toBe(12);
     expect(amountValue('abc')).toBeNull();
     expect(amountValue('12abc')).toBeNull();
+  });
+});
+
+describe('checkReceiptFile', () => {
+  const TEN_MB = 10 * 1024 * 1024;
+  it('takes a JPG or PNG up to 10 MB', () => {
+    expect(checkReceiptFile({ type: 'image/jpeg', size: 2_000_000 })).toBeNull();
+    expect(checkReceiptFile({ type: 'image/png', size: TEN_MB })).toBeNull();
+  });
+  it('refuses any other kind of file', () => {
+    expect(checkReceiptFile({ type: 'application/pdf', size: 1 })).toBe('Choose a JPG or PNG photo.');
+    expect(checkReceiptFile({ type: 'image/heic', size: 1 })).toBe('Choose a JPG or PNG photo.');
+    expect(checkReceiptFile({ type: '', size: 1 })).toBe('Choose a JPG or PNG photo.');
+  });
+  it('refuses a file over 10 MB', () => {
+    expect(checkReceiptFile({ type: 'image/jpeg', size: TEN_MB + 1 })).toBe('This photo is over 10 MB. Choose a smaller one.');
+  });
+  it('checks the kind before the size', () => {
+    expect(checkReceiptFile({ type: 'application/pdf', size: TEN_MB + 1 })).toBe('Choose a JPG or PNG photo.');
+  });
+});
+
+describe('receiptFileOf', () => {
+  it('uses the type and size the picker reports', () => {
+    expect(receiptFileOf({ uri: 'file:///a', mimeType: 'image/png', fileSize: 5 })).toEqual({ type: 'image/png', size: 5 });
+  });
+  it('falls back to the file ending when the picker gives no type', () => {
+    expect(receiptFileOf({ uri: 'file:///a/b.JPG' })).toEqual({ type: 'image/jpeg', size: 0 });
+    expect(receiptFileOf({ uri: 'file:///a/b.jpeg?x=1' })).toEqual({ type: 'image/jpeg', size: 0 });
+    expect(receiptFileOf({ uri: 'file:///a/b.png' })).toEqual({ type: 'image/png', size: 0 });
+  });
+  it('leaves the type empty when it cannot be told, so the check refuses it', () => {
+    expect(receiptFileOf({ uri: 'file:///a/b.heic' })).toEqual({ type: '', size: 0 });
   });
 });
