@@ -175,13 +175,13 @@ describe('myMonthStartKey', () => {
 
 describe('formatDateKey', () => {
   it('formats a calendar-day string without touching Date', () => {
-    expect(formatDateKey('2026-08-01')).toBe('01 Aug 2026');
+    expect(formatDateKey('2026-08-01')).toBe('1 Aug 2026');
     expect(formatDateKey('2026-12-31')).toBe('31 Dec 2026');
   });
 
   it('honours the year and long-month options', () => {
-    expect(formatDateKey('2026-08-01', { year: false })).toBe('01 Aug');
-    expect(formatDateKey('2026-08-01', { long: true })).toBe('01 August 2026');
+    expect(formatDateKey('2026-08-01', { year: false })).toBe('1 Aug');
+    expect(formatDateKey('2026-08-01', { long: true })).toBe('1 August 2026');
   });
 
   it('rejects anything that is not a YYYY-MM-DD key', () => {
@@ -198,7 +198,7 @@ describe('formatDateKey', () => {
     const original = process.env.TZ;
     for (const tz of ['Asia/Kuala_Lumpur', 'UTC', 'America/New_York', 'America/Los_Angeles']) {
       process.env.TZ = tz;
-      expect(formatDateKey('2026-08-01', { year: false })).toBe('01 Aug');
+      expect(formatDateKey('2026-08-01', { year: false })).toBe('1 Aug');
     }
     process.env.TZ = original;
   });
