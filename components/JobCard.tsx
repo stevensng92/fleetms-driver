@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { useReducedMotion } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Card } from './Card';
 import { FeatureCard } from './FeatureCard';
 import { StatusPill, StatusKind } from './StatusPill';
@@ -9,7 +10,7 @@ import { GoFill } from './GoFill';
 import { Icon } from './Icon';
 import { CommissionPill } from './CommissionPill';
 import { useTokens } from '../theme/ThemeProvider';
-import { fontFor, motionFor, radius, space, type, TABULAR } from '../theme/tokens';
+import { EASE_OUT, fontFor, motionFor, radius, space, type, TABULAR } from '../theme/tokens';
 import type { SpecialCommission } from '../lib/commissionRate';
 
 export type Job = {
@@ -28,12 +29,18 @@ export type Job = {
   client: string;
   pax: number;
   status: StatusKind;
+  /** The status as the database sends it ("cancelled"). The pill reads it, so a cancelled job says Cancelled. */
+  rawStatus?: string;
+  /** The real pickup time (ISO). Orders today's jobs on the Jobs tab. */
+  pickupAt?: string;
   /** What this job pays when it isn't the driver's normal cut — a rate
    *  (20 → "20% comm") or a flat fee (80 → "RM 80 flat"). null = pays the
    *  standard rate, so no badge renders. Resolved in lib/commissionRate.ts —
    *  a rate override pinned to the default is deliberately NOT special. */
   specialCommission?: SpecialCommission | null;
 };
+
+const CURVE = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
 
 const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
 
@@ -87,6 +94,9 @@ function Meta({ job, onFeature }: { job: Job; onFeature: boolean }) {
   );
 }
 
+/** "cancelled" and "rejected" are looked up by StatusPill; anything else it doesn't know is shown as sent, so capitalise it. */
+const rawLabel = (raw: string) => (raw.toLowerCase() === 'rejected' ? 'Rejected' : raw);
+
 export function JobCard({
   job, dim, overdue, hideActions, onAccept, onReject, onView, onPress,
 }: {
@@ -97,15 +107,44 @@ export function JobCard({
    *  scheduled today. */
   overdue?: boolean;
   hideActions?: boolean;
-  onAccept?: () => void;
+  /** Called once the buttons have faded. Return (or resolve to) `false` when the accept
+   *  failed, and the buttons come back. */
+  onAccept?: () => void | boolean | Promise<boolean | void>;
   onReject?: () => void;
-  onView?: () => void;
   onPress?: () => void;
 }) {
   const T = useTokens();
   const reduced = useReducedMotion();
   // The job being driven is the one dark card on the screen.
   const live = job.status === 'progress';
+
+  // Accept: a light success haptic on the tap, then the two buttons fade out
+  // (120ms, opacity only) and stop taking taps, then accept fires once. The
+  // pill settles on its own when the job turns Confirmed.
+  const [accepting, setAccepting] = useState(false);
+  const fade = useSharedValue(1);
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
+  // A ref as well as the state: two taps can land before React has re-rendered.
+  const locked = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const accept = () => {
+    if (locked.current) return;
+    locked.current = true;
+    setAccepting(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const ms = motionFor(reduced).fade1;
+    fade.value = withTiming(0, { duration: ms, easing: CURVE });
+    timer.current = setTimeout(async () => {
+      let ok: boolean | void = true;
+      try { ok = await onAccept?.(); } catch { ok = false; }
+      if (ok === false) {
+        fade.value = withTiming(1, { duration: ms, easing: CURVE });
+        locked.current = false;
+        setAccepting(false);
+      }
+    }, ms);
+  };
 
   const ink = live ? T.onFeature : T.text;
   const main = (
@@ -132,7 +171,9 @@ export function JobCard({
           </View>
         )}
         <View style={{ marginLeft: 'auto' }}>
-          <StatusPill kind={job.status}/>
+          {job.status === 'voided' && job.rawStatus
+            ? <StatusPill kind="job" status={rawLabel(job.rawStatus)}/>
+            : <StatusPill kind={job.status}/>}
         </View>
       </View>
 
@@ -161,31 +202,16 @@ export function JobCard({
     <Card dim={dim} style={{ marginHorizontal: space[4], marginBottom: space[3] }}>
       {main}
 
-      {/* Action row, beside the card's link rather than inside it */}
+      {/* Action row, beside the card's link rather than inside it. Only a
+          pending job has one: everything else is the card's own link. */}
       {!hideActions && job.status === 'pending' && (
-        <View style={{ flexDirection: 'row', gap: space[3], paddingHorizontal: space[5], paddingBottom: space[4] }}>
-          <Button variant="secondary" full style={{ flex: 1 }} onPress={onReject}>Reject</Button>
-          <Button full style={{ flex: 1 }} onPress={onAccept}>Accept</Button>
-        </View>
-      )}
-      {!hideActions && job.status === 'confirmed' && (
-        <View style={{ paddingHorizontal: space[5], paddingBottom: space[4] }}>
-          <Button variant="secondary" full onPress={onView} trailingIcon="chevR">
-            View Details
-          </Button>
-        </View>
-      )}
-      {!hideActions && job.status === 'done' && (
-        <View style={{
-          marginHorizontal: space[5], marginBottom: space[4], paddingTop: space[3],
-          borderTopWidth: 1, borderTopColor: T.hairline,
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[2],
-        }}>
-          <Icon name="checkCirc" size={16} color={T.greenText}/>
-          <Text style={[type.label, { color: T.greenText, fontFamily: fontFor('600'), fontWeight: '600' }]}>
-            Completed
-          </Text>
-        </View>
+        <Animated.View
+          pointerEvents={accepting ? 'none' : 'auto'}
+          style={[{ flexDirection: 'row', gap: space[3], paddingHorizontal: space[5], paddingBottom: space[4] }, fadeStyle]}
+        >
+          <Button variant="secondary" full style={{ flex: 1 }} onPress={() => { if (!locked.current) onReject?.(); }}>Reject</Button>
+          <Button full style={{ flex: 1 }} onPress={accept}>Accept</Button>
+        </Animated.View>
       )}
     </Card>
   );
