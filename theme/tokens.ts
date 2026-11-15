@@ -144,22 +144,33 @@ export const space = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 7: 28, 8: 32, 9: 
 /** Corner radii. */
 export const radius = { xs: 8, sm: 12, md: 16, lg: 24, xl: 32, pill: 999 } as const;
 
+/**
+ * Inter, one family per weight. Android ignores fontWeight once a custom
+ * family is set, so the weight has to be in the family name. Loaded in
+ * app/_layout.tsx before the splash screen hides.
+ */
+export const FONT = { medium: 'Inter_500Medium', semibold: 'Inter_600SemiBold', bold: 'Inter_700Bold' } as const;
+
+export function fontFor(weight: '500' | '600' | '700'): string {
+  return weight === '700' ? FONT.bold : weight === '600' ? FONT.semibold : FONT.medium;
+}
+
 // Tracking in the CSS is in em; React Native wants pixels, so it is worked out per size.
 const track = (size: number, em: number) => Math.round(size * em * 100) / 100;
 
-/**
- * Named text styles. Inter arrives in phase 1c; until then these use the
- * phone's font at the same sizes and weights.
- */
+/** Named text styles, in Inter. Spread one into a Text style: `style={[type.body, { color: T.text }]}`. */
 export const type = {
-  display: { fontSize: 40, fontWeight: '700', lineHeight: 42, letterSpacing: track(40, -0.035) },
-  figure: { fontSize: 28, fontWeight: '700', lineHeight: 31, letterSpacing: track(28, -0.02) },
-  heading: { fontSize: 20, fontWeight: '700', lineHeight: 26, letterSpacing: track(20, -0.02) },
-  title: { fontSize: 16, fontWeight: '600', lineHeight: 21, letterSpacing: track(16, -0.02) },
-  body: { fontSize: 14, fontWeight: '500', lineHeight: 20, letterSpacing: track(14, -0.01) },
-  label: { fontSize: 13, fontWeight: '500', lineHeight: 18, letterSpacing: track(13, -0.01) },
-  caption: { fontSize: 12, fontWeight: '500', lineHeight: 16, letterSpacing: 0 },
+  display: { fontFamily: FONT.bold, fontSize: 40, fontWeight: '700', lineHeight: 42, letterSpacing: track(40, -0.035) },
+  figure: { fontFamily: FONT.bold, fontSize: 28, fontWeight: '700', lineHeight: 31, letterSpacing: track(28, -0.02) },
+  heading: { fontFamily: FONT.bold, fontSize: 20, fontWeight: '700', lineHeight: 26, letterSpacing: track(20, -0.02) },
+  title: { fontFamily: FONT.semibold, fontSize: 16, fontWeight: '600', lineHeight: 21, letterSpacing: track(16, -0.02) },
+  body: { fontFamily: FONT.medium, fontSize: 14, fontWeight: '500', lineHeight: 20, letterSpacing: track(14, -0.01) },
+  label: { fontFamily: FONT.medium, fontSize: 13, fontWeight: '500', lineHeight: 18, letterSpacing: track(13, -0.01) },
+  caption: { fontFamily: FONT.medium, fontSize: 12, fontWeight: '500', lineHeight: 16, letterSpacing: 0 },
 } as const;
+
+/** Numbers that should line up in columns (times, money, plates): Inter's even-width digits. */
+export const TABULAR = { fontVariant: ['tabular-nums'] as ('tabular-nums')[] };
 
 export type Motion = { fade1: number; fade2: number; move1: number; move2: number; pressScale: number };
 

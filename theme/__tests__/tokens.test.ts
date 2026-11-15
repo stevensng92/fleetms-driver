@@ -1,4 +1,4 @@
-import { makeTokens, motionFor, radius, space, type, type Tokens } from '../tokens';
+import { FONT, fontFor, makeTokens, motionFor, radius, space, type, type Tokens } from '../tokens';
 
 // Pins the redesign palette (design-systems/fleetms/colors_and_type.css) so a
 // stray edit to theme/tokens.ts fails here instead of silently repainting the
@@ -147,5 +147,20 @@ describe('motionFor', () => {
 
   it('drops movement but keeps fades under Reduce Motion', () => {
     expect(motionFor(true)).toEqual({ fade1: 120, fade2: 200, move1: 0, move2: 0, pressScale: 1 });
+  });
+});
+
+describe('Inter', () => {
+  // Android ignores fontWeight once a custom family is set, so each weight is
+  // its own family. Every named style must carry the family for its weight.
+  it('maps each weight to its Inter family', () => {
+    expect(fontFor('500')).toBe('Inter_500Medium');
+    expect(fontFor('600')).toBe('Inter_600SemiBold');
+    expect(fontFor('700')).toBe('Inter_700Bold');
+    expect(FONT).toEqual({ medium: 'Inter_500Medium', semibold: 'Inter_600SemiBold', bold: 'Inter_700Bold' });
+  });
+
+  it('gives every named style the family for its weight', () => {
+    for (const style of Object.values(type)) expect(style.fontFamily).toBe(fontFor(style.fontWeight));
   });
 });

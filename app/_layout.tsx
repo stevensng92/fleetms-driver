@@ -8,6 +8,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
 import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { ThemeProvider, useTokens, useThemeControls } from '../theme/ThemeProvider';
 import { queryClient } from '../lib/queryClient';
 import { ensureDevSession, DevSessionResult } from '../lib/devSession';
@@ -15,6 +17,9 @@ import { ensurePushNotifications } from '../lib/push';
 import { reportAppVersion } from '../lib/version';
 import { useAppVersionGate } from '../lib/queries/appVersionConfig';
 import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
+
+// Keep the splash screen up until Inter has loaded (see RootLayout).
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Crash + JS-error reporting. Captures Fabric "child already has parent" and
 // other native crashes with native stack traces, plus any unhandled JS errors.
@@ -116,6 +121,16 @@ function RootLayoutImpl() {
     ensureDevSession().then(r => { if (alive) setSession(r); });
     return () => { alive = false; };
   }, []);
+
+  // Inter loads before the first screen draws, or text jumps from the phone's
+  // font to Inter a moment later. The splash stays up until then. A font that
+  // fails to load falls back to the phone's font rather than holding the app.
+  const [fontsLoaded, fontError] = useFonts({ Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
+  const fontsReady = fontsLoaded || !!fontError;
+  useEffect(() => {
+    if (fontsReady) SplashScreen.hideAsync().catch(() => {});
+  }, [fontsReady]);
+  if (!fontsReady) return null;
 
   // Render the shell even before the dev-session resolves — screens will
   // show their own loading state via TanStack Query.
