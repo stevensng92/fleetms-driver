@@ -9,9 +9,6 @@
 // the marker is the familiar anchor that stops "14:30" reading as a typo.
 // Do not "fix" this into strict 24h without asking.
 //
-// Drivers can switch to a 12-hour clock instead (ClockStyle, below). The
-// house format stays the default.
-//
 // TIMEZONE IS PINNED TO MALAYSIA, NOT THE DEVICE.
 // This used to read the device's local clock via getHours(), which made the
 // driver app the only FleetMS surface whose timezone was an assumption rather
@@ -56,45 +53,12 @@ function toMyParts(value: string | Date): Date | null {
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-/**
- * How clock times read. The driver picks this on Profile > Appearance.
- *   '24h' — the house format above, "14:30 pm". The default.
- *   '12h' — "2:30 pm", no leading zero; midnight is "12:15 am".
- */
-export type ClockStyle = '24h' | '12h';
-
-// Module-level rather than passed through every caller: clocks are formatted
-// deep inside query functions (lib/queries/jobs.ts, notifications.ts) as well
-// as in screens. ClockStyleProvider sets this on load and on change, then
-// refetches queries so the cached labels are rebuilt in the new style.
-let currentClockStyle: ClockStyle = '24h';
-
-export function setClockStyle(style: ClockStyle): void {
-  currentClockStyle = style;
-}
-
-export function getClockStyle(): ClockStyle {
-  return currentClockStyle;
-}
-
-/** A stored value read back from AsyncStorage. Anything unknown means 24h. */
-export function parseClockStyle(raw: string | null | undefined): ClockStyle {
-  return raw === '12h' ? '12h' : '24h';
-}
-
-/**
- * "14:30 pm" / "09:00 am" (24h) or "2:30 pm" / "9:00 am" (12h), in Malaysian
- * time. Uses the driver's setting unless `style` is given. Em dash on
- * unparseable input.
- */
-export function formatClock(value: string | Date, style: ClockStyle = currentClockStyle): string {
+/** "14:30 pm" / "09:00 am", in Malaysian time. Em dash on unparseable input. */
+export function formatClock(value: string | Date): string {
   const my = toMyParts(value);
   if (!my) return '—';
   const h = my.getUTCHours();
-  const marker = h < 12 ? 'am' : 'pm';
-  const mm = pad2(my.getUTCMinutes());
-  if (style === '12h') return `${h % 12 === 0 ? 12 : h % 12}:${mm} ${marker}`;
-  return `${pad2(h)}:${mm} ${marker}`;
+  return `${pad2(h)}:${pad2(my.getUTCMinutes())} ${h < 12 ? 'am' : 'pm'}`;
 }
 
 /** "30 Jul" — Malaysian calendar date, no year. */

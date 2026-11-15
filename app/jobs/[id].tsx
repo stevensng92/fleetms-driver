@@ -13,7 +13,6 @@ import { CommissionRateCard } from '../../components/CommissionRateCard';
 import { JobAmountCard } from '../../components/JobAmountCard';
 import { useTokens } from '../../theme/ThemeProvider';
 import { formatClock } from '../../lib/timeFormat';
-import { useClockStyle } from '../../theme/ClockStyleProvider';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { useStartJob, useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 
@@ -21,8 +20,6 @@ import { useStartJob, useConfirmAssignment, useRejectAssignment } from '../../li
 // human-visible JOB-XXX that JobCard shows.
 export default function JobDetail() {
   const T = useTokens();
-  // Passed into formatClock so these labels rebuild when the driver switches.
-  const { clockStyle } = useClockStyle();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: job, isLoading, isError, error, refetch } = useJobDetailByNumber(id);
 
@@ -48,7 +45,7 @@ export default function JobDetail() {
   const stopsForUi: Stop[] = job.stops.map(s => ({
     kind: s.kind,
     arriveLabel: s.scheduledAt ? 'Arrive' : '—',
-    arrive: s.scheduledAt ? formatClock(s.scheduledAt, clockStyle) : '—',
+    arrive: s.scheduledAt ? formatClock(s.scheduledAt) : '—',
     place: s.location + (s.detail ? `, ${s.detail}` : ''),
     depart: undefined,
     lat: s.lat,
@@ -61,7 +58,7 @@ export default function JobDetail() {
       {
         kind: 'Pickup',
         arriveLabel: 'Pickup',
-        arrive: formatClock(job.pickupAt, clockStyle),
+        arrive: formatClock(job.pickupAt),
         place: job.pickupLocation + (job.pickupDetail ? `, ${job.pickupDetail}` : ''),
         depart: undefined,
       },

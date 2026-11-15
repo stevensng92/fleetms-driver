@@ -1,5 +1,5 @@
 import {
-  formatClock, setClockStyle, parseClockStyle, formatDate, formatDateKey, formatDateLong, formatDateTime,
+  formatClock, formatDate, formatDateKey, formatDateLong, formatDateTime,
   formatDayLong, formatMonthLong, formatMonthKey, formatMonthKeyChip,
   myDateKey, myMonthKey, myMonthStartKey, myStartOfDay, myStartOfMonth,
   myStartOfMonthKey, monthKeysDesc,
@@ -496,59 +496,5 @@ describe('weeksBetween / monthsBetween', () => {
     // Sun 2 Aug to Sun 9 Aug is 7 days but TWO calendar weeks — which is why
     // the pager counts buckets rather than dividing elapsed days by seven.
     expect(weeksBetween('2026-08-02T02:00:00Z', '2026-08-09T02:00:00Z')).toBe(2);
-  });
-});
-
-// The driver can pick how clocks read (Profile > Appearance > Time format).
-// '24h' is today's house format and stays the default; '12h' is "2:30 pm".
-describe('clock style setting', () => {
-  const at = (h: number, m: number) => new Date(Date.UTC(2026, 6, 30, h - 8, m));
-  afterEach(() => setClockStyle('24h'));
-
-  it('defaults to the 24-hour house format', () => {
-    expect(formatClock(at(14, 30))).toBe('14:30 pm');
-  });
-
-  it('shows 12-hour digits without a leading zero when set to 12h', () => {
-    setClockStyle('12h');
-    expect(formatClock(at(14, 30))).toBe('2:30 pm');
-    expect(formatClock(at(9, 5))).toBe('9:05 am');
-    expect(formatClock(at(23, 59))).toBe('11:59 pm');
-  });
-
-  it('reads midnight as 12 am and noon as 12 pm in 12h', () => {
-    setClockStyle('12h');
-    expect(formatClock(at(0, 15))).toBe('12:15 am');
-    expect(formatClock(at(12, 0))).toBe('12:00 pm');
-    expect(formatClock(at(11, 59))).toBe('11:59 am');
-  });
-
-  it('lets a caller ask for a style directly, whatever the setting', () => {
-    expect(formatClock(at(14, 30), '12h')).toBe('2:30 pm');
-    setClockStyle('12h');
-    expect(formatClock(at(14, 30), '24h')).toBe('14:30 pm');
-  });
-
-  it('carries the setting into date-and-time labels', () => {
-    setClockStyle('12h');
-    expect(formatDateTime('2026-07-30T06:30:00Z')).toBe('Thu, 30 Jul, 2:30 pm');
-  });
-
-  it('still shows an em dash on unparseable input in 12h', () => {
-    setClockStyle('12h');
-    expect(formatClock('nope')).toBe('—');
-  });
-});
-
-describe('parseClockStyle', () => {
-  it('accepts the two stored values', () => {
-    expect(parseClockStyle('12h')).toBe('12h');
-    expect(parseClockStyle('24h')).toBe('24h');
-  });
-
-  it('falls back to 24h for nothing stored or anything unknown', () => {
-    expect(parseClockStyle(null)).toBe('24h');
-    expect(parseClockStyle('')).toBe('24h');
-    expect(parseClockStyle('12-hour')).toBe('24h');
   });
 });

@@ -116,8 +116,7 @@ counterpart: `../fleetms/app/lib/job-contact.ts`, documented in
 Clock times render as 24-hour digits with the am/pm marker kept behind them
 (`09:00 am`, `14:30 pm`) via `lib/timeFormat.ts`. The marker is redundant
 after noon by strict notation; it is retained deliberately, so don't
-"simplify" it away. That is the default. A driver can switch to a 12-hour
-clock (`2:30 pm`) on Profile > Appearance > Time format; see Theming below.
+"simplify" it away.
 
 | Screen           | Route                        | Wired? |
 |-------------------|-------------------------------|--------|
@@ -230,7 +229,7 @@ lib/
                            job pays, whether that differs from the driver's own
                            normal pay, + "20%" / "RM 80" formatting
   earningsPeriod.ts        Earnings period model + the instant range each covers
-  timeFormat.ts            clock formatting (24h house format or 12h, per driver setting)
+  timeFormat.ts            clock formatting (24h digits + am/pm marker)
   push.ts                  push-token registration
   queryClient.ts           React Query client
   queries/, mutations/     per-screen data-access layer (React Query hooks).
@@ -246,11 +245,6 @@ lib/
 for the user-facing toggles. The Profile screen lets you flip:
 
 - **Theme** — `system` (default), `light`, `dark`. Persisted to AsyncStorage.
-- **Time format** — `24-hour` (default, `14:30 pm`) or `12-hour` (`2:30 pm`).
-  Persisted to AsyncStorage by `theme/ClockStyleProvider.tsx`, which also
-  refetches queries on change, because job cards and notification rows build
-  their clock labels inside query functions. Screens that call `formatClock`
-  directly read `useClockStyle()` and pass the style in, so they re-render.
 - **Primary accent** — `navy`, `cyan`, `amber`, `violet`. Also persisted.
 
 Cyan accent (for the in-progress timeline state) and the functional status

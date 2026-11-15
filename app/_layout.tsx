@@ -9,7 +9,6 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 import { ThemeProvider, useTokens, useThemeControls } from '../theme/ThemeProvider';
-import { ClockStyleProvider } from '../theme/ClockStyleProvider';
 import { queryClient } from '../lib/queryClient';
 import { ensureDevSession, DevSessionResult } from '../lib/devSession';
 import { ensurePushNotifications } from '../lib/push';
@@ -125,9 +124,7 @@ function RootLayoutImpl() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
-            <ClockStyleProvider>
-              <ThemedShell session={session}/>
-            </ClockStyleProvider>
+            <ThemedShell session={session}/>
           </ThemeProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

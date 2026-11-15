@@ -20,8 +20,7 @@ Run with `npm test`. Full guide, including the sharp edges that will bite you
 - New error path → write a test that triggers the error.
 - Never commit code that makes existing tests fail.
 
-Currently covered: the time format setting (`theme/ClockStyleProvider.tsx`),
-pure helpers (`lib/timeFormat.ts`, `lib/commissionRate.ts`,
+Currently covered: pure helpers (`lib/timeFormat.ts`, `lib/commissionRate.ts`,
 `lib/semver.ts`, `lib/earningsPeriod.ts`, `lib/jobContact.ts`) and shared
 components, plus the Earnings screen and `fetchClientPhone` in
 `lib/queries/jobDetail.ts`. NOT covered: the other screens, the remaining React

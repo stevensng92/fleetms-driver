@@ -15,7 +15,6 @@ import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { formatClock } from '../../lib/timeFormat';
-import { useClockStyle } from '../../theme/ClockStyleProvider';
 import { useCompleteJob } from '../../lib/mutations/jobActions';
 
 // S4 — Active Job. Same shape as Job Detail but UI emphasises progress and
@@ -23,8 +22,6 @@ import { useCompleteJob } from '../../lib/mutations/jobActions';
 // implementation would track per-stop progress in job_stops.
 export default function ActiveJob() {
   const T = useTokens();
-  // Passed into formatClock so these labels rebuild when the driver switches.
-  const { clockStyle } = useClockStyle();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: job, isLoading, isError, error, refetch } = useJobDetailByNumber(id);
   const completeJob = useCompleteJob();
@@ -48,7 +45,7 @@ export default function ActiveJob() {
   const stopsForUi: Stop[] = job.stops.map(s => ({
     kind: s.kind,
     arriveLabel: s.scheduledAt ? 'Arrive' : '—',
-    arrive: s.scheduledAt ? formatClock(s.scheduledAt, clockStyle) : '—',
+    arrive: s.scheduledAt ? formatClock(s.scheduledAt) : '—',
     place: s.location + (s.detail ? `, ${s.detail}` : ''),
     depart: undefined,
     lat: s.lat,
@@ -59,7 +56,7 @@ export default function ActiveJob() {
       {
         kind: 'Pickup',
         arriveLabel: 'Pickup',
-        arrive: formatClock(job.pickupAt, clockStyle),
+        arrive: formatClock(job.pickupAt),
         place: job.pickupLocation + (job.pickupDetail ? `, ${job.pickupDetail}` : ''),
         depart: undefined,
       },
