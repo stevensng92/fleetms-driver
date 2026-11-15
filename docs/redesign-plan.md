@@ -174,15 +174,16 @@ screens are where the look and the fixes meet.
 Each phase is one screen area, one branch, one pull request. Each change is
 test first. Order is by how often drivers use the screen.
 
-### Phase 2: Jobs tab (changes 10, 11, 14, 15, 19)
+### Phase 2: Jobs tab (changes 10, 11, 14, 15, 19, 32)
 
 | # | Change | Test first |
 |---|---|---|
-| 10 | Drop the made-up "RM n × 80" from the Today heading; show the job count | heading shows "3 jobs", no RM |
+| 10 | Drop the made-up "RM n × 80" from the Today heading; show the jobs still to do | heading shows "3 jobs to go" ("All done" when none are left), no RM |
 | 11 | Reject from the list asks first, with an optional reason, the same as the job screen | Reject opens the dialog; nothing is sent until confirmed; the reason is passed through |
 | 14 | An in-progress job opens the trip screen from every group, Upcoming included | `jobScreen` port |
 | 15 | "No jobs scheduled today" only when nothing is coming at all | `jobGroups(...).empty` port |
 | 19 | "View details" and "Completed" lines fold into the card | card render test |
+| 32 | Today leads with the job under way, then jobs still to do by pickup time; done and cancelled jobs sit in a "Finished today" fold, closed by default (added to the mock 15 Nov) | port the mock's `jobGroups` cases: `today` order, `todayFinished`, a day of only finished jobs is not empty; fold starts closed and opens on tap |
 
 New pure file: `lib/jobGroups.ts` (groups, which screen opens, "1 job" / "2 jobs").
 
