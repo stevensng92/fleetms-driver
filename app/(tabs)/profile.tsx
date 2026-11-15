@@ -6,6 +6,7 @@ import { AppHeader, SectionLabel } from '../../components/AppHeader';
 import { Card } from '../../components/Card';
 import { Icon } from '../../components/Icon';
 import { useTokens, useThemeControls } from '../../theme/ThemeProvider';
+import { useClockStyle } from '../../theme/ClockStyleProvider';
 import { useDriverProfile, formatVehicleLine, availabilityBadge } from '../../lib/queries/driverProfile';
 import { useDriverTimeOff, REASON_LABEL, type TimeOffEntry, type TimeOffStatus } from '../../lib/queries/timeOff';
 import { useCancelTimeOff } from '../../lib/mutations/timeOff';
@@ -19,6 +20,7 @@ const APP_DOWNLOAD_URL = 'https://app.fleetms.my/driver-app';
 export default function Profile() {
   const T = useTokens();
   const { preference, setPreference } = useThemeControls();
+  const { clockStyle, setClockStyle } = useClockStyle();
   const { data: profile, isLoading } = useDriverProfile();
   const versionGate = useAppVersionGate();
 
@@ -117,6 +119,31 @@ export default function Profile() {
                   color: sel ? T.text : T.muted,
                   textTransform: 'capitalize',
                 }}>{p}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={{ fontSize: 11, color: T.mutedLight, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 16 }}>
+          Time format
+        </Text>
+        <View style={{ flexDirection: 'row', backgroundColor: T.raised, borderRadius: 8, padding: 4, marginTop: 8 }}>
+          {([['24h', '24-hour'], ['12h', '12-hour']] as const).map(([s, label]) => {
+            const sel = s === clockStyle;
+            return (
+              <Pressable
+                key={s}
+                onPress={() => setClockStyle(s)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: sel }}
+                style={{
+                  flex: 1, paddingVertical: 9, borderRadius: 6, alignItems: 'center',
+                  backgroundColor: sel ? T.surface : 'transparent',
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: sel ? '700' : '500', color: sel ? T.text : T.muted }}>
+                  {label}
+                </Text>
               </Pressable>
             );
           })}
