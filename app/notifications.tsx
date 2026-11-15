@@ -6,14 +6,15 @@ import { Icon } from '../components/Icon';
 import { Card } from '../components/Card';
 import { Band } from '../components/Band';
 import { Button } from '../components/Button';
+import { Pill } from '../components/Pill';
 import { useTokens } from '../theme/ThemeProvider';
-import { TABULAR, radius, space, type } from '../theme/tokens';
+import { TABULAR, space, type } from '../theme/tokens';
 import {
   useNotifications,
   useMarkNotificationsRead,
   type NotificationItem,
 } from '../lib/queries/notifications';
-import { formatDateTime } from '../lib/timeFormat';
+import { notificationLink, sentAt } from '../lib/notificationText';
 
 // Notifications inbox. Opens from the bell button on the Jobs tab.
 //
@@ -115,43 +116,24 @@ export default function Notifications() {
 function NotificationRow({ item, isLast }: { item: NotificationItem; isLast: boolean }) {
   const T = useTokens();
   const unread = item.readAt === null;
-  const time = formatDateTime(item.enqueuedAt, { weekday: false });
+  const time = sentAt(item.enqueuedAt);
+  // A row opens its job only when the link is one the app can open (the
+  // allowlist lives in lib/notificationText.ts). Otherwise it is plain text:
+  // not pressable, no chevron.
+  const link = notificationLink(item.deeplink);
 
-  // Deeplinks come from server-controlled push_log.payload.deeplink. Allowlist
-  // by prefix so a compromised/bug-buggy trigger can't route the driver to
-  // an unexpected screen. Expo Router resolves only the app's route tree so
-  // there's no RCE here — this is defence-in-depth against routing bugs.
-  function onPress() {
-    if (!item.deeplink) return;
-    const ALLOWED = ['/jobs/', '/notifications', '/(tabs)', '/profile/'];
-    if (ALLOWED.some(p => item.deeplink!.startsWith(p))) {
-      router.push(item.deeplink as '/');
-    }
-  }
-
-  return (
-    <Pressable
-      onPress={onPress}
-      // Unread = subtle red dot only (industry standard: iOS Mail, Slack).
-      // No row-wide background tint — that read as "selected" rather than
-      // "unread" and clashed visually with the header.
-      style={({ pressed }) => ({
-        minHeight: 44,
-        paddingHorizontal: space[5], paddingVertical: space[4],
-        borderBottomWidth: isLast ? 0 : 1, borderBottomColor: T.hairline,
-        backgroundColor: pressed ? T.surfaceSunk : 'transparent',
-        flexDirection: 'row', gap: space[3], alignItems: 'flex-start',
-      })}
-    >
-      <View style={{
-        marginTop: 6,
-        width: 8, height: 8, borderRadius: radius.pill,
-        backgroundColor: unread ? T.red : 'transparent',
-      }}/>
+  const content = (
+    <>
       <View style={{ flex: 1, minWidth: 0, gap: space[1] }}>
-        <Text style={[type.title, { color: T.text }]} numberOfLines={1}>
-          {item.title}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+          <Text style={[type.title, { color: T.text, flexShrink: 1 }]} numberOfLines={1}>
+            {item.title}
+          </Text>
+          {!!item.jobNumber && (
+            <Text style={[type.caption, TABULAR, { color: T.text3 }]}>{item.jobNumber}</Text>
+          )}
+          {unread && <Pill tone="blue">New</Pill>}
+        </View>
         {!!item.body && (
           <Text style={[type.label, { color: T.text2 }]} numberOfLines={2}>
             {item.body}
@@ -161,6 +143,25 @@ function NotificationRow({ item, isLast }: { item: NotificationItem; isLast: boo
           {time}
         </Text>
       </View>
+      {link && <Icon name="chevR" size={18} color={T.text3}/>}
+    </>
+  );
+
+  const rowStyle = {
+    minHeight: 44,
+    paddingHorizontal: space[5], paddingVertical: space[4],
+    borderBottomWidth: isLast ? 0 : 1, borderBottomColor: T.hairline,
+    flexDirection: 'row' as const, gap: space[3], alignItems: 'center' as const,
+  };
+
+  if (!link) return <View style={rowStyle}>{content}</View>;
+  return (
+    <Pressable
+      onPress={() => router.push(link as '/')}
+      accessibilityRole="button"
+      style={({ pressed }) => ({ ...rowStyle, backgroundColor: pressed ? T.surfaceSunk : 'transparent' })}
+    >
+      {content}
     </Pressable>
   );
 }

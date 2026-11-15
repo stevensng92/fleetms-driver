@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { driverSyntheticEmail } from './phone';
 
 // =============================================================================
 // Driver PIN auth — client helpers
@@ -10,29 +11,6 @@ import { supabase } from './supabase';
 //
 // See docs/driver-pin-auth.md in the fleetms repo for the full design.
 // =============================================================================
-
-/**
- * Strip the input phone to digits-only and wrap in the synthetic format.
- * '+60 12-345 6789' → 'driver-60123456789@fleetms.local'
- *
- * MUST stay byte-equivalent to private.driver_synthetic_email in Postgres.
- */
-// The sign-in screen has a hard-coded +60 country-code chip; users only type
-// the local part. Prepend '60' if absent so the synthetic email matches what
-// the dispatcher provisioned (drivers.phone is stored with country code, and
-// private.driver_synthetic_email strips non-digits from it server-side).
-// MY-only for now; revisit when we add tenants in other countries.
-const COUNTRY_CODE = '60';
-
-export function driverSyntheticEmail(rawPhone: string): string {
-  let digits = rawPhone.replace(/\D/g, '');
-  // Drop leading zeros (Malaysian local convention: 0169343913 → 169343913).
-  // Multi-zero defence: `^0+` instead of slicing once, so `00169...` collapses too.
-  digits = digits.replace(/^0+/, '');
-  // Prepend the country code if the user didn't paste a full international form.
-  if (!digits.startsWith(COUNTRY_CODE)) digits = COUNTRY_CODE + digits;
-  return `driver-${digits}@fleetms.local`;
-}
 
 export type SignInResult =
   | { ok: true }
