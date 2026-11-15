@@ -1,9 +1,12 @@
 import React from 'react';
 import { Pressable, Text, View, ViewStyle, StyleProp } from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Icon, IconName } from './Icon';
 import { useTokens } from '../theme/ThemeProvider';
+import { EASE_OUT, motionFor, radius } from '../theme/tokens';
 
-type Variant = 'primary' | 'green' | 'danger' | 'secondary' | 'ghost';
+/** `green` and `ghost` are today's names: they now draw as `primary` and `quiet`. */
+type Variant = 'primary' | 'secondary' | 'danger' | 'quiet' | 'green' | 'ghost';
 
 type Props = {
   variant?: Variant;
@@ -14,51 +17,67 @@ type Props = {
   icon?: IconName;
   trailingIcon?: IconName;
   size?: 'md' | 'lg';
+  disabled?: boolean;
+  testID?: string;
 };
 
+const CURVE = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
+
 export function Button({
-  variant = 'primary', children, full, onPress, style, icon, trailingIcon, size = 'md',
+  variant = 'primary', children, full, onPress, style, icon, trailingIcon, size = 'md', disabled, testID,
 }: Props) {
   const T = useTokens();
-  const variants: Record<Variant, { bg: string; fg: string; bd: string }> = {
-    primary:   { bg: T.primary, fg: T.primaryFg, bd: T.primary },
-    green:     { bg: T.green,   fg: '#FFFFFF',   bd: T.green },
-    danger:    { bg: T.surface, fg: T.red,       bd: T.theme === 'dark' ? 'rgba(248,113,113,0.45)' : '#FCA5A5' },
-    secondary: { bg: T.surface, fg: T.text,      bd: T.borderHard },
-    ghost:     { bg: 'transparent', fg: T.muted, bd: 'transparent' },
+  const reduced = useReducedMotion();
+  const scale = useSharedValue(1);
+  const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  // The accent never fills a button (design rule), so legacy green is primary.
+  const v = variant === 'green' ? 'primary' : variant === 'ghost' ? 'quiet' : variant;
+  const look = {
+    primary: { bg: T.ink, fg: T.onInk, shadow: undefined },
+    secondary: { bg: T.surface, fg: T.text, shadow: T.shadow1 },
+    danger: { bg: T.danger, fg: T.onColor, shadow: undefined },
+    quiet: { bg: 'transparent', fg: T.text2, shadow: undefined },
+  }[v];
+  const lg = size === 'lg';
+  const press = (to: number) => {
+    scale.value = withTiming(to, { duration: 120, easing: CURVE });
   };
-  const v = variants[variant];
-  const minHeight = size === 'lg' ? 56 : 48;
-  const fontSize = size === 'lg' ? 17 : 16;
 
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
       onPress={onPress}
-      android_ripple={{ color: T.theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}
-      style={({ pressed }) => [
-        {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          paddingHorizontal: 18,
-          paddingVertical: 14,
-          minHeight,
-          width: full ? '100%' : undefined,
-          backgroundColor: v.bg,
-          borderColor: v.bd,
-          borderWidth: 1,
-          borderRadius: 6,
-          opacity: pressed ? 0.85 : 1,
-        },
-        style,
-      ]}
+      onPressIn={disabled ? undefined : () => press(motionFor(reduced).pressScale)}
+      onPressOut={disabled ? undefined : () => press(1)}
+      style={[{ width: full ? '100%' : undefined }, style]}
     >
-      {icon && <Icon name={icon} size={18} color={v.fg}/>}
-      {typeof children === 'string'
-        ? <Text style={{ color: v.fg, fontSize, fontWeight: '600', letterSpacing: -0.1 }}>{children}</Text>
-        : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>{children}</View>}
-      {trailingIcon && <Icon name={trailingIcon} size={18} color={v.fg}/>}
+      <Animated.View
+        testID={testID}
+        style={[
+          {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            paddingHorizontal: lg ? 24 : 20,
+            minHeight: lg ? 52 : 44,
+            backgroundColor: look.bg,
+            borderRadius: radius.pill,
+            boxShadow: look.shadow,
+            opacity: disabled ? 0.4 : 1,
+          },
+          animated,
+        ]}
+      >
+        {icon && <Icon name={icon} size={18} color={look.fg} testID={testID ? `${testID}-icon` : undefined}/>}
+        {typeof children === 'string'
+          ? <Text style={{ color: look.fg, fontSize: lg ? 16 : 14, fontWeight: '600', letterSpacing: -0.14 }}>{children}</Text>
+          : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>{children}</View>}
+        {trailingIcon && <Icon name={trailingIcon} size={18} color={look.fg} testID={testID ? `${testID}-trailing-icon` : undefined}/>}
+      </Animated.View>
     </Pressable>
   );
 }

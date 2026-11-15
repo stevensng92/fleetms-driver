@@ -1,67 +1,42 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, Pressable, View, ViewStyle, StyleProp } from 'react-native';
+import React from 'react';
+import { Pressable, View, ViewStyle, StyleProp } from 'react-native';
 import { useTokens } from '../theme/ThemeProvider';
+import { radius } from '../theme/tokens';
 
 type Props = {
+  /** Legacy: the coloured left stripe. The design has none, so it is accepted and ignored. */
   accent?: string;
+  /** Legacy: the breathing stripe. The design has no pulse, so it is accepted and ignored. */
+  pulse?: boolean;
+  /** Fades the card to 0.6. */
   dim?: boolean;
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   onPress?: () => void;
-  /** Gentle breathing animation on the accent stripe + the card border.
-   *  Used to make in-progress jobs stand out in the Jobs list without being
-   *  flashy. No-op when `accent` isn't set. */
-  pulse?: boolean;
+  testID?: string;
 };
 
-export function Card({ accent, dim, children, style, onPress, pulse }: Props) {
+export function Card({ dim, children, style, onPress, testID }: Props) {
   const T = useTokens();
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (!pulse) return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.55, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse, pulseAnim]);
-
-  // We animate the left border by scaling its width 4 → 6 px (subtle), and
-  // fade the colour slightly. useNativeDriver:false because layout width
-  // isn't supported on the native driver — but 1100ms transitions on a
-  // single non-scrollable view aren't a perf concern.
-  const animatedBorderWidth = pulse
-    ? pulseAnim.interpolate({ inputRange: [0.55, 1], outputRange: [4, 6] })
-    : undefined;
-
   const inner = (
-    <Animated.View
+    <View
+      testID={testID}
       style={[
         {
           backgroundColor: T.surface,
-          borderRadius: 12,
-          borderLeftWidth: pulse && accent ? (animatedBorderWidth as any) : (accent ? 4 : 0),
-          borderLeftColor: accent ?? 'transparent',
+          borderRadius: radius.lg,
+          boxShadow: T.shadow1,
           opacity: dim ? 0.6 : 1,
-          shadowColor: T.theme === 'dark' ? '#000' : '#0F172A',
-          shadowOpacity: T.theme === 'dark' ? 0.35 : 0.06,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 2 },
-          elevation: 2,
         },
         style,
       ]}
     >
       {children}
-    </Animated.View>
+    </View>
   );
   if (!onPress) return inner;
   return (
-    <Pressable onPress={onPress} android_ripple={{ color: 'rgba(0,0,0,0.04)' }} style={{ borderRadius: 12 }}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={{ borderRadius: radius.lg }}>
       {inner}
     </Pressable>
   );
