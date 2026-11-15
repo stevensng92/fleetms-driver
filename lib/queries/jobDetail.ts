@@ -162,7 +162,15 @@ function reportClientPhoneError(
   } catch {}
 }
 
-async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
+// PostgREST's answer when .single() matches no row. For these reads that means
+// "this job is not on this driver's list": cancelled, reassigned, or hidden by
+// row-level security. It is the one error that is NOT a failure.
+const NO_ROW = 'PGRST116';
+const isNoRow = (e: { code?: string } | null) => e?.code === NO_ROW;
+
+// Null means "no such job for this driver". Anything else that goes wrong
+// (no network, a server error) throws, so the screen can offer Retry.
+async function fetchJobDetail(jobUuid: string): Promise<JobDetail | null> {
   // Pull the job + the current assignment + stops in a single round-trip.
   //
   // job_stops disambiguator: there's both a plain FK on job_id AND a composite
@@ -193,8 +201,9 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
     .order('position', { foreignTable: 'job_stops', ascending: true })
     .single();
 
+  if (isNoRow(jobErr)) return null;
   if (jobErr) throw jobErr;
-  if (!job) throw new Error('Job not found');
+  if (!job) return null;
 
   // The driver's normal pay, to decide whether this job's RATE is worth
   // surfacing. A failed lookup degrades to "no rate badge"
@@ -297,18 +306,26 @@ async function fetchJobDetail(jobUuid: string): Promise<JobDetail> {
 // If a by-uuid read is genuinely needed later, call `fetchJobDetail` directly
 // rather than re-exporting a second hook that differs only in what a `string`
 // means.
+//
+// Resolves to null when the job is not on the driver's list any more (change
+// 20); throws on a real failure. Exported for tests only, for the same reason
+// as fetchClientPhone: the hook needs a React Query provider to reach this.
+export async function fetchJobDetailByNumber(jobNumber: string): Promise<JobDetail | null> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('id')
+    .eq('job_number', jobNumber)
+    .single();
+  if (isNoRow(error)) return null;
+  if (error) throw error;
+  if (!data) return null;
+  return fetchJobDetail(data.id);
+}
+
 export function useJobDetailByNumber(jobNumber: string | undefined) {
   return useQuery({
     queryKey: ['job-by-number', jobNumber],
     enabled: Boolean(jobNumber),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('id')
-        .eq('job_number', jobNumber!)
-        .single();
-      if (error) throw error;
-      return fetchJobDetail(data!.id);
-    },
+    queryFn: () => fetchJobDetailByNumber(jobNumber!),
   });
 }

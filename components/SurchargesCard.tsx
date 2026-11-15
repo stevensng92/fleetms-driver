@@ -3,6 +3,7 @@ import { View, Text, StyleProp, ViewStyle } from 'react-native';
 import { Card } from './Card';
 import { useTokens } from '../theme/ThemeProvider';
 import { fontFor, space, type, TABULAR } from '../theme/tokens';
+import { surchargeNote } from '../lib/route';
 
 export type Surcharge = {
   id: string;
@@ -49,9 +50,7 @@ export function SurchargesCard({ items, style }: {
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               <Text style={[type.body, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text }]}>{s.name}</Text>
               <Text style={[type.label, { color: T.text2 }]}>
-                {s.paidInAdvance
-                  ? 'Paid in advance'
-                  : s.treatment === 'pass_through' ? 'Added to your pay' : 'Counts toward fare'}
+                {surchargeNote(s)}
               </Text>
             </View>
             {/* One flat style object (not an array): the tests read textDecorationLine off it. */}
