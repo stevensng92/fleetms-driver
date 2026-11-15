@@ -326,7 +326,7 @@ describe('Earnings — period pager', () => {
     // Two weeks back is named by its dates, not "2 weeks ago" — that would put
     // the arithmetic on the person least able to check it.
     const label = periodHeadline(weeksBack(2), now());
-    expect(label).toMatch(/^\d{1,2} \w{3} \u2013 \d{1,2} \w{3}/);
+    expect(label).toMatch(/^\d{1,2} \w{3} to \d{1,2} \w{3}/);
     expect(await screen.findByText(label)).toBeTruthy();
   });
 

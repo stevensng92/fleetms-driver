@@ -6,7 +6,11 @@ import { AppHeader, SectionLabel } from '../../components/AppHeader';
 import { Button } from '../../components/Button';
 import { Icon, IconName } from '../../components/Icon';
 import { Card } from '../../components/Card';
+import { FeatureCard } from '../../components/FeatureCard';
+import { Band } from '../../components/Band';
+import { Pill } from '../../components/Pill';
 import { useTokens } from '../../theme/ThemeProvider';
+import { fontFor, radius, space, TABULAR, type } from '../../theme/tokens';
 import { formatDateKey, formatMonthLong } from '../../lib/timeFormat';
 import { useMyExpenses, type ExpenseRow, type ExpenseCategory } from '../../lib/queries/expenses';
 
@@ -32,7 +36,7 @@ export default function Expenses() {
   const rows = data?.rows ?? [];
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: T.page }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: T.ground }}>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 24 }}
@@ -41,7 +45,7 @@ export default function Expenses() {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={() => refetch()}
-            tintColor={T.muted}
+            tintColor={T.text2}
           />
         }
       >
@@ -49,90 +53,71 @@ export default function Expenses() {
 
         {isLoading ? (
           <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-            <ActivityIndicator color={T.muted}/>
+            <ActivityIndicator color={T.text2}/>
           </View>
         ) : isError ? (
           <ErrorBox message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>
         ) : (
           <>
-            {/* Summary hero */}
-            <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-              <View style={{
-                backgroundColor: rows.length ? T.heroBg : T.surface,
-                borderRadius: 12,
-                paddingHorizontal: 18, paddingTop: 18, paddingBottom: 16,
-                borderWidth: rows.length ? 0 : 1,
-                borderStyle: rows.length ? 'solid' : 'dashed',
-                borderColor: T.borderHard,
-                shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-                elevation: 2,
-              }}>
-                <Text style={{
-                  fontSize: 12, color: rows.length ? T.heroMuted : T.muted, fontWeight: '600',
-                  letterSpacing: 0.4, textTransform: 'uppercase',
-                }}>Logged this month</Text>
-                <Text style={{
-                  fontSize: 34, fontWeight: '800', letterSpacing: -1, marginTop: 2,
-                  color: rows.length ? T.heroFg : T.borderHard,
-                }}>RM {total.toFixed(2)}</Text>
-
-                {rows.length > 0 && (
+            {/* Month total: the dark card when there is something to show */}
+            <View style={{ paddingHorizontal: space[4], paddingBottom: space[4] }}>
+              {rows.length ? (
+                <FeatureCard style={{ gap: space[3] }}>
+                  <Text style={[type.label, { color: T.onFeature2 }]}>Logged this month</Text>
+                  <Text style={[type.figure, TABULAR, { color: T.onFeature }]}>RM {total.toFixed(2)}</Text>
                   <View style={{
-                    flexDirection: 'row', marginTop: 14, paddingTop: 12,
-                    borderTopWidth: 1, borderTopColor: T.heroLine,
+                    flexDirection: 'row', gap: space[3], marginTop: space[1], paddingTop: space[4],
+                    borderTopWidth: 1, borderTopColor: T.featureTrack,
                   }}>
-                    {([
-                      { k: 'fuel',  c: T.pendingDot },
-                      { k: 'toll',  c: T.confirmDot },
-                      { k: 'other', c: T.voidedDot },
-                    ] as const).map(({ k, c }) => (
+                    {(['fuel', 'toll', 'other'] as const).map((k) => (
                       <View key={k} style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c }}/>
-                          <Text style={{
-                            fontSize: 10.5, color: T.heroMuted, fontWeight: '600',
-                            letterSpacing: 0.5, textTransform: 'uppercase',
-                          }}>{CAT_LABEL[k]}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>
+                          <Icon name={CAT_ICON[k]} size={14} color={T.onFeature2}/>
+                          <Text style={[type.label, { color: T.onFeature2 }]}>{CAT_LABEL[k]}</Text>
                         </View>
-                        <Text style={{ fontSize: 15, fontWeight: '700', marginTop: 4, color: T.heroFg }}>
+                        <Text style={[type.body, TABULAR, { fontFamily: fontFor('600'), fontWeight: '600', marginTop: space[1], color: T.onFeature }]}>
                           RM {totals[k].toFixed(2)}
                         </Text>
                       </View>
                     ))}
                   </View>
-                )}
-              </View>
+                </FeatureCard>
+              ) : (
+                <Card style={{ padding: space[5], gap: space[1] }}>
+                  <Text style={[type.label, { color: T.text2 }]}>Logged this month</Text>
+                  <Text style={[type.figure, TABULAR, { color: T.text3 }]}>RM {total.toFixed(2)}</Text>
+                </Card>
+              )}
             </View>
 
-            <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
+            <View style={{ paddingHorizontal: space[4], paddingBottom: space[4] }}>
               <Button full icon="plus" onPress={() => router.push('/expenses/log')}>
-                Log Expense
+                Log expense
               </Button>
             </View>
 
             {rows.length === 0 ? (
-              <View style={{
-                marginHorizontal: 16, marginTop: 20, paddingHorizontal: 20, paddingVertical: 40,
-                backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: T.border,
+              <Card style={{
+                marginHorizontal: space[4], marginTop: space[2], paddingHorizontal: space[5], paddingVertical: space[10],
                 alignItems: 'center',
               }}>
                 <View style={{
-                  width: 64, height: 64, borderRadius: 32, backgroundColor: T.raised,
-                  alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+                  width: 64, height: 64, borderRadius: radius.pill, backgroundColor: T.surfaceSunk,
+                  alignItems: 'center', justifyContent: 'center', marginBottom: space[3],
                 }}>
-                  <Icon name="receipt" size={28} color={T.mutedLight}/>
+                  <Icon name="receipt" size={28} color={T.text3}/>
                 </View>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: T.text, marginBottom: 4 }}>
+                <Text style={[type.title, { color: T.text, marginBottom: space[1] }]}>
                   No expenses logged yet this month
                 </Text>
-                <Text style={{ fontSize: 13, color: T.muted, textAlign: 'center', lineHeight: 19 }}>
-                  Tap <Text style={{ fontWeight: '700' }}>Log Expense</Text> above to record fuel, toll or other costs.
+                <Text style={[type.label, { color: T.text2, textAlign: 'center', lineHeight: 19 }]}>
+                  Tap <Text style={{ fontFamily: fontFor('700'), fontWeight: '700' }}>Log expense</Text> above to record fuel, toll or other costs.
                 </Text>
-              </View>
+              </Card>
             ) : (
               <>
                 <SectionLabel>Recent</SectionLabel>
-                <Card style={{ marginHorizontal: 16, overflow: 'hidden' }}>
+                <Card style={{ marginHorizontal: space[4], overflow: 'hidden' }}>
                   {rows.map((e, i) => (
                     <ExpenseRowView key={e.id} e={e} last={i === rows.length - 1}/>
                   ))}
@@ -148,18 +133,14 @@ export default function Expenses() {
 
 function ExpenseRowView({ e, last }: { e: ExpenseRow; last?: boolean }) {
   const T = useTokens();
-  const tint =
-    e.category === 'fuel' ? { bg: T.pendingBg, fg: T.pendingFg } :
-    e.category === 'toll' ? { bg: T.confirmBg, fg: T.confirmFg } :
-                            { bg: T.voidedBg,  fg: T.voidedFg  };
   const voided   = Boolean(e.voidedAt);
   const rejected = !voided && e.status === 'rejected';
   const pending  = !voided && e.status === 'pending';
   // Rejected reads like voided (dead row, struck through) but keeps its own
-  // label — the dispatcher declined this claim, vs. cancelled the record.
+  // label: the dispatcher declined this claim, vs. cancelled the record.
   const dead = voided || rejected;
   // expenseDate is a DATE column ("2026-08-01"). new Date() parses a bare
-  // date-only string as UTC, then toLocaleDateString renders it device-local —
+  // date-only string as UTC, then toLocaleDateString renders it device-local,
   // so on any UTC-negative device this showed the DAY BEFORE the expense was
   // filed. Format the string instead; it has no timezone to apply.
   const dayShort = formatDateKey(e.expenseDate, { year: false });
@@ -168,41 +149,48 @@ function ExpenseRowView({ e, last }: { e: ExpenseRow; last?: boolean }) {
     <Pressable
       onPress={() => router.push(`/expenses/${e.id}`)}
       style={{
-        flexDirection: 'row', alignItems: 'center', gap: 12,
-        paddingHorizontal: 16, paddingVertical: 14,
-        borderBottomWidth: last ? 0 : 1, borderBottomColor: T.border,
+        flexDirection: 'row', alignItems: 'center', gap: space[3],
+        paddingHorizontal: space[5], paddingVertical: space[3], minHeight: 64,
+        borderBottomWidth: last ? 0 : 1, borderBottomColor: T.hairline,
         opacity: dead ? 0.55 : 1,
       }}
     >
       <View style={{
-        width: 38, height: 38, borderRadius: 10, backgroundColor: tint.bg,
+        width: 40, height: 40, borderRadius: radius.sm, backgroundColor: T.surfaceSunk,
         alignItems: 'center', justifyContent: 'center',
       }}>
-        <Icon name={CAT_ICON[e.category]} size={20} color={tint.fg}/>
+        <Icon name={CAT_ICON[e.category]} size={20} color={dead ? T.text3 : T.text2}/>
       </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{
-          fontSize: 15, fontWeight: '600', color: T.text, letterSpacing: -0.2,
+      <View style={{ flex: 1, minWidth: 0, gap: space[1] }}>
+        <Text style={[type.title, {
+          color: dead ? T.text2 : T.text,
           textDecorationLine: dead ? 'line-through' : 'none',
-        }}>
-          {CAT_LABEL[e.category]}{e.notes ? ` · ${e.notes}` : ''}
+        }]}>
+          {CAT_LABEL[e.category]}{e.notes ? `, ${e.notes}` : ''}
         </Text>
-        <Text style={{ fontSize: 12, color: T.muted, marginTop: 2, fontFamily: MONO }}>
-          {dayShort} · {e.vehiclePlate}
-          {voided   && <Text style={{ color: T.red,        fontWeight: '600' }}>  VOIDED</Text>}
-          {rejected && <Text style={{ color: T.red,        fontWeight: '600' }}>  REJECTED</Text>}
-          {pending  && <Text style={{ color: T.pendingDot, fontWeight: '600' }}>  PENDING</Text>}
-        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], rowGap: space[1] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>
+            <Icon name="calendar" size={13} color={T.text3}/>
+            <Text style={[type.caption, TABULAR, { color: T.text2 }]}>{dayShort}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>
+            <Icon name="car" size={13} color={T.text3}/>
+            <Text style={[type.caption, { fontFamily: MONO, color: T.text2 }]}>{e.vehiclePlate}</Text>
+          </View>
+          {voided && <Pill tone="neutral" icon="ban">Voided</Pill>}
+          {rejected && <Pill tone="red" icon="circleX">Rejected</Pill>}
+          {pending && <Pill tone="amber" icon="clock">Pending</Pill>}
+        </View>
       </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={{
-          fontSize: 15, fontWeight: '700', color: T.text, letterSpacing: -0.3,
+      <View style={{ alignItems: 'flex-end', gap: space[1] }}>
+        <Text style={[type.title, TABULAR, {
+          color: dead ? T.text2 : T.text,
           textDecorationLine: dead ? 'line-through' : 'none',
-        }}>RM {e.amount.toFixed(2)}</Text>
+        }]}>RM {e.amount.toFixed(2)}</Text>
         {e.receiptPath && (
-          <View style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Icon name="image" size={12} color={T.confirmDot}/>
-            <Text style={{ fontSize: 11, color: T.confirmDot, fontWeight: '600' }}>Receipt</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>
+            <Icon name="image" size={13} color={T.text2}/>
+            <Text style={[type.caption, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text2 }]}>Receipt</Text>
           </View>
         )}
       </View>
@@ -213,18 +201,13 @@ function ExpenseRowView({ e, last }: { e: ExpenseRow; last?: boolean }) {
 function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) {
   const T = useTokens();
   return (
-    <View style={{
-      marginHorizontal: 16, padding: 16, borderRadius: 12,
-      backgroundColor: T.redSoft, borderWidth: 1, borderColor: T.red,
-    }}>
-      <Text style={{ fontSize: 14, fontWeight: '700', color: T.redFg }}>Couldn't load expenses</Text>
-      <Text style={{ fontSize: 13, color: T.redFg, lineHeight: 19, marginTop: 4 }}>{message}</Text>
-      <Pressable
-        onPress={onRetry}
-        style={{ marginTop: 12, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: T.red }}
-      >
-        <Text style={{ fontSize: 13, color: T.redFg, fontWeight: '600' }}>Retry</Text>
-      </Pressable>
-    </View>
+    <Band
+      tone="red"
+      style={{ marginHorizontal: space[4] }}
+      action={<Button variant="secondary" onPress={onRetry}>Retry</Button>}
+    >
+      <Text style={[type.title, { color: T.redText }]}>Couldn&apos;t load expenses</Text>
+      <Text style={[type.label, { color: T.redText, marginTop: space[1] }]}>{message}</Text>
+    </Band>
   );
 }

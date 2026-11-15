@@ -1,17 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Button } from '../../components/Button';
 import { Icon, IconName } from '../../components/Icon';
+import { FormField } from '../../components/FormField';
+import { Input } from '../../components/Input';
+import { Segmented } from '../../components/Segmented';
+import { Sheet } from '../../components/Sheet';
+import { Pill } from '../../components/Pill';
 import { useTokens } from '../../theme/ThemeProvider';
+import { fontFor, radius, space, TABULAR, type } from '../../theme/tokens';
 import { useMyVehicles } from '../../lib/queries/vehicles';
 import { useLogExpense } from '../../lib/mutations/logExpense';
 import type { ExpenseCategory } from '../../lib/queries/expenses';
 import { formatDateLong, myDateKey } from '../../lib/timeFormat';
-
-const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
 
 const CATS: { value: ExpenseCategory; label: string; icon: IconName }[] = [
   { value: 'fuel',  label: 'Fuel',  icon: 'fuel' },
@@ -28,6 +32,7 @@ export default function LogExpense() {
   const [receiptUri, setReceiptUri] = useState<string | null>(null);
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const [showVehiclePicker, setShowVehiclePicker] = useState(false);
+  const [amountFocused, setAmountFocused] = useState(false);
 
   const { data: vehicles, isLoading: vehiclesLoading } = useMyVehicles();
   const logExpense = useLogExpense();
@@ -46,7 +51,7 @@ export default function LogExpense() {
 
   // Both derived from the same Malaysian instant, so the date shown and the
   // date stored can never disagree. They used to: the label was device-local
-  // while the stored value came from toISOString(), which is UTC — so between
+  // while the stored value came from toISOString(), which is UTC, so between
   // 00:00 and 08:00 MY a driver saw one day and filed the expense on the day
   // before, pushing it into the wrong month at a period boundary.
   const now = new Date();
@@ -118,252 +123,209 @@ export default function LogExpense() {
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: T.surface }}>
       <View style={{
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 20, paddingVertical: 12,
-        borderBottomWidth: 1, borderBottomColor: T.border,
+        paddingHorizontal: space[5], paddingVertical: space[3],
+        borderBottomWidth: 1, borderBottomColor: T.hairline,
       }}>
-        <Text style={{ fontSize: 20, fontWeight: '700', color: T.text, letterSpacing: -0.4 }}>
-          Log Expense
+        <Text style={[type.heading, { color: T.text }]}>
+          Log expense
         </Text>
         <Pressable
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
           style={{
-            width: 32, height: 32, borderRadius: 16, backgroundColor: T.raised,
+            width: 36, height: 36, borderRadius: radius.pill, backgroundColor: T.track,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Icon name="x" size={16} color={T.muted}/>
+          <Icon name="x" size={16} color={T.text2}/>
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <Label>Category</Label>
-        <View style={{ flexDirection: 'row', backgroundColor: T.raised, borderRadius: 8, padding: 4, marginBottom: 16 }}>
-          {CATS.map(c => {
-            const sel = c.value === cat;
-            return (
-              <Pressable
-                key={c.value}
-                onPress={() => setCat(c.value)}
-                style={{
-                  flex: 1, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 6,
-                  alignItems: 'center', gap: 4,
-                  backgroundColor: sel ? T.surface : 'transparent',
-                }}
-              >
-                <Icon name={c.icon} size={20} color={sel ? T.primary : T.mutedLight}/>
-                <Text style={{ fontSize: 13, fontWeight: sel ? '700' : '500', color: sel ? T.text : T.muted }}>
-                  {c.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Label>Amount</Label>
-        <View style={{
-          flexDirection: 'row', alignItems: 'center',
-          borderWidth: 1.5, borderColor: T.accent, borderRadius: 8,
-          paddingHorizontal: 16, paddingVertical: 6, marginBottom: 16,
-        }}>
-          <Text style={{ fontSize: 22, fontWeight: '700', color: T.muted, marginRight: 10 }}>RM</Text>
-          <TextInput
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="decimal-pad"
-            placeholder="0.00"
-            placeholderTextColor={T.mutedLight}
-            style={{
-              flex: 1, fontSize: 32, fontWeight: '800', color: T.text,
-              letterSpacing: -1, fontFamily: MONO,
-            }}
+      <ScrollView contentContainerStyle={{ padding: space[5], gap: space[5] }}>
+        <FormField label="Category">
+          <Segmented
+            block
+            options={CATS.map(c => ({ value: c.value, label: c.label }))}
+            value={cat}
+            onChange={setCat}
           />
-        </View>
+        </FormField>
 
-        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
-          <View style={{ flex: 1 }}>
-            <Label>Date</Label>
-            <View style={{
-              paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: T.border,
-              borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: T.surface,
-            }}>
-              <Icon name="calendar" size={16} color={T.muted}/>
-              <Text style={{ fontSize: 15, fontWeight: '600', color: T.text }}>{todayLocal}</Text>
-            </View>
+        <FormField label="Amount">
+          <View style={{
+            flexDirection: 'row', alignItems: 'center',
+            backgroundColor: T.surfaceSunk, borderRadius: radius.md, borderWidth: 2,
+            borderColor: amountFocused ? T.ink : 'transparent',
+            paddingLeft: space[4],
+          }}>
+            <Text style={[type.title, { color: T.text2, marginRight: space[2] }]}>RM</Text>
+            <Input
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              onFocus={() => setAmountFocused(true)}
+              onBlur={() => setAmountFocused(false)}
+              style={[type.figure, TABULAR, {
+                flex: 1, height: 52, borderWidth: 0, backgroundColor: 'transparent',
+                paddingHorizontal: 0, color: T.text,
+              }]}
+            />
           </View>
-          <View style={{ flex: 1 }}>
-            <Label>Vehicle</Label>
-            <Pressable
-              onPress={() => setShowVehiclePicker(true)}
-              disabled={vehiclesLoading || !vehicles?.length}
-              style={{
-                paddingHorizontal: 14, paddingVertical: 12, backgroundColor: T.surface,
-                borderWidth: 1, borderColor: T.border,
-                borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8,
-              }}
-            >
-              <Icon name="car" size={16} color={T.muted}/>
-              <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: T.text }} numberOfLines={1}>
-                {vehiclesLoading
-                  ? 'Loading…'
-                  : selectedVehicle
-                    ? selectedVehicle.plateNumber
-                    : 'Pick vehicle'}
-              </Text>
-              <Icon name="chevDown" size={14} color={T.muted}/>
-            </Pressable>
+        </FormField>
+
+        <FormField label="Date" hint="Expenses are always logged for today.">
+          <View style={{
+            flexDirection: 'row', alignItems: 'center', gap: space[2],
+            minHeight: 44, paddingHorizontal: space[5], borderRadius: radius.pill,
+            backgroundColor: T.surfaceSunk,
+          }}>
+            <Icon name="calendar" size={18} color={T.text3}/>
+            <Text style={[type.body, { color: T.text }]}>{todayLocal}</Text>
           </View>
-        </View>
+        </FormField>
 
-        <Label>Receipt photo</Label>
-        <Pressable
-          onPress={showReceiptOptions}
-          style={{
-            borderWidth: receiptUri ? 0 : 2, borderStyle: 'dashed', borderColor: T.borderHard,
-            borderRadius: 10, paddingVertical: receiptUri ? 0 : 20, alignItems: 'center',
-            marginBottom: 16, overflow: 'hidden',
-          }}
-        >
-          {receiptUri ? (
-            <Image source={{ uri: receiptUri }} style={{ width: '100%', height: 200 }} resizeMode="cover"/>
-          ) : (
-            <>
-              <View style={{
-                width: 44, height: 44, borderRadius: 22, backgroundColor: T.raised,
-                alignItems: 'center', justifyContent: 'center', marginBottom: 8,
-              }}>
-                <Icon name="camera" size={22} color={T.muted}/>
-              </View>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: T.text }}>Take photo or upload</Text>
-              <Text style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>JPG or PNG, up to 10 MB</Text>
-            </>
-          )}
-        </Pressable>
+        <FormField label="Vehicle">
+          <Pressable
+            onPress={() => setShowVehiclePicker(true)}
+            disabled={vehiclesLoading || !vehicles?.length}
+            accessibilityRole="button"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: space[2],
+              minHeight: 44, paddingHorizontal: space[5], borderRadius: radius.pill,
+              backgroundColor: T.surface, borderWidth: 1, borderColor: T.controlRing,
+              boxShadow: T.shadow1,
+            }}
+          >
+            <Icon name="car" size={18} color={T.text3}/>
+            <Text style={[type.body, { flex: 1, color: T.text }]} numberOfLines={1}>
+              {vehiclesLoading
+                ? 'Loading…'
+                : selectedVehicle
+                  ? selectedVehicle.plateNumber
+                  : 'Pick vehicle'}
+            </Text>
+            <Icon name="chevDown" size={18} color={T.text3}/>
+          </Pressable>
+        </FormField>
 
-        <Label>Notes (optional)</Label>
-        <TextInput
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="e.g. Plus highway, KL–Seremban"
-          placeholderTextColor={T.mutedLight}
-          style={{
-            paddingHorizontal: 14, paddingVertical: 12, borderRadius: 8,
-            borderWidth: 1, borderColor: T.border,
-            fontSize: 14, color: T.text, backgroundColor: T.surface,
-          }}
-        />
+        <FormField label="Receipt photo">
+          <Pressable
+            onPress={showReceiptOptions}
+            accessibilityRole="button"
+            style={{
+              borderRadius: radius.md, overflow: 'hidden', alignItems: 'center',
+              ...(receiptUri
+                ? {}
+                : {
+                    backgroundColor: T.surfaceSunk, borderWidth: 2, borderColor: T.controlRing,
+                    paddingVertical: space[5], paddingHorizontal: space[4], gap: space[1],
+                  }),
+            }}
+          >
+            {receiptUri ? (
+              <Image source={{ uri: receiptUri }} style={{ width: '100%', height: 200 }} resizeMode="cover"/>
+            ) : (
+              <>
+                <View style={{
+                  width: 44, height: 44, borderRadius: radius.pill, backgroundColor: T.surface,
+                  alignItems: 'center', justifyContent: 'center', marginBottom: space[1],
+                }}>
+                  <Icon name="camera" size={22} color={T.text2}/>
+                </View>
+                <Text style={[type.body, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text }]}>Take photo or upload</Text>
+                <Text style={[type.caption, { color: T.text2 }]}>JPG or PNG, up to 10 MB</Text>
+              </>
+            )}
+          </Pressable>
+        </FormField>
+
+        <FormField label="Notes (optional)">
+          <Input
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="e.g. Plus highway, KL–Seremban"
+          />
+        </FormField>
       </ScrollView>
 
       <View style={{
-        flexDirection: 'row', gap: 10,
-        paddingHorizontal: 20, paddingVertical: 14, paddingBottom: 30,
-        borderTopWidth: 1, borderTopColor: T.border, backgroundColor: T.surface,
+        flexDirection: 'row', gap: space[3],
+        paddingHorizontal: space[5], paddingVertical: space[4], paddingBottom: 30,
+        borderTopWidth: 1, borderTopColor: T.hairline, backgroundColor: T.surface,
       }}>
         <Button variant="secondary" style={{ flex: 1 }} onPress={() => router.back()} >
           Cancel
         </Button>
         <Button style={{ flex: 2 }} onPress={onSave}>
-          {logExpense.isPending ? 'Saving…' : 'Save Expense'}
+          {logExpense.isPending ? 'Saving…' : 'Save expense'}
         </Button>
       </View>
 
-      {showVehiclePicker && (
-        <VehicleSheet
-          vehicles={vehicles ?? []}
-          selectedId={vehicleId}
-          onPick={id => { setVehicleId(id); setShowVehiclePicker(false); }}
-          onClose={() => setShowVehiclePicker(false)}
-        />
-      )}
+      <VehicleSheet
+        visible={showVehiclePicker}
+        vehicles={vehicles ?? []}
+        selectedId={vehicleId}
+        onPick={id => { setVehicleId(id); setShowVehiclePicker(false); }}
+        onClose={() => setShowVehiclePicker(false)}
+      />
     </SafeAreaView>
   );
 }
 
-function Label({ children }: { children: React.ReactNode }) {
-  const T = useTokens();
-  return (
-    <Text style={{
-      fontSize: 12, fontWeight: '700', color: T.muted,
-      letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8,
-    }}>
-      {children}
-    </Text>
-  );
-}
-
-// Lightweight bottom-sheet replacement using absolute positioning. Avoids
-// pulling in another nav layer just to pick a vehicle.
 function VehicleSheet({
-  vehicles, selectedId, onPick, onClose,
+  visible, vehicles, selectedId, onPick, onClose,
 }: {
-  vehicles: Array<{ id: string; plateNumber: string; type: string; model: string | null; isDefault: boolean }>;
+  visible: boolean;
+  vehicles: { id: string; plateNumber: string; type: string; model: string | null; isDefault: boolean }[];
   selectedId: string | null;
   onPick: (id: string) => void;
   onClose: () => void;
 }) {
   const T = useTokens();
   return (
-    <View style={{ position: 'absolute', inset: 0 }}>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: T.scrim }}/>
-      <View style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0,
-        backgroundColor: T.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20,
-        paddingBottom: 30, maxHeight: '70%',
-      }}>
-        <View style={{ alignItems: 'center', paddingTop: 10 }}>
-          <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: T.border }}/>
+    <Sheet visible={visible} onClose={onClose} title="Pick vehicle">
+      {vehicles.length === 0 ? (
+        <View style={{ padding: space[5], alignItems: 'center' }}>
+          <ActivityIndicator color={T.text2}/>
+          <Text style={[type.label, { marginTop: space[3], color: T.text2 }]}>
+            No active vehicles in your org.
+          </Text>
         </View>
-        <Text style={{ fontSize: 18, fontWeight: '700', color: T.text, padding: 16 }}>
-          Pick vehicle
-        </Text>
-        {vehicles.length === 0 ? (
-          <View style={{ padding: 20, alignItems: 'center' }}>
-            <ActivityIndicator color={T.muted}/>
-            <Text style={{ marginTop: 10, fontSize: 13, color: T.muted }}>
-              No active vehicles in your org.
-            </Text>
-          </View>
-        ) : (
-          <ScrollView>
-            {vehicles.map(v => {
-              const sel = v.id === selectedId;
-              return (
-                <Pressable
-                  key={v.id}
-                  onPress={() => onPick(v.id)}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center',
-                    paddingHorizontal: 16, paddingVertical: 14,
-                    borderTopWidth: 1, borderTopColor: T.border,
-                    backgroundColor: sel ? T.raised : T.surface,
-                  }}
-                >
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={{ fontSize: 15, fontWeight: '700', color: T.text }}>
-                        {v.plateNumber}
-                      </Text>
-                      {v.isDefault && (
-                        <Text style={{
-                          fontSize: 10, fontWeight: '700', color: T.primary,
-                          letterSpacing: 0.5, textTransform: 'uppercase',
-                          backgroundColor: T.accentSoft, paddingHorizontal: 6, paddingVertical: 2,
-                          borderRadius: 4,
-                        }}>
-                          Default
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>
-                      {v.type}{v.model ? ` · ${v.model}` : ''}
+      ) : (
+        <ScrollView style={{ maxHeight: 360 }}>
+          {vehicles.map(v => {
+            const sel = v.id === selectedId;
+            return (
+              <Pressable
+                key={v.id}
+                onPress={() => onPick(v.id)}
+                accessibilityRole="button"
+                style={{
+                  flexDirection: 'row', alignItems: 'center',
+                  paddingHorizontal: space[2], paddingVertical: space[3], minHeight: 60,
+                  borderRadius: radius.sm,
+                  backgroundColor: sel ? T.surfaceSunk : 'transparent',
+                }}
+              >
+                <View style={{ flex: 1, gap: space[1] }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+                    <Text style={[type.title, { color: T.text }]}>
+                      {v.plateNumber}
                     </Text>
+                    {v.isDefault && <Pill tone="neutral">Default</Pill>}
                   </View>
-                  {sel && <Icon name="check" size={18} color={T.primary}/>}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        )}
-      </View>
-    </View>
+                  <Text style={[type.caption, { color: T.text2 }]}>
+                    {v.type}{v.model ? `, ${v.model}` : ''}
+                  </Text>
+                </View>
+                {sel && <Icon name="check" size={20} stroke={2.6} color={T.text}/>}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+    </Sheet>
   );
 }
