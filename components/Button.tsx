@@ -3,7 +3,7 @@ import { Pressable, Text, View, ViewStyle, StyleProp } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Icon, IconName } from './Icon';
 import { useTokens } from '../theme/ThemeProvider';
-import { EASE_OUT, motionFor, radius } from '../theme/tokens';
+import { EASE_OUT, motionFor, radius, fontFor } from '../theme/tokens';
 
 /** `green` and `ghost` are today's names: they now draw as `primary` and `quiet`. */
 type Variant = 'primary' | 'secondary' | 'danger' | 'quiet' | 'green' | 'ghost';
@@ -74,7 +74,7 @@ export function Button({
       >
         {icon && <Icon name={icon} size={18} color={look.fg} testID={testID ? `${testID}-icon` : undefined}/>}
         {typeof children === 'string'
-          ? <Text style={{ color: look.fg, fontSize: lg ? 16 : 14, fontWeight: '600', letterSpacing: -0.14 }}>{children}</Text>
+          ? <Text style={{ color: look.fg, fontSize: lg ? 16 : 14, fontFamily: fontFor('600'), fontWeight: '600', letterSpacing: -0.14 }}>{children}</Text>
           : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>{children}</View>}
         {trailingIcon && <Icon name={trailingIcon} size={18} color={look.fg} testID={testID ? `${testID}-trailing-icon` : undefined}/>}
       </Animated.View>

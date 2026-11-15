@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { Icon, IconName } from './Icon';
 import { useOnFeature } from './FeatureCard';
 import { useTokens } from '../theme/ThemeProvider';
-import { radius } from '../theme/tokens';
+import { radius, fontFor } from '../theme/tokens';
 import type { Tone } from '../lib/statusTone';
 
 /** The tint and text colour of a tone, on the page or on the dark feature card. */
@@ -42,7 +42,7 @@ export function PillShell({ bg, fg, icon, struck, children, testID }: ShellProps
       {icon ? <View testID={testID ? `${testID}-icon` : undefined}><Icon name={icon} size={13} stroke={2.6} color={fg}/></View> : null}
       <Text
         style={{
-          color: fg, fontSize: 12, fontWeight: '600', lineHeight: 16,
+          color: fg, fontSize: 12, fontFamily: fontFor('600'), fontWeight: '600', lineHeight: 16,
           textDecorationLine: struck ? 'line-through' : 'none',
         }}
       >

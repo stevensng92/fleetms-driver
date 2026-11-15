@@ -2,7 +2,7 @@ import React from 'react';
 import { Text, View, ViewStyle, StyleProp } from 'react-native';
 import { Icon, IconName } from './Icon';
 import { useTokens } from '../theme/ThemeProvider';
-import { radius } from '../theme/tokens';
+import { radius, fontFor } from '../theme/tokens';
 import type { Tone } from '../lib/statusTone';
 
 const DEFAULT_ICON: Record<Tone, IconName> = {
@@ -46,7 +46,7 @@ export function Band({ tone, children, icon, action, style, testID }: Props) {
       </View>
       <View style={{ flex: 1 }}>
         {typeof children === 'string'
-          ? <Text style={{ color: fg, fontSize: 14, fontWeight: '500', lineHeight: 20 }}>{children}</Text>
+          ? <Text style={{ color: fg, fontSize: 14, fontFamily: fontFor('500'), fontWeight: '500', lineHeight: 20 }}>{children}</Text>
           : children}
       </View>
       {action ? <View testID={testID ? `${testID}-action` : undefined}>{action}</View> : null}

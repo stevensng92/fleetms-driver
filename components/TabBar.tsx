@@ -4,7 +4,7 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, IconName } from './Icon';
 import { useTokens } from '../theme/ThemeProvider';
-import { radius, space } from '../theme/tokens';
+import { radius, space, fontFor } from '../theme/tokens';
 
 export type TabItem = {
   key: string;
@@ -55,7 +55,7 @@ export function TabBar({ tabs }: { tabs: TabItem[] }) {
                 />
               ) : null}
             </View>
-            {t.active ? <Text style={{ fontSize: 14, fontWeight: '600', color: T.onInk }}>{t.label}</Text> : null}
+            {t.active ? <Text style={{ fontSize: 14, fontFamily: fontFor('600'), fontWeight: '600', color: T.onInk }}>{t.label}</Text> : null}
           </Pressable>
         ))}
       </View>

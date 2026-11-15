@@ -1,7 +1,7 @@
 import React, { forwardRef, useState } from 'react';
 import { TextInput, TextInputProps } from 'react-native';
 import { useTokens } from '../theme/ThemeProvider';
-import { radius, space } from '../theme/tokens';
+import { fontFor, radius, space } from '../theme/tokens';
 
 type Props = TextInputProps & { invalid?: boolean };
 
@@ -21,6 +21,7 @@ export const Input = forwardRef<TextInput, Props>(function Input({ invalid, styl
       style={[{
         backgroundColor: T.surfaceSunk,
         color: T.text,
+        fontFamily: fontFor('500'),
         fontSize: 16,
         borderRadius: radius.md,
         borderWidth: 2,

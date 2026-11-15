@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Icon } from './Icon';
 import { useTokens } from '../theme/ThemeProvider';
+import { fontFor } from '../theme/tokens';
 
 type Props = {
   title: string;
@@ -37,13 +38,13 @@ export function AppHeader({ title, subtitle, onBack, right }: Props) {
       )}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{
-          fontSize: 28, fontWeight: '700', color: T.text,
+          fontSize: 28, fontFamily: fontFor('700'), fontWeight: '700', color: T.text,
           letterSpacing: -0.56, lineHeight: 32,
         }}>
           {title}
         </Text>
         {subtitle && (
-          <Text style={{ marginTop: 4, fontSize: 14, color: T.text2, fontWeight: '500' }}>
+          <Text style={{ marginTop: 4, fontSize: 14, color: T.text2, fontFamily: fontFor('500'), fontWeight: '500' }}>
             {subtitle}
           </Text>
         )}
@@ -64,7 +65,7 @@ export function SectionLabel({ children, right }: { children: React.ReactNode; r
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingHorizontal: 20, paddingTop: 4, paddingBottom: 10,
     }}>
-      <Text style={{ fontSize: 16, fontWeight: '600', color: T.text }}>
+      <Text style={{ fontSize: 16, fontFamily: fontFor('600'), fontWeight: '600', color: T.text }}>
         {children}
       </Text>
       {right}
