@@ -93,6 +93,10 @@ the dispatcher repo made for ESLint in v0.27.3.2 — it hit this exact defect on
 tool over (2130 phantom lint errors, all from worktrees) and the reasoning
 transfers unchanged.
 
+Both patterns are anchored to `<rootDir>` since 2026-11-16. Unanchored, they
+also matched the worktree's OWN path, so `npm test` run from inside a worktree
+found no tests at all. The main checkout still skips every worktree copy.
+
 ### Fix Earnings row navigation (uuid vs job_number)
 **Completed:** v0.7.0 (2026-07-31)
 

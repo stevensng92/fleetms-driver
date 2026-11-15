@@ -2,6 +2,29 @@
 
 All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **A job shows the same status on every screen.** A job the dispatcher
+  cancelled read "Cancelled" on its card but "Voided" on its job screen. It
+  now reads "Cancelled" everywhere, and a job the driver turned down reads
+  "Rejected" everywhere. Rejected looks like Cancelled (grey, crossed out) but
+  keeps its own word. "Voided" is gone from jobs.
+- **The trip screen no longer shows "Job is voided".** When a job is no longer
+  In progress, the trip screen shows its real status and a "Back to jobs"
+  button.
+- **A job with a new dispatcher status stays visible.** The driver sees the
+  dispatcher's own word for it, the job stays in the main list (and in Overdue
+  once its day has passed), and it offers only "Back to jobs". Each new word is
+  reported to Sentry once.
+
+### Changed
+
+- The buttons a job offers (Accept and Reject, On my way, Open active job, Back
+  to jobs) follow one rule on the Jobs list, the job screen and the trip
+  screen.
+
 ## [Hotfix] - 2026-09-24
 
 No version bump. JS-only, ships as an EAS Update on the `preview` channel to
