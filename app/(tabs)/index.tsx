@@ -3,9 +3,13 @@ import { View, Text, Pressable, ActivityIndicator, RefreshControl, ScrollView, A
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, SectionLabel } from '../../components/AppHeader';
-import { JobCard } from '../../components/JobCard';
+import { JobCard, type Job } from '../../components/JobCard';
+import { Band } from '../../components/Band';
+import { Button } from '../../components/Button';
+import { Card } from '../../components/Card';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
+import { fontFor, space, type } from '../../theme/tokens';
 import { formatDayLong } from '../../lib/timeFormat';
 import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
@@ -60,17 +64,48 @@ export default function JobsToday() {
   // Mock RM total — replace with real earnings query once it exists.
   const sumRM = today.length * 80;
 
+  // The group heading's count, on the right of the title.
+  const count = { ...type.label, fontFamily: fontFor('600'), fontWeight: '600', color: T.text2 } as const;
+
+  // One job card. An in-progress job opens the trip screen (Upcoming has
+  // always opened the job screen, so it passes `tripFromHere: false`).
+  const card = (j: Job, opts: { dim?: boolean; overdue?: boolean; tripFromHere?: boolean } = {}) => {
+    const open = opts.tripFromHere === false || j.status !== 'progress'
+      ? `/jobs/${j.id}`
+      : { pathname: '/jobs/active' as const, params: { id: j.id } };
+    return (
+      <JobCard
+        key={j.id}
+        job={j}
+        dim={opts.dim}
+        overdue={opts.overdue}
+        onPress={() => router.push(open as Parameters<typeof router.push>[0])}
+        onView={() => router.push(`/jobs/${j.id}`)}
+        onAccept={async () => {
+          if (!j.assignmentId) return;
+          try { await confirmAsg.mutateAsync(j.assignmentId); }
+          catch (e: any) { Alert.alert('Could not accept', e?.message ?? 'Unknown error'); }
+        }}
+        onReject={async () => {
+          if (!j.assignmentId) return;
+          try { await rejectAsg.mutateAsync({ assignmentId: j.assignmentId }); }
+          catch (e: any) { Alert.alert('Could not reject', e?.message ?? 'Unknown error'); }
+        }}
+      />
+    );
+  };
+
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: T.page }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: T.ground }}>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: space[6] }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={() => refetch()}
-            tintColor={T.muted}
+            tintColor={T.text2}
           />
         }
       >
@@ -92,146 +127,58 @@ export default function JobsToday() {
         {!isLoading && !isError && overdue.length > 0 && (
           <>
             <SectionLabel
-              right={<Text style={{ fontSize: 12, color: T.red, fontWeight: '700' }}>
+              right={<Text style={[count, { color: T.redText }]}>
                 {overdue.length} {overdue.length === 1 ? 'job' : 'jobs'}
               </Text>}
             >Overdue</SectionLabel>
-            <Text style={{
-              paddingHorizontal: 20, marginTop: -6, marginBottom: 10,
-              fontSize: 12.5, color: T.muted, lineHeight: 17,
-            }}>
+            <Text style={[type.label, {
+              paddingHorizontal: space[5], marginTop: -6, marginBottom: 10, color: T.text2,
+            }]}>
               Pickup already passed on a previous day — not for today. Accept, reject, or mark done to clear it.
             </Text>
-            {overdue.map(j => (
-              <JobCard
-                key={j.id}
-                job={j}
-                overdue
-                onPress={() => router.push(
-                  j.status === 'progress'
-                    ? { pathname: '/jobs/active', params: { id: j.id } }
-                    : `/jobs/${j.id}`,
-                )}
-                onView={() => router.push(`/jobs/${j.id}`)}
-                onAccept={async () => {
-                  if (!j.assignmentId) return;
-                  try { await confirmAsg.mutateAsync(j.assignmentId); }
-                  catch (e: any) { Alert.alert('Could not accept', e?.message ?? 'Unknown error'); }
-                }}
-                onReject={async () => {
-                  if (!j.assignmentId) return;
-                  try { await rejectAsg.mutateAsync({ assignmentId: j.assignmentId }); }
-                  catch (e: any) { Alert.alert('Could not reject', e?.message ?? 'Unknown error'); }
-                }}
-              />
-            ))}
+            {overdue.map(j => card(j, { overdue: true }))}
           </>
         )}
 
         {!isLoading && !isError && today.length > 0 && (
           <>
             <SectionLabel
-              right={<Text style={{ fontSize: 12, color: T.muted, fontWeight: '600' }}>
+              right={<Text style={count}>
                 {today.length} {today.length === 1 ? 'job' : 'jobs'} · RM {sumRM}
               </Text>}
             >Today</SectionLabel>
-            {today.map(j => (
-              <JobCard
-                key={j.id}
-                job={j}
-                dim={j.status === 'done' || j.status === 'voided'}
-                onPress={() => router.push(
-                  j.status === 'progress'
-                    ? { pathname: '/jobs/active', params: { id: j.id } }
-                    : `/jobs/${j.id}`,
-                )}
-                onView={() => router.push(`/jobs/${j.id}`)}
-                onAccept={async () => {
-                  if (!j.assignmentId) return;
-                  try { await confirmAsg.mutateAsync(j.assignmentId); }
-                  catch (e: any) { Alert.alert('Could not accept', e?.message ?? 'Unknown error'); }
-                }}
-                onReject={async () => {
-                  if (!j.assignmentId) return;
-                  try { await rejectAsg.mutateAsync({ assignmentId: j.assignmentId }); }
-                  catch (e: any) { Alert.alert('Could not reject', e?.message ?? 'Unknown error'); }
-                }}
-              />
-            ))}
+            {today.map(j => card(j, { dim: j.status === 'done' || j.status === 'voided' }))}
           </>
         )}
 
         {!isLoading && !isError && tomorrow.length > 0 && (
           <>
-            <View style={{ height: 8 }}/>
+            <View style={{ height: space[2] }}/>
             <SectionLabel
-              right={<Text style={{ fontSize: 12, color: T.muted, fontWeight: '600' }}>
+              right={<Text style={count}>
                 {tomorrow.length} {tomorrow.length === 1 ? 'job' : 'jobs'}
               </Text>}
             >Tomorrow</SectionLabel>
-            {tomorrow.map(j => (
-              <JobCard
-                key={j.id}
-                job={j}
-                dim
-                onPress={() => router.push(
-                  j.status === 'progress'
-                    ? { pathname: '/jobs/active', params: { id: j.id } }
-                    : `/jobs/${j.id}`,
-                )}
-                onView={() => router.push(`/jobs/${j.id}`)}
-                onAccept={async () => {
-                  if (!j.assignmentId) return;
-                  try { await confirmAsg.mutateAsync(j.assignmentId); }
-                  catch (e: any) { Alert.alert('Could not accept', e?.message ?? 'Unknown error'); }
-                }}
-                onReject={async () => {
-                  if (!j.assignmentId) return;
-                  try { await rejectAsg.mutateAsync({ assignmentId: j.assignmentId }); }
-                  catch (e: any) { Alert.alert('Could not reject', e?.message ?? 'Unknown error'); }
-                }}
-              />
-            ))}
+            {tomorrow.map(j => card(j, { dim: true }))}
           </>
         )}
 
         {!isLoading && !isError && upcoming.length > 0 && (
           <>
-            <View style={{ height: 8 }}/>
+            <View style={{ height: space[2] }}/>
             <SectionLabel
-              right={<Text style={{ fontSize: 12, color: T.muted, fontWeight: '600' }}>
+              right={<Text style={count}>
                 {upcomingTotal} {upcomingTotal === 1 ? 'job' : 'jobs'}
               </Text>}
             >Upcoming</SectionLabel>
             {upcoming.map(group => (
               <React.Fragment key={group.dateKey}>
-                <View style={{
-                  paddingHorizontal: 20, paddingTop: 6, paddingBottom: 8,
-                }}>
-                  <Text style={{
-                    fontSize: 11, fontWeight: '700', color: T.mutedLight,
-                    letterSpacing: 0.4, textTransform: 'uppercase',
-                  }}>{group.label}</Text>
+                <View style={{ paddingHorizontal: space[5], paddingTop: 6, paddingBottom: space[2] }}>
+                  <Text style={[type.label, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text2 }]}>
+                    {group.label}
+                  </Text>
                 </View>
-                {group.jobs.map(j => (
-                  <JobCard
-                    key={j.id}
-                    job={j}
-                    dim
-                    onPress={() => router.push(`/jobs/${j.id}`)}
-                    onView={() => router.push(`/jobs/${j.id}`)}
-                    onAccept={async () => {
-                      if (!j.assignmentId) return;
-                      try { await confirmAsg.mutateAsync(j.assignmentId); }
-                      catch (e: any) { Alert.alert('Could not accept', e?.message ?? 'Unknown error'); }
-                    }}
-                    onReject={async () => {
-                      if (!j.assignmentId) return;
-                      try { await rejectAsg.mutateAsync({ assignmentId: j.assignmentId }); }
-                      catch (e: any) { Alert.alert('Could not reject', e?.message ?? 'Unknown error'); }
-                    }}
-                  />
-                ))}
+                {group.jobs.map(j => card(j, { dim: true, tripFromHere: false }))}
               </React.Fragment>
             ))}
           </>
@@ -244,25 +191,26 @@ export default function JobsToday() {
 function UpdateAvailableBanner({ onDismiss }: { onDismiss: () => void }) {
   const T = useTokens();
   return (
-    <View style={{
-      marginHorizontal: 16, marginBottom: 14,
-      backgroundColor: T.amberSoft, borderRadius: 10,
-      paddingVertical: 10, paddingHorizontal: 14,
-      flexDirection: 'row', alignItems: 'center', gap: 10,
-    }}>
-      <Text style={{ flex: 1, fontSize: 13, color: T.amberFg, lineHeight: 18 }}>
+    <Band
+      tone="amber"
+      icon="info"
+      style={{ marginHorizontal: space[4], marginBottom: space[4] }}
+      action={
+        <Pressable onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Dismiss" hitSlop={8} style={{ padding: 2 }}>
+          <Icon name="x" size={16} stroke={2.4} color={T.amberText}/>
+        </Pressable>
+      }
+    >
+      <Text style={[type.body, { color: T.amberText }]}>
         A newer version of FleetMS Driver is available.{' '}
         <Text
-          style={{ fontWeight: '700', textDecorationLine: 'underline' }}
+          style={{ fontFamily: fontFor('600'), fontWeight: '600', textDecorationLine: 'underline' }}
           onPress={() => { Linking.openURL(APP_DOWNLOAD_URL); }}
         >
           Update
         </Text>
       </Text>
-      <Pressable onPress={onDismiss} hitSlop={8} style={{ padding: 2 }}>
-        <Icon name="x" size={16} color={T.amberFg}/>
-      </Pressable>
-    </View>
+    </Band>
   );
 }
 
@@ -272,22 +220,23 @@ function BellButton() {
   return (
     <Pressable
       onPress={() => router.push('/notifications' as '/')}
-      // Icon-only — no fill, no border. The previous chrome (T.surface bg +
-      // T.border) sat awkwardly on top of T.page in light mode where surface
-      // and page are close-but-not-equal off-whites. Cleaner without it.
+      accessibilityRole="button"
+      accessibilityLabel="Notifications"
+      // The admin's sunk icon button: a quiet round well, no shadow.
       style={({ pressed }) => ({
-        width: 42, height: 42, borderRadius: 21,
+        width: 44, height: 44, borderRadius: 22,
+        backgroundColor: T.surfaceSunk,
         alignItems: 'center', justifyContent: 'center',
         opacity: pressed ? 0.6 : 1,
       })}
       hitSlop={8}
     >
-      <Icon name="bell" size={20} color={T.text}/>
+      <Icon name="bell" size={20} stroke={2.2} color={T.text}/>
       {unread > 0 && (
         <View style={{
-          position: 'absolute', top: 8, right: 9,
+          position: 'absolute', top: 9, right: 10,
           width: 10, height: 10, borderRadius: 5,
-          backgroundColor: T.red, borderWidth: 2, borderColor: T.page,
+          backgroundColor: T.danger, borderWidth: 2, borderColor: T.surfaceSunk,
         }}/>
       )}
     </Pressable>
@@ -298,8 +247,8 @@ function LoadingState() {
   const T = useTokens();
   return (
     <View style={{ paddingVertical: 60, alignItems: 'center' }}>
-      <ActivityIndicator color={T.muted}/>
-      <Text style={{ marginTop: 12, fontSize: 13, color: T.muted }}>Loading today's jobs…</Text>
+      <ActivityIndicator color={T.text2}/>
+      <Text style={[type.label, { marginTop: space[3], color: T.text2 }]}>Loading today's jobs…</Text>
     </View>
   );
 }
@@ -308,16 +257,13 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
   const T = useTokens();
   const sessionInfo = (globalThis as any).__FLEETMS_DEV_SESSION__;
   return (
-    <View style={{
-      marginHorizontal: 16, padding: 16, borderRadius: 12,
-      backgroundColor: T.redSoft, borderWidth: 1, borderColor: T.red,
-    }}>
-      <Text style={{ fontSize: 14, fontWeight: '700', color: T.redFg, marginBottom: 4 }}>
+    <Band tone="red" style={{ marginHorizontal: space[4] }}>
+      <Text style={[type.body, { fontFamily: fontFor('600'), fontWeight: '600', color: T.redText, marginBottom: 4 }]}>
         Couldn't load jobs
       </Text>
-      <Text style={{ fontSize: 13, color: T.redFg, lineHeight: 19 }}>{message}</Text>
+      <Text style={[type.body, { color: T.redText }]}>{message}</Text>
       {sessionInfo && sessionInfo.kind !== 'ok' && (
-        <Text style={{ fontSize: 12, color: T.muted, marginTop: 8 }}>
+        <Text style={[type.caption, { color: T.text2, marginTop: space[2] }]}>
           Auth status: {sessionInfo.kind}
           {sessionInfo.kind === 'error' ? ` — ${sessionInfo.message}` : ''}
           {sessionInfo.kind === 'no-config'
@@ -328,33 +274,27 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
             : ''}
         </Text>
       )}
-      <Pressable
-        onPress={onRetry}
-        style={{ marginTop: 12, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: T.red }}
-      >
-        <Text style={{ fontSize: 13, color: T.redFg, fontWeight: '600' }}>Retry</Text>
-      </Pressable>
-    </View>
+      <View style={{ marginTop: space[3], alignSelf: 'flex-start' }}>
+        <Button variant="secondary" onPress={onRetry}>Retry</Button>
+      </View>
+    </Band>
   );
 }
 
 function EmptyState() {
   const T = useTokens();
   return (
-    <View style={{ paddingHorizontal: 28, paddingVertical: 40, alignItems: 'center' }}>
-      <View style={{
-        width: 140, height: 140, borderRadius: 70,
-        backgroundColor: T.surface, borderWidth: 1, borderStyle: 'dashed', borderColor: T.borderHard,
-        alignItems: 'center', justifyContent: 'center', marginBottom: 18,
-      }}>
-        <Icon name="calendar" size={56} stroke={1.5} color={T.mutedLight}/>
-      </View>
-      <Text style={{ fontSize: 18, fontWeight: '700', color: T.text, marginBottom: 6 }}>
+    <Card style={{
+      marginHorizontal: space[4], paddingHorizontal: space[6], paddingVertical: space[8],
+      alignItems: 'center', gap: space[2],
+    }}>
+      <Icon name="calendarDays" size={32} stroke={1.8} color={T.text3}/>
+      <Text style={[type.heading, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text, marginTop: space[2], textAlign: 'center' }]}>
         No jobs scheduled today
       </Text>
-      <Text style={{ fontSize: 14, color: T.muted, textAlign: 'center', lineHeight: 21, maxWidth: 280 }}>
+      <Text style={[type.body, { color: T.text2, textAlign: 'center', maxWidth: 300 }]}>
         You're all clear. New jobs will appear here when dispatch assigns them.
       </Text>
-    </View>
+    </Card>
   );
 }

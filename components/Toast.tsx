@@ -4,7 +4,7 @@ import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, w
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from './Icon';
 import { useTokens } from '../theme/ThemeProvider';
-import { EASE_OUT, motionFor, radius, space } from '../theme/tokens';
+import { EASE_OUT, motionFor, radius, space, fontFor } from '../theme/tokens';
 import { enterFrame } from '../lib/overlayMotion';
 
 export type ToastTone = 'default' | 'success';
@@ -117,7 +117,7 @@ function ToastView({ toast, leaving }: { toast: ToastItem; leaving: boolean }) {
       {toast.tone === 'success' ? (
         <View testID="toast-check"><Icon name="check" size={16} stroke={2.4} color={T.onInk}/></View>
       ) : null}
-      <Text style={{ fontSize: 14, fontWeight: '600', color: T.onInk, flexShrink: 1 }}>{toast.text}</Text>
+      <Text style={{ fontSize: 14, fontFamily: fontFor('600'), fontWeight: '600', color: T.onInk, flexShrink: 1 }}>{toast.text}</Text>
     </Animated.View>
   );
 }

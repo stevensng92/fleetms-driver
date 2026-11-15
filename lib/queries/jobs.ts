@@ -28,8 +28,7 @@ function mapStatus(s: string): StatusKind {
   }
 }
 
-// "14:30 pm" — 24h digits with the am/pm marker behind them. See
-// lib/timeFormat.ts for why the format is shaped that way.
+// "14:30" — plain 24-hour digits (redesign change 4). See lib/timeFormat.ts.
 const timeOf = formatClock;
 
 // "Thu, 2 Jul" — only rendered on overdue cards, so a driver can see at a

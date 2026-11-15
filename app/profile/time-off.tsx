@@ -1,11 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar, DateData } from 'react-native-calendars';
 import { Button } from '../../components/Button';
 import { Icon } from '../../components/Icon';
+import { Band } from '../../components/Band';
+import { FormField } from '../../components/FormField';
+import { Input } from '../../components/Input';
 import { useTokens } from '../../theme/ThemeProvider';
+import { FONT, fontFor, radius, space, type } from '../../theme/tokens';
 import { useRequestTimeOff } from '../../lib/mutations/timeOff';
 import type { TimeOffReason } from '../../lib/queries/timeOff';
 import { formatDateKey, myDateKey, myStartOfDay } from '../../lib/timeFormat';
@@ -87,12 +91,12 @@ export default function TimeOff() {
       marks[key] = {
         startingDay: isStart,
         endingDay:   isEnd,
-        color:       T.primary,
-        textColor:   '#FFFFFF',
+        color:       T.ink,
+        textColor:   T.onInk,
       };
     }
     return marks;
-  }, [startDate, endDate, T.primary]);
+  }, [startDate, endDate, T.ink, T.onInk]);
 
   const days = startDate && endDate ? daysBetweenInclusive(startDate, endDate)
               : startDate ? 1 : 0;
@@ -114,42 +118,40 @@ export default function TimeOff() {
       {/* Header */}
       <View style={{
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 20, paddingVertical: 12,
-        borderBottomWidth: 1, borderBottomColor: T.border,
+        paddingHorizontal: space[5], paddingVertical: space[3],
+        borderBottomWidth: 1, borderBottomColor: T.hairline,
       }}>
-        <Text style={{ fontSize: 20, fontWeight: '700', color: T.text, letterSpacing: -0.4 }}>
-          Request Time Off
+        <Text style={[type.heading, { color: T.text }]}>
+          Request time off
         </Text>
         <Pressable
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
           style={{
-            width: 32, height: 32, borderRadius: 16, backgroundColor: T.raised,
+            width: 36, height: 36, borderRadius: radius.pill, backgroundColor: T.track,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Icon name="x" size={16} color={T.muted}/>
+          <Icon name="x" size={16} color={T.text2}/>
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
+      <ScrollView contentContainerStyle={{ padding: space[5], gap: space[4] }}>
         {/* Selected range summary */}
-        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+        <View style={{ flexDirection: 'row', gap: space[3] }}>
           {[
             ['Start date', startDate ? formatDate(startDate) : '—'],
             ['End date',   endDate ? formatDate(endDate) : (startDate ? '(tap a later day)' : '—')],
           ].map(([k, v]) => (
-            <View key={k} style={{ flex: 1 }}>
-              <Text style={{
-                fontSize: 12, fontWeight: '700', color: T.muted,
-                letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8,
-              }}>{k}</Text>
-              <View style={{
-                paddingHorizontal: 14, paddingVertical: 12,
-                borderWidth: 1, borderColor: T.border, borderRadius: 8,
-                flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: T.surface,
-              }}>
-                <Icon name="calendar" size={16} color={T.muted}/>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: T.text }}>{v}</Text>
+            <View key={k} style={{
+              flex: 1, gap: space[1], paddingVertical: space[3], paddingHorizontal: space[4],
+              borderRadius: radius.md, backgroundColor: T.surfaceSunk,
+            }}>
+              <Text style={[type.label, { color: T.text2 }]}>{k}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 24 }}>
+                <Icon name="calendar" size={16} color={T.text3}/>
+                <Text style={[type.body, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text }]}>{v}</Text>
               </View>
             </View>
           ))}
@@ -157,8 +159,8 @@ export default function TimeOff() {
 
         {/* Inline calendar */}
         <View style={{
-          borderWidth: 1, borderColor: T.border, borderRadius: 10, overflow: 'hidden',
-          marginBottom: 16,
+          borderRadius: radius.lg, overflow: 'hidden', backgroundColor: T.surface,
+          boxShadow: T.shadow1, padding: space[2],
         }}>
           <Calendar
             minDate={today}
@@ -170,10 +172,13 @@ export default function TimeOff() {
               calendarBackground:  T.surface,
               dayTextColor:        T.text,
               monthTextColor:      T.text,
-              textSectionTitleColor: T.muted,
-              textDisabledColor:   T.mutedLight,
-              arrowColor:          T.primary,
-              todayTextColor:      T.primary,
+              textSectionTitleColor: T.text3,
+              textDisabledColor:   T.text3,
+              arrowColor:          T.ink,
+              todayTextColor:      T.ink,
+              textDayFontFamily:   FONT.medium,
+              textMonthFontFamily: FONT.bold,
+              textDayHeaderFontFamily: FONT.medium,
               textDayFontWeight:   '500',
               textMonthFontWeight: '700',
             }}
@@ -182,81 +187,57 @@ export default function TimeOff() {
 
         {/* Day count + assignment hint */}
         {days > 0 && (
-          <View style={{
-            paddingHorizontal: 14, paddingVertical: 10,
-            backgroundColor: T.amberSoft, borderWidth: 1, borderColor: T.amber,
-            borderRadius: 8, marginBottom: 16,
-            flexDirection: 'row', gap: 8, alignItems: 'flex-start',
-          }}>
-            <Icon name="bell" size={14} color={T.amber}/>
-            <Text style={{ flex: 1, fontSize: 12.5, color: T.amberFg, fontWeight: '500' }}>
-              {days} {days === 1 ? 'day' : 'days'} requested
-              {endDate ? ' · awaiting dispatcher approval.' : ' · tap a later date for a multi-day range.'}
-            </Text>
-          </View>
+          <Band tone="amber" icon="calendarDays">
+            {`${days} ${days === 1 ? 'day' : 'days'} requested${endDate ? ', awaiting dispatcher approval.' : ', tap a later date for a multi-day range.'}`}
+          </Band>
         )}
 
         {/* Reason */}
-        <Text style={{
-          fontSize: 12, fontWeight: '700', color: T.muted,
-          letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8,
-        }}>Reason</Text>
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-          {REASONS.map(r => {
-            const sel = r.key === reason;
-            return (
-              <Pressable
-                key={r.key}
-                onPress={() => setReason(r.key)}
-                style={{
-                  flex: 1, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 8,
-                  borderWidth: 1.5, borderColor: sel ? T.primary : T.border,
-                  backgroundColor: sel ? T.primary : T.surface, alignItems: 'center',
-                }}
-              >
-                <Text style={{
-                  fontSize: 14, fontWeight: '700',
-                  color: sel ? T.primaryFg : T.text,
-                }}>{r.label}</Text>
-                <Text style={{
-                  fontSize: 11, marginTop: 2,
-                  color: sel ? T.primaryFg : T.muted, opacity: sel ? 0.85 : 1,
-                }}>{r.help}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <FormField label="Reason">
+          <View style={{ flexDirection: 'row', gap: space[2] }}>
+            {REASONS.map(r => {
+              const sel = r.key === reason;
+              return (
+                <Pressable
+                  key={r.key}
+                  onPress={() => setReason(r.key)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: sel }}
+                  style={{
+                    flex: 1, paddingVertical: space[3], paddingHorizontal: space[2], borderRadius: radius.md,
+                    borderWidth: 2, borderColor: sel ? T.ink : T.hairlineStrong,
+                    backgroundColor: T.surface, alignItems: 'center', gap: 2,
+                  }}
+                >
+                  <Text style={[type.body, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text }]}>{r.label}</Text>
+                  <Text style={[type.caption, { color: T.text2, textAlign: 'center' }]}>{r.help}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </FormField>
 
         {/* Notes */}
-        <Text style={{
-          fontSize: 12, fontWeight: '700', color: T.muted,
-          letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8,
-        }}>Notes (optional)</Text>
-        <TextInput
-          value={notes}
-          onChangeText={setNotes}
-          multiline
-          placeholder="e.g. Family wedding in Penang"
-          placeholderTextColor={T.mutedLight}
-          style={{
-            paddingHorizontal: 14, paddingVertical: 12, borderRadius: 8,
-            borderWidth: 1, borderColor: T.border,
-            fontSize: 14, color: T.text, backgroundColor: T.surface,
-            minHeight: 70, textAlignVertical: 'top',
-          }}
-        />
+        <FormField label="Notes (optional)">
+          <Input
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            placeholder="e.g. Family wedding in Penang"
+          />
+        </FormField>
       </ScrollView>
 
       {/* Footer */}
       <View style={{
-        flexDirection: 'row', gap: 10,
-        paddingHorizontal: 20, paddingVertical: 14, paddingBottom: 30,
-        borderTopWidth: 1, borderTopColor: T.border, backgroundColor: T.surface,
+        flexDirection: 'row', gap: space[3],
+        paddingHorizontal: space[5], paddingVertical: space[4], paddingBottom: 30,
+        borderTopWidth: 1, borderTopColor: T.hairline, backgroundColor: T.surface,
       }}>
         <Button variant="secondary" style={{ flex: 1 }} onPress={() => router.back()}>Cancel</Button>
         <View style={{ flex: 2, opacity: canSubmit ? 1 : 0.5 }}>
           <Button full onPress={onSubmit}>
-            {mutate.isPending ? 'Submitting…' : 'Submit Request'}
+            {mutate.isPending ? 'Submitting…' : 'Submit request'}
           </Button>
         </View>
       </View>

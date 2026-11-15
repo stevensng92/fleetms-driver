@@ -1,8 +1,15 @@
 import React from 'react';
-import { View, Text, Pressable, Linking, Alert } from 'react-native';
+import { View, Text, Alert, Linking } from 'react-native';
+import { Band } from './Band';
+import { Button } from './Button';
+import { Card } from './Card';
 import { Icon } from './Icon';
+import { Pill } from './Pill';
 import { useTokens } from '../theme/ThemeProvider';
+import { fontFor, space, type } from '../theme/tokens';
 import { isDialable, toDialString, type JobContact } from '../lib/jobContact';
+
+const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
 
 const VEHICLE_TYPE_LABEL: Record<string, string> = {
   sedan:           'Sedan',
@@ -25,8 +32,9 @@ const VEHICLE_TYPE_LABEL: Record<string, string> = {
 // other than the person named above it, say so rather than implying the
 // headline name will answer.
 //
-// Bottom row: assigned-vehicle line ("MPV · Alphard · WA 1234 B"). When no
-// vehicle is assigned, falls back to the requested vehicle type alone.
+// Bottom row: the assigned vehicle as separate items (type, model, plate) after
+// a car icon, not one dot-joined line. When no vehicle is assigned, falls back
+// to the requested vehicle type alone.
 export function ClientCard({
   clientName,
   passengerName,
@@ -65,94 +73,74 @@ export function ClientCard({
     );
   }
 
-  // Vehicle line composition: type · model · plate. Drop falsy pieces.
+  // Vehicle items: type, model, plate. Drop falsy pieces; the plate keeps the
+  // mono face. Index 2 is always the plate, so keep positions, not just values.
   const typeLabel = vehicleType ? (VEHICLE_TYPE_LABEL[vehicleType] ?? vehicleType) : null;
-  const vehicleParts = [typeLabel, vehicleModel, vehiclePlate].filter(Boolean) as string[];
-  const vehicleLine = vehicleParts.length > 0 ? vehicleParts.join(' · ') : 'No vehicle assigned';
+  const vehicleItems = [
+    typeLabel ? { text: typeLabel, mono: false } : null,
+    vehicleModel ? { text: vehicleModel, mono: false } : null,
+    vehiclePlate ? { text: vehiclePlate, mono: true } : null,
+  ].filter(Boolean) as { text: string; mono: boolean }[];
+
+  const strong = { fontFamily: fontFor('600'), fontWeight: '600' } as const;
 
   return (
-    <View style={{
-      backgroundColor: T.surface, borderRadius: 12, marginBottom: 18,
-      shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-      elevation: 2,
-    }}>
-      {/* Top section: identity + pax chip */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 }}>
-        <Text style={{
-          fontSize: 10.5, fontWeight: '800', color: T.muted,
-          letterSpacing: 0.7, textTransform: 'uppercase', marginBottom: 6,
-        }}>
-          {passengerName ? 'Passenger' : 'Client'}
-        </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: T.text, letterSpacing: -0.3 }} numberOfLines={1}>
-              {displayName}
-            </Text>
-            {dialable && (
-              <Pressable
-                onPress={call}
-                style={({ pressed }) => ({
-                  marginTop: 4,
-                  flexDirection: 'row', alignItems: 'center', gap: 6,
-                  alignSelf: 'flex-start',
-                  opacity: pressed ? 0.5 : 1,
-                })}
-                hitSlop={6}
-              >
-                <Icon name="phone" size={13} color={T.green}/>
-                {/* numberOfLines caps a stored value that is long or carries
-                    line breaks, so it cannot push the rest of the card around
-                    or trail content below where the driver stops reading. */}
-                <Text style={{ fontSize: 13, color: T.green, fontWeight: '600' }} numberOfLines={1}>
-                  {phone}
-                </Text>
-                {phoneNote && (
-                  <Text style={{ fontSize: 12, color: T.muted }} numberOfLines={1}>
-                    ({phoneNote})
-                  </Text>
-                )}
-              </Pressable>
-            )}
-            {/* A number IS on file but is not usable. Say so plainly rather
-                than rendering the stored text or showing nothing at all —
-                "no number" and "the number on file is junk" are different
-                problems and dispatch can only fix the second if it is told. */}
-            {phone && !dialable && (
-              <Text style={{ fontSize: 13, color: T.muted, marginTop: 4 }} numberOfLines={1}>
-                Number on file is not valid — contact dispatch
-              </Text>
-            )}
-          </View>
-          {pax != null && (
-            <View style={{
-              paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9999,
-              backgroundColor: T.raised,
-              flexDirection: 'row', alignItems: 'center', gap: 4,
-            }}>
-              <Icon name="users" size={12} color={T.muted}/>
-              <Text style={{ fontSize: 12.5, fontWeight: '700', color: T.text }}>
-                {pax} pax
-              </Text>
-            </View>
-          )}
+    <Card style={{ padding: space[5], gap: space[4] }}>
+      {/* Top section: identity + pax pill */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space[3] }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={[type.label, strong, { color: T.text2 }]}>
+            {passengerName ? 'Passenger' : 'Client'}
+          </Text>
+          <Text style={[type.heading, strong, { color: T.text }]} numberOfLines={1}>
+            {displayName}
+          </Text>
         </View>
+        {pax != null && <Pill tone="neutral" icon="users">{pax} pax</Pill>}
       </View>
 
-      {/* Bottom section: vehicle line */}
-      <View style={{
-        paddingHorizontal: 16, paddingVertical: 10,
-        borderTopWidth: 1, borderTopColor: T.border,
-        flexDirection: 'row', alignItems: 'center', gap: 8,
-      }}>
-        <Icon name="car" size={14} color={T.muted}/>
-        <Text style={{
-          flex: 1, fontSize: 13, fontWeight: '600', color: T.muted,
-          letterSpacing: 0.1,
-        }} numberOfLines={1}>
-          {vehicleLine}
+      {dialable && (
+        <Button variant="secondary" full icon="phone" onPress={call}>
+          {/* numberOfLines caps a stored value that is long or carries line
+              breaks, so it cannot push the rest of the card around or trail
+              content below where the driver stops reading. */}
+          <Text style={[type.body, strong, { color: T.text, flexShrink: 1 }]} numberOfLines={1}>
+            Call <Text>{phone}</Text>
+          </Text>
+        </Button>
+      )}
+      {dialable && phoneNote && (
+        <Text style={[type.label, { color: T.text2 }]} numberOfLines={1}>
+          ({phoneNote})
         </Text>
+      )}
+      {/* A number IS on file but is not usable. Say so plainly rather
+          than rendering the stored text or showing nothing at all —
+          "no number" and "the number on file is junk" are different
+          problems and dispatch can only fix the second if it is told. */}
+      {phone && !dialable && (
+        <Band tone="amber">Number on file is not valid — contact dispatch</Band>
+      )}
+
+      {/* Bottom section: the vehicle, one item per fact */}
+      <View style={{
+        paddingTop: space[3],
+        borderTopWidth: 1, borderTopColor: T.hairline,
+        flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: space[3], rowGap: space[1],
+      }}>
+        <Icon name="car" size={16} color={T.text3}/>
+        {vehicleItems.length > 0 ? vehicleItems.map((v, i) => (
+          <Text
+            key={i}
+            style={[type.body, v.mono ? { fontFamily: MONO, fontWeight: '600' } : null, { color: T.text }]}
+            numberOfLines={1}
+          >
+            {v.text}
+          </Text>
+        )) : (
+          <Text style={[type.body, { color: T.text2 }]}>No vehicle assigned</Text>
+        )}
       </View>
-    </View>
+    </Card>
   );
 }

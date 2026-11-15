@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, NativeSyntheticEvent, TextLayoutEventData } from 'react-native';
+import { Band } from './Band';
 import { Icon } from './Icon';
 import { useTokens } from '../theme/ThemeProvider';
-import { SectionLabel } from './AppHeader';
+import { fontFor, space, type } from '../theme/tokens';
 
-// Amber instruction card. Sits below the client card on both Job Detail and
+// Amber instruction band. Sits below the client card on both Job Detail and
 // Active Job. Truncates to 2 rows by default; if the text overflows, the
-// whole card becomes tappable to expand/collapse. The "Read more / less"
+// whole band becomes tappable to expand/collapse. The "Read more / Show less"
 // affordance only renders when truncation actually fires.
 //
 // Overflow detection trick: render a hidden mirror Text without numberOfLines
@@ -24,43 +25,37 @@ export function SpecialInstructionsCard({ text }: { text: string }) {
   }
 
   return (
-    <>
-      <SectionLabel>Special instructions</SectionLabel>
+    <View style={{ gap: space[2] }}>
+      <Text style={[type.title, { color: T.text }]}>Special instructions</Text>
       <Pressable
         onPress={overflows ? () => setExpanded(x => !x) : undefined}
-        style={({ pressed }) => ({
-          backgroundColor: T.amberSoft, borderColor: T.amber, borderWidth: 1,
-          borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 18,
-          opacity: overflows && pressed ? 0.8 : 1,
-        })}
+        style={({ pressed }) => ({ opacity: overflows && pressed ? 0.8 : 1 })}
       >
-        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
-          <Icon name="bell" size={18} color={T.amber}/>
-          <View style={{ flex: 1, minWidth: 0 }}>
+        <Band tone="amber" icon="info">
+          <View>
             <Text
               numberOfLines={expanded ? undefined : 2}
-              style={{ fontSize: 14, color: T.amberFg, fontWeight: '500', lineHeight: 20 }}
+              style={[type.body, { color: T.amberText }]}
             >
               {text}
             </Text>
             {overflows && (
-              <Text style={{
-                fontSize: 12, color: T.amberFg, fontWeight: '700',
-                marginTop: 6, letterSpacing: 0.3,
-              }}>
-                {expanded ? 'SHOW LESS ▴' : 'READ MORE ▾'}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1], marginTop: space[2] }}>
+                <Text style={[type.body, { fontFamily: fontFor('600'), fontWeight: '600', color: T.amberText }]}>
+                  {expanded ? 'Show less' : 'Read more'}
+                </Text>
+                <Icon name={expanded ? 'chevUp' : 'chevDown'} size={16} stroke={2.4} color={T.amberText}/>
+              </View>
             )}
             {/* Hidden mirror for unclamped line measurement. position: 'absolute'
                 + opacity 0 keeps it offscreen-equivalent and laid out at full
                 width so its lines.length reflects the true line count. */}
             <Text
               onTextLayout={measureMirror}
-              style={{
+              style={[type.body, {
                 position: 'absolute', left: 0, right: 0, top: 0,
-                fontSize: 14, fontWeight: '500', lineHeight: 20,
                 opacity: 0, color: 'transparent',
-              }}
+              }]}
               pointerEvents="none"
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
@@ -68,8 +63,8 @@ export function SpecialInstructionsCard({ text }: { text: string }) {
               {text}
             </Text>
           </View>
-        </View>
+        </Band>
       </Pressable>
-    </>
+    </View>
   );
 }

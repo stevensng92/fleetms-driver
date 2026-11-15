@@ -1,11 +1,16 @@
 import React from 'react';
-import { View, Text, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { AppFrame } from '../components/AppFrame';
 import { Logo, Wordmark } from '../components/Logo';
 import { Button } from '../components/Button';
+import { Card } from '../components/Card';
+import { Band } from '../components/Band';
+import { FormField } from '../components/FormField';
+import { Input } from '../components/Input';
 import { useTokens } from '../theme/ThemeProvider';
+import { TABULAR, fontFor, space, type } from '../theme/tokens';
 import { completeDriverPinSetup, signOut } from '../lib/auth';
 
 const APP_VERSION = Constants.expoConfig?.version ?? '';
@@ -55,78 +60,57 @@ export default function SetPin() {
   }
 
   return (
-    <AppFrame bg={T.surface}>
-      <View style={{
-        flex: 1, paddingHorizontal: 28, paddingTop: 64, paddingBottom: 40,
-        justifyContent: 'space-between',
-      }}>
-        <View style={{ alignItems: 'center', marginTop: 40 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 18 }}>
-            <Logo size={56}/>
-            <Wordmark size={32}/>
+    <AppFrame>
+      <View style={{ flex: 1, justifyContent: 'space-between', paddingBottom: space[6] }}>
+        <View style={{ paddingHorizontal: space[6], paddingTop: space[6], gap: space[1] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            <Logo size={40}/>
+            <Wordmark size={20}/>
           </View>
-          <Text style={{
-            fontSize: 13, color: T.muted, fontWeight: '600',
-            letterSpacing: 2.4, textTransform: 'uppercase',
-          }}>Driver</Text>
+          <Text style={[type.body, { color: T.text2, paddingLeft: 40 + space[3] }]}>Driver</Text>
         </View>
 
-        <View>
-          <Text style={{
-            fontSize: 22, fontWeight: '700', color: T.text,
-            letterSpacing: -0.4, marginBottom: 6,
-          }}>{expired ? 'Temporary PIN expired' : 'Choose your PIN'}</Text>
-          <Text style={{ fontSize: 14, color: T.muted, marginBottom: 24, lineHeight: 20 }}>
-            {expired
-              ? 'Your temporary PIN is no longer valid. Ask your dispatcher to issue a new one, then sign in again.'
-              : 'You\'ll use this 6-digit PIN every time you sign in. Pick something only you know.'}
-          </Text>
+        <View style={{ paddingHorizontal: space[4], paddingVertical: space[5] }}>
+          <Card style={{ paddingVertical: space[6], paddingHorizontal: space[5], gap: space[5] }}>
+            <View style={{ gap: space[2] }}>
+              <Text style={[type.figure, { color: T.text }]}>
+                {expired ? 'Temporary PIN expired' : 'Choose your PIN'}
+              </Text>
+              <Text style={[type.body, { color: T.text2 }]}>
+                {expired
+                  ? 'Your temporary PIN is no longer valid. Ask your dispatcher to issue a new one, then sign in again.'
+                  : "You'll use this 6-digit PIN every time you sign in. Pick something only you know."}
+              </Text>
+            </View>
 
-          {!expired && (
-            <>
-              <Text style={{
-                fontSize: 12, fontWeight: '600', color: T.muted, marginBottom: 8,
-                letterSpacing: 0.3, textTransform: 'uppercase',
-              }}>New PIN</Text>
-              <PinInput value={pin} onChange={setPin} T={T} autoFocus/>
+            <View style={{ gap: space[4] }}>
+              {!expired && (
+                <>
+                  <FormField label="New PIN">
+                    <PinInput value={pin} onChange={setPin} autoFocus/>
+                  </FormField>
 
-              <View style={{ height: 16 }}/>
-
-              <Text style={{
-                fontSize: 12, fontWeight: '600', color: T.muted, marginBottom: 8,
-                letterSpacing: 0.3, textTransform: 'uppercase',
-              }}>Confirm PIN</Text>
-              <PinInput value={confirm} onChange={setConfirm} T={T}/>
-
-              {mismatch && (
-                <Text style={{ fontSize: 13, color: T.red, marginTop: 8 }}>
-                  PINs don&apos;t match.
-                </Text>
+                  <FormField label="Confirm PIN" error={mismatch ? "PINs don't match." : undefined}>
+                    <PinInput value={confirm} onChange={setConfirm} invalid={mismatch}/>
+                  </FormField>
+                </>
               )}
-            </>
-          )}
 
-          {error && (
-            <Text style={{ fontSize: 13, color: T.red, marginTop: 12 }}>
-              {error}
-            </Text>
-          )}
+              {error && <Band tone="red">{error}</Band>}
 
-          <View style={{ marginTop: 20 }}>
-            {expired ? (
-              <Button full onPress={onSignOut}>Sign out</Button>
-            ) : (
-              <View style={{ opacity: canSubmit ? 1 : 0.5 }}>
-                <Button full onPress={onSubmit}>
-                  {submitting ? <ActivityIndicator color="#fff"/> : 'Save PIN'}
+              {expired ? (
+                <Button full size="lg" onPress={onSignOut}>Sign out</Button>
+              ) : (
+                <Button full size="lg" disabled={!canSubmit} onPress={onSubmit}>
+                  {submitting ? <ActivityIndicator color={T.onInk}/> : 'Save PIN'}
                 </Button>
-              </View>
-            )}
-          </View>
+              )}
+            </View>
+          </Card>
         </View>
 
         <View style={{ alignItems: 'center' }}>
-          <Text style={{ fontSize: 11, color: T.mutedLight, letterSpacing: 0.4 }}>
+          <Text style={[type.label, { color: T.text3 }]}>
             v{APP_VERSION}
           </Text>
         </View>
@@ -135,32 +119,22 @@ export default function SetPin() {
   );
 }
 
-// Local PIN input — single 6-digit field with monospaced letter-spacing for
-// the dots/digits effect. Same shape on sign-in and set-pin so the user gets
-// the same muscle memory.
+// Local PIN input: single 6-digit field with letter-spacing for the dots/digits
+// effect. Same shape on sign-in and set-pin so the user gets the same muscle memory.
 function PinInput({
-  value, onChange, T, autoFocus,
-}: { value: string; onChange: (v: string) => void; T: ReturnType<typeof useTokens>; autoFocus?: boolean }) {
+  value, onChange, autoFocus, invalid,
+}: { value: string; onChange: (v: string) => void; autoFocus?: boolean; invalid?: boolean }) {
   return (
-    <View style={{
-      borderWidth: 1.5, borderColor: T.border, borderRadius: 8,
-      backgroundColor: T.surface,
-    }}>
-      <TextInput
-        value={value}
-        onChangeText={(t) => onChange(t.replace(/\D/g, '').slice(0, 6))}
-        keyboardType="number-pad"
-        placeholder="••••••"
-        placeholderTextColor={T.mutedLight}
-        maxLength={6}
-        secureTextEntry
-        autoFocus={autoFocus}
-        style={{
-          paddingHorizontal: 14, paddingVertical: 14,
-          fontSize: 22, fontWeight: '600', color: T.text,
-          letterSpacing: 12, textAlign: 'center',
-        }}
-      />
-    </View>
+    <Input
+      value={value}
+      onChangeText={(t) => onChange(t.replace(/\D/g, '').slice(0, 6))}
+      keyboardType="number-pad"
+      placeholder="••••••"
+      maxLength={6}
+      secureTextEntry
+      autoFocus={autoFocus}
+      invalid={invalid}
+      style={[TABULAR, { fontFamily: fontFor('600'), fontWeight: '600', letterSpacing: space[1], textAlign: 'center' }]}
+    />
   );
 }

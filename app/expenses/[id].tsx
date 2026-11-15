@@ -1,17 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, Image } from 'react-native';
+import { View, Text, ActivityIndicator, Image } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { AppFrame } from '../../components/AppFrame';
 import { AppHeader } from '../../components/AppHeader';
-import { Icon } from '../../components/Icon';
+import { Icon, IconName } from '../../components/Icon';
+import { Card } from '../../components/Card';
+import { Band } from '../../components/Band';
 import { useTokens } from '../../theme/ThemeProvider';
+import { fontFor, radius, space, TABULAR, type } from '../../theme/tokens';
 import { formatDateKey } from '../../lib/timeFormat';
 import { supabase } from '../../lib/supabase';
 import { getSignedReceiptUrl, type ExpenseCategory, type ExpenseStatus } from '../../lib/queries/expenses';
 
-const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
 const CAT_LABEL: Record<ExpenseCategory, string> = { fuel: 'Fuel', toll: 'Toll', other: 'Other' };
+const CAT_ICON: Record<ExpenseCategory, IconName> = { fuel: 'fuel', toll: 'toll', other: 'dots' };
 
 type ExpenseDetail = {
   id: string;
@@ -73,128 +76,101 @@ export default function Receipt() {
 
   if (isLoading || !e) {
     return (
-      <AppFrame bg={T.surface}>
+      <AppFrame bg={T.ground}>
         <AppHeader title="Receipt" onBack={() => router.back()}/>
         {isError ? (
-          <Text style={{ marginHorizontal: 20, color: T.red }}>
+          <Text style={[type.body, { marginHorizontal: space[5], color: T.redText }]}>
             {(error as Error)?.message ?? 'Couldn’t load expense'}
           </Text>
         ) : (
           <View style={{ paddingTop: 40, alignItems: 'center' }}>
-            <ActivityIndicator color={T.muted}/>
+            <ActivityIndicator color={T.text2}/>
           </View>
         )}
       </AppFrame>
     );
   }
 
-  // Format the DATE-column string directly — see the note in (tabs)/expenses.tsx:
+  // Format the DATE-column string directly: see the note in (tabs)/expenses.tsx.
   // new Date('2026-08-01') is UTC midnight and renders a day early west of UTC.
   const dateLabel = formatDateKey(e.expenseDate, { long: true });
 
   return (
-    <AppFrame bg={T.surface}>
+    <AppFrame bg={T.ground}>
       <AppHeader
-        title={`${CAT_LABEL[e.category]} Receipt`}
+        title={`${CAT_LABEL[e.category]} receipt`}
         subtitle={dateLabel}
         onBack={() => router.back()}
       />
 
-      <View style={{ paddingHorizontal: 20, paddingBottom: 16 }}>
+      <View style={{ paddingHorizontal: space[4], paddingBottom: space[4], gap: space[4] }}>
         {/* Receipt photo (or no-photo placeholder) */}
-        <View style={{
-          backgroundColor: T.surface, borderWidth: 1, borderColor: T.border,
-          borderRadius: 12, padding: 12,
-          shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-          elevation: 2,
-        }}>
+        <Card style={{ padding: space[4] }}>
           {e.receiptPath ? (
             signedUrl ? (
-              <Image source={{ uri: signedUrl }} style={{ width: '100%', height: 320, borderRadius: 6 }} resizeMode="cover"/>
+              <Image source={{ uri: signedUrl }} style={{ width: '100%', height: 320, borderRadius: radius.md }} resizeMode="cover"/>
             ) : (
               <View style={{ height: 320, alignItems: 'center', justifyContent: 'center' }}>
-                <ActivityIndicator color={T.muted}/>
-                <Text style={{ marginTop: 10, fontSize: 13, color: T.muted }}>Loading receipt…</Text>
+                <ActivityIndicator color={T.text2}/>
+                <Text style={[type.label, { marginTop: space[3], color: T.text2 }]}>Loading receipt…</Text>
               </View>
             )
           ) : (
             <View style={{
               height: 220, alignItems: 'center', justifyContent: 'center',
-              backgroundColor: T.raised, borderRadius: 6,
+              backgroundColor: T.surfaceSunk, borderRadius: radius.md,
             }}>
-              <Icon name="image" size={28} color={T.mutedLight}/>
-              <Text style={{ marginTop: 10, fontSize: 13, color: T.muted }}>No receipt photo</Text>
+              <Icon name="image" size={32} color={T.text3}/>
+              <Text style={[type.body, { marginTop: space[2], color: T.text2 }]}>No receipt photo</Text>
             </View>
           )}
-        </View>
+        </Card>
 
-        {/* Meta grid */}
-        <View style={{
-          backgroundColor: T.raised, borderRadius: 12, padding: 14, marginTop: 16,
-          flexDirection: 'row', flexWrap: 'wrap',
-        }}>
-          {[
-            ['Category', CAT_LABEL[e.category]],
-            ['Date',     dateLabel],
-            ['Amount',   `RM ${e.amount.toFixed(2)}`],
-            ['Vehicle',  e.vehiclePlate],
-          ].map(([k, v]) => (
-            <View key={k} style={{ width: '50%', paddingVertical: 6 }}>
-              <Text style={{
-                fontSize: 11, color: T.mutedLight, fontWeight: '700',
-                letterSpacing: 0.5, textTransform: 'uppercase',
-              }}>{k}</Text>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: T.text, marginTop: 3 }}>{v}</Text>
+        {/* Details */}
+        <Card style={{ padding: space[5], flexDirection: 'row', flexWrap: 'wrap', rowGap: space[4] }}>
+          {([
+            ['Category', CAT_LABEL[e.category], CAT_ICON[e.category]],
+            ['Date',     dateLabel, null],
+            ['Amount',   `RM ${e.amount.toFixed(2)}`, null],
+            ['Vehicle',  e.vehiclePlate, null],
+          ] as const).map(([k, v, icon]) => (
+            <View key={k} style={{ width: '50%', gap: space[1] }}>
+              <Text style={[type.label, { color: T.text2 }]}>{k}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+                {icon && <Icon name={icon} size={16} color={T.text2}/>}
+                <Text style={[type.title, TABULAR, { color: T.text }]}>{v}</Text>
+              </View>
             </View>
           ))}
           {e.notes && (
-            <View style={{ width: '100%', paddingTop: 6 }}>
-              <Text style={{
-                fontSize: 11, color: T.mutedLight, fontWeight: '700',
-                letterSpacing: 0.5, textTransform: 'uppercase',
-              }}>Notes</Text>
-              <Text style={{ fontSize: 14, color: T.text, marginTop: 3, lineHeight: 20 }}>
-                {e.notes}
-              </Text>
+            <View style={{ width: '100%', gap: space[1] }}>
+              <Text style={[type.label, { color: T.text2 }]}>Notes</Text>
+              <Text style={[type.body, { color: T.text }]}>{e.notes}</Text>
             </View>
           )}
-        </View>
+        </Card>
 
         {e.voidedAt ? (
-          <View style={{
-            marginTop: 16, padding: 12, borderRadius: 10,
-            backgroundColor: T.redSoft, borderWidth: 1, borderColor: T.red,
-          }}>
-            <Text style={{ fontSize: 13, color: T.redFg, fontWeight: '700' }}>VOIDED</Text>
-            <Text style={{ fontSize: 12, color: T.redFg, marginTop: 4 }}>
-              This expense has been voided by your dispatcher and is not counted in your monthly total.
+          <Band tone="neutral" icon="ban">
+            <Text style={[type.body, { color: T.text2 }]}>
+              <Text style={{ fontFamily: fontFor('700'), fontWeight: '700' }}>Voided.</Text> This expense has been voided by your dispatcher and is not counted in your monthly total.
             </Text>
-          </View>
+          </Band>
         ) : e.status === 'rejected' ? (
-          <View style={{
-            marginTop: 16, padding: 12, borderRadius: 10,
-            backgroundColor: T.redSoft, borderWidth: 1, borderColor: T.red,
-          }}>
-            <Text style={{ fontSize: 13, color: T.redFg, fontWeight: '700' }}>REJECTED</Text>
-            <Text style={{ fontSize: 12, color: T.redFg, marginTop: 4 }}>
-              Your dispatcher reviewed this expense and declined it. It is not counted in your monthly total.
+          <Band tone="red" icon="circleX">
+            <Text style={[type.body, { color: T.redText }]}>
+              <Text style={{ fontFamily: fontFor('700'), fontWeight: '700' }}>Rejected.</Text> Your dispatcher reviewed this expense and declined it. It is not counted in your monthly total.
             </Text>
-          </View>
+          </Band>
         ) : e.status === 'pending' ? (
-          <View style={{
-            marginTop: 16, padding: 12, borderRadius: 10,
-            backgroundColor: T.pendingBg, borderWidth: 1, borderColor: T.pendingDot,
-          }}>
-            <Text style={{ fontSize: 13, color: T.pendingFg, fontWeight: '700' }}>PENDING REVIEW</Text>
-            <Text style={{ fontSize: 12, color: T.pendingFg, marginTop: 4 }}>
-              Your dispatcher hasn't reviewed this expense yet. It stays in your monthly total unless it's rejected.
+          <Band tone="amber" icon="clock">
+            <Text style={[type.body, { color: T.amberText }]}>
+              <Text style={{ fontFamily: fontFor('700'), fontWeight: '700' }}>Pending review.</Text> Your dispatcher hasn&apos;t reviewed this expense yet. It stays in your monthly total unless it&apos;s rejected.
             </Text>
-          </View>
+          </Band>
         ) : null}
 
-        <Text style={{
-          fontSize: 11, color: T.mutedLight, textAlign: 'center', lineHeight: 16, marginTop: 24,
-        }}>
+        <Text style={[type.caption, { color: T.text3, textAlign: 'center', marginTop: space[2] }]}>
           To correct or void this expense, contact your dispatcher.
         </Text>
       </View>

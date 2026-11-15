@@ -1,17 +1,19 @@
 import React from 'react';
-import { View, Text, Pressable, ActivityIndicator, Alert, Linking } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppFrame } from '../../components/AppFrame';
-import { AppHeader, SectionLabel } from '../../components/AppHeader';
+import { AppHeader } from '../../components/AppHeader';
 import { StatusPill } from '../../components/StatusPill';
+import { Band } from '../../components/Band';
 import { Button } from '../../components/Button';
-import { TimelineStop, Stop } from '../../components/TimelineStop';
+import { Card } from '../../components/Card';
+import { TimelineStop, Stop, pinFor } from '../../components/TimelineStop';
 import { ClientCard } from '../../components/ClientCard';
 import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
 import { SurchargesCard } from '../../components/SurchargesCard';
-import { CommissionRateCard } from '../../components/CommissionRateCard';
-import { JobAmountCard } from '../../components/JobAmountCard';
+import { PayCard } from '../../components/JobAmountCard';
 import { useTokens } from '../../theme/ThemeProvider';
+import { fontFor, space, type } from '../../theme/tokens';
 import { formatClock } from '../../lib/timeFormat';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { useStartJob, useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
@@ -35,7 +37,7 @@ export default function JobDetail() {
           <ErrorBox message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>
         ) : (
           <View style={{ paddingTop: 60, alignItems: 'center' }}>
-            <ActivityIndicator color={T.muted}/>
+            <ActivityIndicator color={T.text2}/>
           </View>
         )}
       </AppFrame>
@@ -83,7 +85,7 @@ export default function JobDetail() {
         right={<StatusPill kind={job.status}/>}
       />
 
-      <View style={{ paddingHorizontal: 20, paddingBottom: 20 }}>
+      <View style={{ paddingHorizontal: space[4], paddingBottom: space[5], gap: space[4] }}>
         <ClientCard
           clientName={job.client}
           passengerName={job.passengerName}
@@ -98,45 +100,40 @@ export default function JobDetail() {
           <SpecialInstructionsCard text={job.specialInstructions}/>
         )}
 
-        <SectionLabel>Route · {stopsForUi.length} stops</SectionLabel>
-        <View style={{
-          backgroundColor: T.surface, borderRadius: 12,
-          paddingHorizontal: 14, paddingTop: 14, paddingBottom: 8, marginBottom: 18,
-          shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-          elevation: 2,
-        }}>
-          {stopsForUi.map((s, i) => (
-            <TimelineStop key={i} stop={s} isLast={i === stopsForUi.length - 1}/>
-          ))}
-        </View>
+        <Card style={{ padding: space[5], gap: space[4] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space[3] }}>
+            <Text style={[type.title, { color: T.text }]}>Route</Text>
+            <Text style={[type.label, { color: T.text2 }]}>{stopsForUi.length} stops</Text>
+          </View>
+          <View>
+            {stopsForUi.map((s, i) => (
+              <TimelineStop key={i} stop={s} isLast={i === stopsForUi.length - 1} pin={pinFor(i, stopsForUi.length)}/>
+            ))}
+          </View>
+        </Card>
 
         <SurchargesCard items={job.surcharges}/>
 
-        <JobAmountCard amount={job.amount} commission={job.specialCommission}/>
-
-        {/* Non-default pay. Sits directly under the amount so the fare and what
-            the driver gets out of it read together. Rendered independently of
+        {/* The fare and, under it, the job's own pay when it is not the
+            driver's normal cut. Non-default pay is rendered independently of
             `amount` because an unpriced job can still carry pay the driver
             should know about before accepting — and under fixed-fee pricing
             that is no longer a hypothetical: a flat fee resolves whatever the
             fare, so a fareless job can have a real, knowable payout. */}
-        <CommissionRateCard
-          commission={job.specialCommission}
-          style={{ marginTop: job.amount !== null ? 10 : 0 }}
-        />
+        <PayCard amount={job.amount} commission={job.specialCommission}/>
       </View>
 
       {/* Sticky CTA — depends on status */}
       <View style={{
         position: 'absolute', left: 0, right: 0, bottom: 0,
-        paddingHorizontal: 20, paddingTop: 14, paddingBottom: 30,
-        backgroundColor: T.page,
+        paddingHorizontal: space[4], paddingTop: space[3], paddingBottom: 30,
+        backgroundColor: T.ground,
       }}>
         {isPending && job.assignmentId && (
           <>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: space[3] }}>
               <Button
-                variant="danger" full style={{ flex: 1, minHeight: 56 }}
+                variant="secondary" full size="lg" style={{ flex: 1 }}
                 onPress={() => promptReject(job.assignmentId!, rejectAsg.mutateAsync, () => router.back())}
               >
                 Reject
@@ -182,9 +179,11 @@ export default function JobDetail() {
           </Button>
         )}
 
-        <View style={{ alignItems: 'center', marginTop: 10 }}>
+        <View style={{ alignItems: 'center', marginTop: space[3] }}>
           <Pressable>
-            <Text style={{ fontSize: 13, color: T.red, fontWeight: '600', textDecorationLine: 'underline' }}>
+            <Text style={[type.label, {
+              fontFamily: fontFor('600'), fontWeight: '600', color: T.text2, textDecorationLine: 'underline',
+            }]}>
               Report an Issue
             </Text>
           </Pressable>
@@ -233,18 +232,12 @@ function promptReject(
 function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) {
   const T = useTokens();
   return (
-    <View style={{
-      marginHorizontal: 16, padding: 16, borderRadius: 12,
-      backgroundColor: T.redSoft, borderWidth: 1, borderColor: T.red,
-    }}>
-      <Text style={{ fontSize: 14, fontWeight: '700', color: T.redFg }}>Couldn't load job</Text>
-      <Text style={{ fontSize: 13, color: T.redFg, lineHeight: 19, marginTop: 4 }}>{message}</Text>
-      <Pressable
-        onPress={onRetry}
-        style={{ marginTop: 12, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: T.red }}
-      >
-        <Text style={{ fontSize: 13, color: T.redFg, fontWeight: '600' }}>Retry</Text>
-      </Pressable>
-    </View>
+    <Band tone="red" style={{ marginHorizontal: space[4] }}>
+      <Text style={[type.body, { fontFamily: fontFor('600'), fontWeight: '600', color: T.redText }]}>Couldn't load job</Text>
+      <Text style={[type.body, { color: T.redText, marginTop: 4 }]}>{message}</Text>
+      <View style={{ marginTop: space[3], alignSelf: 'flex-start' }}>
+        <Button variant="secondary" onPress={onRetry}>Retry</Button>
+      </View>
+    </Band>
   );
 }

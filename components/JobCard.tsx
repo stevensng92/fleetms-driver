@@ -1,11 +1,15 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { Card } from './Card';
+import { FeatureCard } from './FeatureCard';
 import { StatusPill, StatusKind } from './StatusPill';
 import { Button } from './Button';
+import { GoFill } from './GoFill';
 import { Icon } from './Icon';
 import { CommissionPill } from './CommissionPill';
 import { useTokens } from '../theme/ThemeProvider';
+import { fontFor, motionFor, radius, space, type, TABULAR } from '../theme/tokens';
 import type { SpecialCommission } from '../lib/commissionRate';
 
 export type Job = {
@@ -33,14 +37,64 @@ export type Job = {
 
 const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
 
+/** From and to, with the pin column the admin route band uses: an ink ring, then the green pin. */
+export function RouteLine({ from, to, onFeature }: { from: string; to: string; onFeature: boolean }) {
+  const T = useTokens();
+  const place = { ...type.body, color: onFeature ? T.onFeature : T.text, flex: 1 } as const;
+  return (
+    <View style={{ gap: space[2] }}>
+      {/* the line between the two pins */}
+      <View style={{
+        position: 'absolute', left: 5, top: 12, bottom: 12, width: 2,
+        backgroundColor: onFeature ? T.featureTrack : T.hairlineStrong,
+      }}/>
+      <View accessible accessibilityLabel={`From ${from}`} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+        <View style={{
+          width: 12, height: 12, borderRadius: 6, borderWidth: 2,
+          backgroundColor: onFeature ? T.feature : T.surface,
+          borderColor: onFeature ? T.onFeature : T.ink,
+        }}/>
+        <Text style={place} numberOfLines={1}>{from}</Text>
+      </View>
+      <View accessible accessibilityLabel={`To ${to}`} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+        <View style={{ width: 12, height: 12, borderRadius: 6, overflow: 'hidden' }}>
+          <GoFill radius={6}/>
+        </View>
+        <Text style={place} numberOfLines={1}>{to}</Text>
+      </View>
+    </View>
+  );
+}
+
+/** Pax, plate and job number as separate items, each with its own icon where it has one. */
+function Meta({ job, onFeature }: { job: Job; onFeature: boolean }) {
+  const T = useTokens();
+  const color = onFeature ? T.onFeature2 : T.text2;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[4], rowGap: space[2] }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>
+        <Icon name="users" size={14} stroke={2.2} color={color}/>
+        <Text style={[type.label, { color }]}>{job.pax} pax</Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1], flexShrink: 1 }}>
+        <Icon name="car" size={14} stroke={2.2} color={color}/>
+        <Text style={[type.label, { color, fontFamily: MONO }]} numberOfLines={1}>{job.vehicle}</Text>
+      </View>
+      <Text style={[type.caption, TABULAR, { color, fontFamily: fontFor('600'), fontWeight: '600', marginLeft: 'auto' }]}>
+        {job.id}
+      </Text>
+    </View>
+  );
+}
+
 export function JobCard({
   job, dim, overdue, hideActions, onAccept, onReject, onView, onPress,
 }: {
   job: Job;
   dim?: boolean;
   /** Pickup already passed on a previous day and the job is still open.
-   *  Marks the PICKUP chip red and swaps in the missed date so it can't be
-   *  mistaken for a job scheduled today. */
+   *  Swaps in a red "Missed, <date>" line so it can't be mistaken for a job
+   *  scheduled today. */
   overdue?: boolean;
   hideActions?: boolean;
   onAccept?: () => void;
@@ -49,134 +103,86 @@ export function JobCard({
   onPress?: () => void;
 }) {
   const T = useTokens();
-  const accent =
-    job.status === 'pending'   ? T.pendingDot :
-    job.status === 'confirmed' ? T.confirmDot :
-    job.status === 'progress'  ? T.progressDot :
-    job.status === 'done'      ? T.doneDot :
-    undefined;
+  const reduced = useReducedMotion();
+  // The job being driven is the one dark card on the screen.
+  const live = job.status === 'progress';
+
+  const ink = live ? T.onFeature : T.text;
+  const main = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${job.id}, ${job.client}, pickup ${job.time}${overdue && job.pickupDate ? `, missed on ${job.pickupDate}` : ''}`}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        gap: space[3],
+        paddingVertical: space[4], paddingHorizontal: space[5],
+        borderRadius: live ? radius.xl : radius.lg,
+        transform: [{ scale: pressed ? motionFor(reduced).pressScale : 1 }],
+      })}
+    >
+      {/* Top row: pickup time, the missed date when overdue, status pill */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minWidth: 0 }}>
+        <Text style={[type.heading, TABULAR, { color: ink }]}>{job.time}</Text>
+        {overdue && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1], flexShrink: 1 }}>
+            <Icon name="triangleAlert" size={14} stroke={2.4} color={T.redText}/>
+            <Text style={[type.label, { color: T.redText, fontFamily: fontFor('600'), fontWeight: '600' }]} numberOfLines={1}>
+              {job.pickupDate ? `Missed, ${job.pickupDate}` : 'Missed'}
+            </Text>
+          </View>
+        )}
+        <View style={{ marginLeft: 'auto' }}>
+          <StatusPill kind={job.status}/>
+        </View>
+      </View>
+
+      <Text style={[type.title, { color: ink }]} numberOfLines={1}>{job.client}</Text>
+
+      <RouteLine from={job.from} to={job.to} onFeature={live}/>
+      <Meta job={job} onFeature={live}/>
+
+      {/* Non-default pay. Its own row rather than another chip in the
+          crowded meta line above — it only appears on the handful of jobs
+          that carry one, and a pay figure shouldn't be the thing that gets
+          truncated on a narrow phone. */}
+      <CommissionPill commission={job.specialCommission}/>
+    </Pressable>
+  );
+
+  if (live) {
+    return (
+      <FeatureCard style={{ padding: 0, marginHorizontal: space[4], marginBottom: space[3], opacity: dim ? 0.6 : 1 }}>
+        {main}
+      </FeatureCard>
+    );
+  }
 
   return (
-    <Card
-      accent={accent}
-      dim={dim}
-      onPress={onPress}
-      pulse={job.status === 'progress'}
-      style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, marginHorizontal: 16, marginBottom: 12 }}
-    >
-      {/* Header row: PICKUP block (left) + client + meta + status pill */}
-      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
-        {/* PICKUP time block — anchors the card, most-scanned info.
-            Overdue cards get a red tint + the missed date so they can't be
-            mistaken for a job scheduled today. */}
-        <View style={{
-          paddingHorizontal: 10, paddingVertical: 8,
-          borderRadius: 8, backgroundColor: overdue ? T.redSoft : T.raised,
-          alignItems: 'center', minWidth: 64,
-        }}>
-          <Text style={{
-            fontSize: 9.5, fontWeight: '800', color: overdue ? T.red : T.muted,
-            letterSpacing: 0.8, textTransform: 'uppercase',
-          }}>{overdue ? 'Missed' : 'Pickup'}</Text>
-          <Text style={{
-            fontSize: 18, fontWeight: '800', color: overdue ? T.redFg : T.text,
-            letterSpacing: -0.3, marginTop: 2,
-            // tabular-nums keeps the time numerals same-width so cards line
-            // up vertically (12:30 vs 9:00 don't shift).
-            fontVariant: ['tabular-nums'],
-          }}>{job.time}</Text>
-          {overdue && job.pickupDate && (
-            <Text style={{
-              fontSize: 10.5, fontWeight: '700', color: T.red, marginTop: 3,
-            }}>{job.pickupDate}</Text>
-          )}
-        </View>
+    <Card dim={dim} style={{ marginHorizontal: space[4], marginBottom: space[3] }}>
+      {main}
 
-        {/* Right side: client + meta + status pill */}
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-            <Text
-              style={{
-                flex: 1, fontSize: 16, fontWeight: '700', color: T.text,
-                letterSpacing: -0.3,
-              }}
-              numberOfLines={1}
-            >
-              {job.client}
-            </Text>
-            <StatusPill kind={job.status} pulse={job.status === 'progress'}/>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <Icon name="users" size={12} color={T.muted}/>
-            <Text style={{ fontSize: 12.5, color: T.muted, fontWeight: '500' }}>
-              {job.pax} pax
-            </Text>
-            <Text style={{ fontSize: 12.5, color: T.borderHard }}>·</Text>
-            <Text style={{ fontSize: 12.5, color: T.muted, fontWeight: '500' }} numberOfLines={1}>
-              {job.vehicle}
-            </Text>
-            <Text style={{ fontSize: 12.5, color: T.borderHard }}>·</Text>
-            <Text style={{
-              fontSize: 12, fontFamily: MONO, color: T.mutedLight, fontWeight: '600',
-              letterSpacing: 0.2,
-            }} numberOfLines={1}>
-              {job.id}
-            </Text>
-          </View>
-
-          {/* Non-default pay. Its own row rather than another chip in the
-              crowded meta line above — it only appears on the handful of jobs
-              that carry one, and a pay figure shouldn't be the thing that gets
-              truncated on a narrow phone. */}
-          <CommissionPill commission={job.specialCommission} style={{ marginTop: 6 }}/>
-        </View>
-      </View>
-
-      {/* Route timeline */}
-      <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: 10, marginBottom: 6 }}>
-        <View style={{ alignItems: 'center', paddingTop: 6 }}>
-          <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: T.text }}/>
-          <View style={{ width: 2, flex: 1, backgroundColor: T.border, marginVertical: 3 }}/>
-          <View style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: T.accent }}/>
-        </View>
-        <View style={{ flex: 1 }}>
-          <View style={{ marginBottom: 6 }}>
-            <Text style={{ fontSize: 10.5, color: T.mutedLight, fontWeight: '700', letterSpacing: 0.5 }}>FROM</Text>
-            <Text style={{ fontSize: 14.5, fontWeight: '600', color: T.text, letterSpacing: -0.2 }} numberOfLines={1}>
-              {job.from}
-            </Text>
-          </View>
-          <View>
-            <Text style={{ fontSize: 10.5, color: T.mutedLight, fontWeight: '700', letterSpacing: 0.5 }}>TO</Text>
-            <Text style={{ fontSize: 14.5, fontWeight: '600', color: T.text, letterSpacing: -0.2 }} numberOfLines={1}>
-              {job.to}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Action row */}
+      {/* Action row, beside the card's link rather than inside it */}
       {!hideActions && job.status === 'pending' && (
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-          <Button variant="danger" full style={{ flex: 1, minHeight: 44 }} onPress={onReject}>Reject</Button>
-          <Button full style={{ flex: 1, minHeight: 44 }} onPress={onAccept}>Accept</Button>
+        <View style={{ flexDirection: 'row', gap: space[3], paddingHorizontal: space[5], paddingBottom: space[4] }}>
+          <Button variant="secondary" full style={{ flex: 1 }} onPress={onReject}>Reject</Button>
+          <Button full style={{ flex: 1 }} onPress={onAccept}>Accept</Button>
         </View>
       )}
       {!hideActions && job.status === 'confirmed' && (
-        <View style={{ marginTop: 10 }}>
-          <Button variant="secondary" full style={{ minHeight: 44 }} onPress={onView} trailingIcon="chevR">
+        <View style={{ paddingHorizontal: space[5], paddingBottom: space[4] }}>
+          <Button variant="secondary" full onPress={onView} trailingIcon="chevR">
             View Details
           </Button>
         </View>
       )}
       {!hideActions && job.status === 'done' && (
         <View style={{
-          marginTop: 10, paddingTop: 10,
-          borderTopWidth: 1, borderTopColor: T.border,
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+          marginHorizontal: space[5], marginBottom: space[4], paddingTop: space[3],
+          borderTopWidth: 1, borderTopColor: T.hairline,
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[2],
         }}>
-          <Icon name="checkCirc" size={16} color={T.greenFg}/>
-          <Text style={{ fontSize: 13, color: T.greenFg, fontWeight: '600' }}>
+          <Icon name="checkCirc" size={16} color={T.greenText}/>
+          <Text style={[type.label, { color: T.greenText, fontFamily: fontFor('600'), fontWeight: '600' }]}>
             Completed
           </Text>
         </View>

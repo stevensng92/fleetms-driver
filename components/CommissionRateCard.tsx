@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, StyleProp, ViewStyle } from 'react-native';
+import { Card } from './Card';
 import { CommissionPill } from './CommissionPill';
 import { useTokens } from '../theme/ThemeProvider';
+import { fontFor, space, type } from '../theme/tokens';
 import type { SpecialCommission } from '../lib/commissionRate';
 
 // Detail-screen treatment of non-standard pay, shared by Job Detail and Active
@@ -25,29 +27,26 @@ import type { SpecialCommission } from '../lib/commissionRate';
 // wallets in one row reads like a rendering bug.
 //
 // Renders nothing when the job pays the driver's normal rate.
-export function CommissionRateCard({ commission, style }: {
+//
+// `bare` draws the row without its card, for PayCard (JobAmountCard.tsx), which
+// stacks it under the fare in one card.
+export function CommissionRateCard({ commission, style, bare }: {
   commission: SpecialCommission | null | undefined;
   style?: StyleProp<ViewStyle>;
+  bare?: boolean;
 }) {
   const T = useTokens();
   if (commission == null) return null;
   const isFixed = commission.kind === 'fixed';
-  return (
-    <View style={[{
-      backgroundColor: T.surface, borderRadius: 12,
-      paddingHorizontal: 16, paddingVertical: 12,
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-      shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-      elevation: 2,
-    }, style]}>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 13, color: T.text, fontWeight: '600' }}>
+  const row = (
+    <View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3] }, bare ? style : null]}>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Text style={[type.body, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text }]}>
           {isFixed ? 'Your fee for this job' : 'Commission rate'}
         </Text>
-        {/* T.muted, not T.mutedLight: this is the only line telling a driver the
-            figure isn't an error, and mutedLight computes 2.56:1 on light /
-            3.57:1 on dark at 11px — both below the WCAG AA 4.5:1 floor. */}
-        <Text style={{ fontSize: 11, color: T.muted }}>
+        {/* text2, not text3: this is the only line telling a driver the figure
+            isn't an error, so it keeps the stronger of the two greys. */}
+        <Text style={[type.label, { color: T.text2 }]}>
           {isFixed
             ? 'Flat fee — not a percentage of the fare'
             : 'Different from your usual rate'}
@@ -56,4 +55,6 @@ export function CommissionRateCard({ commission, style }: {
       <CommissionPill commission={commission} compact/>
     </View>
   );
+  if (bare) return row;
+  return <Card style={[{ padding: space[5] }, style]}>{row}</Card>;
 }

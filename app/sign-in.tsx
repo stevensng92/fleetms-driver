@@ -5,7 +5,12 @@ import Constants from 'expo-constants';
 import { AppFrame } from '../components/AppFrame';
 import { Logo, Wordmark } from '../components/Logo';
 import { Button } from '../components/Button';
+import { Card } from '../components/Card';
+import { Band } from '../components/Band';
+import { FormField } from '../components/FormField';
+import { Input } from '../components/Input';
 import { useTokens } from '../theme/ThemeProvider';
+import { TABULAR, fontFor, radius, space, type } from '../theme/tokens';
 import { signInWithPin, fetchDriverProfile } from '../lib/auth';
 
 const APP_VERSION = Constants.expoConfig?.version ?? '';
@@ -54,119 +59,86 @@ export default function SignIn() {
     setTimeout(() => router.replace('/'), 0);
   }
 
+  const [phoneFocused, setPhoneFocused] = React.useState(false);
+
   return (
-    <AppFrame bg={T.surface}>
-      <View style={{
-        flex: 1, paddingHorizontal: 28, paddingTop: 64, paddingBottom: 40,
-        justifyContent: 'space-between',
-      }}>
-        {/* Logo lockup */}
-        <View style={{ alignItems: 'center', marginTop: 60 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 18 }}>
-            <Logo size={56}/>
-            <Wordmark size={32}/>
+    <AppFrame>
+      <View style={{ flex: 1, justifyContent: 'space-between', paddingBottom: space[6] }}>
+        {/* Logo lockup: the mark and the name, with the plain word "Driver" under */}
+        <View style={{ paddingHorizontal: space[6], paddingTop: space[6], gap: space[1] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            <Logo size={40}/>
+            <Wordmark size={20}/>
           </View>
-          <Text style={{
-            fontSize: 13, color: T.muted, fontWeight: '600',
-            letterSpacing: 2.4, textTransform: 'uppercase',
-          }}>Driver</Text>
+          <Text style={[type.body, { color: T.text2, paddingLeft: 40 + space[3] }]}>Driver</Text>
         </View>
 
-        {/* Form */}
-        <View>
-          <Text style={{
-            fontSize: 22, fontWeight: '700', color: T.text,
-            letterSpacing: -0.4, marginBottom: 6,
-          }}>Sign in to start your shift</Text>
-          <Text style={{ fontSize: 14, color: T.muted, marginBottom: 24 }}>
-            Enter your registered phone number and 6-digit PIN.
-          </Text>
-
-          <Text style={{
-            fontSize: 12, fontWeight: '600', color: T.muted, marginBottom: 8,
-            letterSpacing: 0.3, textTransform: 'uppercase',
-          }}>Phone number</Text>
-
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', overflow: 'hidden',
-            borderWidth: 1.5, borderColor: T.accent, borderRadius: 8,
-            backgroundColor: T.surface,
-            shadowColor: T.accent, shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 0 },
-            marginBottom: 16,
-          }}>
-            <View style={{
-              paddingHorizontal: 14, paddingVertical: 14,
-              borderRightWidth: 1, borderRightColor: T.border,
-              flexDirection: 'row', alignItems: 'center', gap: 6,
-            }}>
-              <Text style={{ fontSize: 16 }}>🇲🇾</Text>
-              <Text style={{ fontSize: 16, fontWeight: '600', color: T.text }}>+60</Text>
+        <View style={{ paddingHorizontal: space[4], paddingVertical: space[5], gap: space[4] }}>
+          <Card style={{ paddingVertical: space[6], paddingHorizontal: space[5], gap: space[5] }}>
+            <View style={{ gap: space[2] }}>
+              <Text style={[type.figure, { color: T.text }]}>Sign in to start your shift</Text>
+              <Text style={[type.body, { color: T.text2 }]}>
+                Enter your registered phone number and 6-digit PIN.
+              </Text>
             </View>
-            <TextInput
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              placeholder="12-345 6789"
-              placeholderTextColor={T.mutedLight}
-              autoComplete="tel"
-              style={{
-                flex: 1, paddingHorizontal: 14, paddingVertical: 14,
-                fontSize: 17, fontWeight: '500', color: T.text, letterSpacing: 0.3,
-              }}
-            />
-          </View>
 
-          <Text style={{
-            fontSize: 12, fontWeight: '600', color: T.muted, marginBottom: 8,
-            letterSpacing: 0.3, textTransform: 'uppercase',
-          }}>PIN</Text>
+            <View style={{ gap: space[4] }}>
+              <FormField label="Phone number">
+                {/* The +60 prefix is plain text inside the field (change 8), not a flag. */}
+                <View style={{
+                  flexDirection: 'row', alignItems: 'center', height: 48,
+                  backgroundColor: T.surfaceSunk, borderRadius: radius.md,
+                  borderWidth: 2, borderColor: phoneFocused ? T.ink : 'transparent',
+                  paddingHorizontal: space[4], gap: space[3],
+                }}>
+                  <Text style={{ fontFamily: fontFor('600'), fontWeight: '600', fontSize: 16, color: T.text2 }}>+60</Text>
+                  <TextInput
+                    value={phone}
+                    onChangeText={setPhone}
+                    onFocus={() => setPhoneFocused(true)}
+                    onBlur={() => setPhoneFocused(false)}
+                    keyboardType="phone-pad"
+                    placeholder="12-345 6789"
+                    placeholderTextColor={T.text3}
+                    autoComplete="tel"
+                    style={[TABULAR, {
+                      flex: 1, height: '100%', padding: 0,
+                      fontFamily: fontFor('500'), fontWeight: '500', fontSize: 16, color: T.text,
+                    }]}
+                  />
+                </View>
+              </FormField>
 
-          <View style={{
-            borderWidth: 1.5, borderColor: T.border, borderRadius: 8,
-            backgroundColor: T.surface, marginBottom: 6,
-          }}>
-            <TextInput
-              value={pin}
-              onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 6))}
-              keyboardType="number-pad"
-              placeholder="••••••"
-              placeholderTextColor={T.mutedLight}
-              maxLength={6}
-              secureTextEntry
-              style={{
-                paddingHorizontal: 14, paddingVertical: 14,
-                fontSize: 22, fontWeight: '600', color: T.text,
-                letterSpacing: 12, textAlign: 'center',
-              }}
-            />
-          </View>
+              <FormField label="PIN">
+                <Input
+                  value={pin}
+                  onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 6))}
+                  keyboardType="number-pad"
+                  placeholder="••••••"
+                  maxLength={6}
+                  secureTextEntry
+                  style={[TABULAR, { fontFamily: fontFor('600'), fontWeight: '600', letterSpacing: space[1], textAlign: 'center' }]}
+                />
+              </FormField>
 
-          {error && (
-            <Text style={{ fontSize: 13, color: T.red, marginTop: 8 }}>
-              {error}
-            </Text>
-          )}
+              {error && <Band tone="red">{error}</Band>}
 
-          <View style={{ marginTop: 20 }}>
-            <View style={{ opacity: canSubmit ? 1 : 0.5 }}>
-              <Button full onPress={onSubmit}>
-                {submitting ? <ActivityIndicator color="#fff"/> : 'Sign in'}
+              <Button full size="lg" disabled={!canSubmit} onPress={onSubmit}>
+                {submitting ? <ActivityIndicator color={T.onInk}/> : 'Sign in'}
               </Button>
             </View>
-          </View>
+          </Card>
 
-          <View style={{ marginTop: 22, alignItems: 'center' }}>
-            <Text style={{ fontSize: 13, color: T.muted, textAlign: 'center' }}>
-              Don&apos;t have a PIN, or forgot it?{'\n'}
-              <Text style={{ color: T.text, fontWeight: '600' }}>
-                Contact your dispatcher.
-              </Text>
+          <Text style={[type.body, { color: T.text2, textAlign: 'center', paddingHorizontal: space[2] }]}>
+            Don&apos;t have a PIN, or forgot it?{'\n'}
+            <Text style={{ color: T.text, fontFamily: fontFor('600'), fontWeight: '600' }}>
+              Contact your dispatcher.
             </Text>
-          </View>
+          </Text>
         </View>
 
         <View style={{ alignItems: 'center' }}>
-          <Text style={{ fontSize: 11, color: T.mutedLight, letterSpacing: 0.4 }}>
+          <Text style={[type.label, { color: T.text3 }]}>
             v{APP_VERSION}
           </Text>
         </View>

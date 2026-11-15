@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Text, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { Redirect } from 'expo-router';
 import * as Sentry from '@sentry/react-native';
 import { supabase } from '../lib/supabase';
 import { fetchDriverProfile } from '../lib/auth';
 import { useTokens } from '../theme/ThemeProvider';
 import { AppFrame } from '../components/AppFrame';
+import { Button } from '../components/Button';
+import { space, type } from '../theme/tokens';
 
 // Session gate. Three terminal states:
 //   - no session             → /sign-in
@@ -58,23 +60,15 @@ export default function Entry() {
 
   if (transientError) {
     return (
-      <AppFrame bg={T.surface}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: T.text, marginBottom: 8 }}>
+      <AppFrame>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[8], gap: space[2] }}>
+          <Text style={[type.title, { color: T.text }]}>
             Couldn&apos;t reach the server
           </Text>
-          <Text style={{ fontSize: 13, color: T.muted, textAlign: 'center', marginBottom: 18 }}>
+          <Text style={[type.label, { color: T.text2, textAlign: 'center', marginBottom: space[4] }]}>
             Check your connection and try again. You&apos;re still signed in.
           </Text>
-          <Pressable
-            onPress={() => { setTransientError(null); setAttempt(a => a + 1); }}
-            style={({ pressed }) => ({
-              paddingHorizontal: 18, paddingVertical: 10, borderRadius: 8,
-              backgroundColor: T.primary, opacity: pressed ? 0.8 : 1,
-            })}
-          >
-            <Text style={{ color: T.primaryFg, fontSize: 14, fontWeight: '700' }}>Retry</Text>
-          </Pressable>
+          <Button onPress={() => { setTransientError(null); setAttempt(a => a + 1); }}>Retry</Button>
         </View>
       </AppFrame>
     );
@@ -82,9 +76,9 @@ export default function Entry() {
 
   if (!destination) {
     return (
-      <AppFrame bg={T.surface}>
+      <AppFrame>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={T.muted}/>
+          <ActivityIndicator color={T.text2}/>
         </View>
       </AppFrame>
     );

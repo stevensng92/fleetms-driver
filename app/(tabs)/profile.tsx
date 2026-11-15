@@ -4,8 +4,13 @@ import { router } from 'expo-router';
 import { AppFrame } from '../../components/AppFrame';
 import { AppHeader, SectionLabel } from '../../components/AppHeader';
 import { Card } from '../../components/Card';
+import { Band } from '../../components/Band';
 import { Icon } from '../../components/Icon';
+import { Button } from '../../components/Button';
+import { Pill } from '../../components/Pill';
+import { Segmented } from '../../components/Segmented';
 import { useTokens, useThemeControls } from '../../theme/ThemeProvider';
+import { fontFor, radius, space, TABULAR, type } from '../../theme/tokens';
 import { useDriverProfile, formatVehicleLine, availabilityBadge } from '../../lib/queries/driverProfile';
 import { useDriverTimeOff, REASON_LABEL, type TimeOffEntry, type TimeOffStatus } from '../../lib/queries/timeOff';
 import { useCancelTimeOff } from '../../lib/mutations/timeOff';
@@ -13,7 +18,9 @@ import { useAppVersionGate } from '../../lib/queries/appVersionConfig';
 import { signOut } from '../../lib/auth';
 import { formatDate, myDateKey } from '../../lib/timeFormat';
 
-const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
+/** 'AVAILABLE' becomes 'Available': the words stay, the capitals go (change 2). */
+const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+
 const APP_DOWNLOAD_URL = 'https://app.fleetms.my/driver-app';
 
 export default function Profile() {
@@ -25,44 +32,36 @@ export default function Profile() {
   const badge = profile ? availabilityBadge(profile.availability) : null;
 
   return (
-    <AppFrame>
+    <AppFrame bg={T.ground}>
       <AppHeader title="Profile"/>
 
       {/* Identity card */}
-      <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18, paddingVertical: 20 }}>
+      <View style={{ paddingHorizontal: space[4], paddingBottom: space[4] }}>
+        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: space[4], padding: space[5] }}>
           <View style={{
-            width: 64, height: 64, borderRadius: 32, backgroundColor: T.heroBg,
+            width: 56, height: 56, borderRadius: radius.pill, backgroundColor: T.feature,
             alignItems: 'center', justifyContent: 'center',
           }}>
             {isLoading ? (
-              <ActivityIndicator color={T.heroFg}/>
+              <ActivityIndicator color={T.onFeature}/>
             ) : (
-              <Text style={{ color: T.heroFg, fontSize: 22, fontWeight: '700', letterSpacing: 0.5 }}>
+              <Text style={[type.title, { color: T.onFeature }]}>
                 {profile?.initials ?? '—'}
               </Text>
             )}
           </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: T.text, letterSpacing: -0.4 }}>
+          <View style={{ flex: 1, minWidth: 0, gap: space[1], alignItems: 'flex-start' }}>
+            <Text style={[type.title, { color: T.text }]}>
               {profile?.name ?? '—'}
             </Text>
-            <Text style={{ fontSize: 13, color: T.muted, marginTop: 2, fontFamily: MONO }}>
+            <Text style={[type.label, TABULAR, { color: T.text2 }]}>
               {profile?.phone ?? '—'}
             </Text>
             {badge && (
-              <View style={{
-                alignSelf: 'flex-start', marginTop: 8, paddingHorizontal: 8, paddingVertical: 3,
-                borderRadius: 9999, backgroundColor: badge.on ? T.doneBg : T.raised,
-                flexDirection: 'row', alignItems: 'center', gap: 4,
-              }}>
-                <Icon name="checkCirc" size={11} color={badge.on ? T.doneFg : T.muted}/>
-                <Text style={{
-                  fontSize: 11, fontWeight: '700',
-                  color: badge.on ? T.doneFg : T.muted, letterSpacing: 0.3,
-                }}>
-                  {profile?.isActive === false ? 'INACTIVE' : badge.label}
-                </Text>
+              <View style={{ marginTop: space[1] }}>
+                <Pill tone={badge.on && profile?.isActive !== false ? 'green' : 'neutral'} icon={badge.on && profile?.isActive !== false ? 'circleCheck' : 'circleAlert'}>
+                  {profile?.isActive === false ? 'Inactive' : sentenceCase(badge.label)}
+                </Pill>
               </View>
             )}
           </View>
@@ -70,13 +69,13 @@ export default function Profile() {
       </View>
 
       {versionGate.status !== 'ok' && (
-        <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+        <View style={{ paddingHorizontal: space[4], paddingBottom: space[4] }}>
           <UpdateAvailableRow/>
         </View>
       )}
 
       <SectionLabel>Driver info</SectionLabel>
-      <Card style={{ marginHorizontal: 16, marginBottom: 18, overflow: 'hidden' }}>
+      <Card style={{ marginHorizontal: space[4], marginBottom: space[5], overflow: 'hidden' }}>
         <InfoRow k="License class"   v={profile?.licenseClass || '—'}/>
         <InfoRow k="Organisation"    v={profile?.org.name ?? '—'}/>
         <InfoRow k="Vehicle assigned" v={formatVehicleLine(profile?.vehicle ?? null)} last/>
@@ -84,49 +83,39 @@ export default function Profile() {
 
       <SectionLabel
         right={
-          <Pressable
-            onPress={() => router.push('/profile/time-off')}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-          >
-            <Icon name="plus" size={14} color={T.primary}/>
-            <Text style={{ fontSize: 13, color: T.primary, fontWeight: '700' }}>Request Time Off</Text>
-          </Pressable>
+          <Button variant="secondary" icon="plus" onPress={() => router.push('/profile/time-off')}>
+            Request time off
+          </Button>
         }
-      >Time Off</SectionLabel>
+      >Time off</SectionLabel>
       <TimeOffList/>
 
       <SectionLabel>Appearance</SectionLabel>
-      <Card style={{ marginHorizontal: 16, marginBottom: 12, padding: 16 }}>
-        <Text style={{ fontSize: 11, color: T.mutedLight, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+      <Card style={{ marginHorizontal: space[4], marginBottom: space[3], padding: space[5], gap: space[3] }}>
+        <Text style={[type.label, { color: T.text2 }]}>
           Theme
         </Text>
-        <View style={{ flexDirection: 'row', backgroundColor: T.raised, borderRadius: 8, padding: 4, marginTop: 8 }}>
-          {(['system', 'light', 'dark'] as const).map(p => {
-            const sel = p === preference;
-            return (
-              <Pressable
-                key={p}
-                onPress={() => setPreference(p)}
-                style={{
-                  flex: 1, paddingVertical: 9, borderRadius: 6, alignItems: 'center',
-                  backgroundColor: sel ? T.surface : 'transparent',
-                }}
-              >
-                <Text style={{
-                  fontSize: 13, fontWeight: sel ? '700' : '500',
-                  color: sel ? T.text : T.muted,
-                  textTransform: 'capitalize',
-                }}>{p}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <Segmented
+          block
+          options={[
+            { value: 'system', label: 'System' },
+            { value: 'light', label: 'Light' },
+            { value: 'dark', label: 'Dark' },
+          ]}
+          value={preference}
+          onChange={setPreference}
+        />
       </Card>
 
-      <View style={{ marginHorizontal: 16, marginVertical: 24, alignItems: 'center' }}>
-        <Pressable onPress={async () => { await signOut(); router.replace('/sign-in'); }}>
-          <Text style={{ fontSize: 15, color: T.red, fontWeight: '700' }}>Sign Out</Text>
-        </Pressable>
+      <View style={{ marginHorizontal: space[4], marginVertical: space[6] }}>
+        <Button
+          variant="secondary"
+          full
+          icon="logOut"
+          onPress={async () => { await signOut(); router.replace('/sign-in'); }}
+        >
+          Sign out
+        </Button>
       </View>
     </AppFrame>
   );
@@ -144,37 +133,38 @@ function UpdateAvailableRow() {
     <Card style={{ overflow: 'hidden' }}>
       <Pressable
         onPress={() => { Linking.openURL(APP_DOWNLOAD_URL); }}
+        accessibilityRole="link"
         style={({ pressed }) => ({
-          flexDirection: 'row', alignItems: 'center', gap: 12,
-          paddingHorizontal: 16, paddingVertical: 14,
+          flexDirection: 'row', alignItems: 'center', gap: space[3],
+          padding: space[4],
           opacity: pressed ? 0.7 : 1,
         })}
       >
         <View style={{
-          width: 34, height: 34, borderRadius: 17,
+          width: 40, height: 40, borderRadius: radius.pill,
           backgroundColor: T.amberSoft,
           alignItems: 'center', justifyContent: 'center',
         }}>
-          <Icon name="arrowRight" size={16} color={T.amberFg}/>
+          <Icon name="circleArrowUp" size={20} color={T.amberText}/>
         </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: T.text }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={[type.title, { color: T.text }]}>
             Update available
           </Text>
-          <Text style={{ fontSize: 12.5, color: T.muted, marginTop: 1 }}>
+          <Text style={[type.caption, { color: T.text2 }]}>
             A newer version of FleetMS Driver is ready to install
           </Text>
         </View>
-        <Icon name="chevR" size={18} color={T.mutedLight}/>
+        <Icon name="chevR" size={18} color={T.text3}/>
       </Pressable>
     </Card>
   );
 }
 
 // -----------------------------------------------------------------------------
-// TimeOffList — live driver_time_off rows. Pending rows surface a Cancel
+// TimeOffList: live driver_time_off rows. Pending rows surface a Cancel
 // affordance (calls cancel_driver_time_off RPC). Approved/rejected rows are
-// read-only — drivers must talk to dispatcher.
+// read-only: drivers must talk to dispatcher.
 // -----------------------------------------------------------------------------
 function TimeOffList() {
   const T = useTokens();
@@ -183,24 +173,24 @@ function TimeOffList() {
 
   if (isLoading) {
     return (
-      <Card style={{ marginHorizontal: 16, marginBottom: 18, paddingVertical: 28, alignItems: 'center' }}>
-        <ActivityIndicator color={T.muted}/>
+      <Card style={{ marginHorizontal: space[4], marginBottom: space[5], paddingVertical: space[7], alignItems: 'center' }}>
+        <ActivityIndicator color={T.text2}/>
       </Card>
     );
   }
   if (error) {
     return (
-      <Card style={{ marginHorizontal: 16, marginBottom: 18, paddingHorizontal: 16, paddingVertical: 14 }}>
-        <Text style={{ fontSize: 13, color: T.red }}>Couldn&apos;t load time off.</Text>
-      </Card>
+      <Band tone="red" style={{ marginHorizontal: space[4], marginBottom: space[5] }}>
+        Couldn&apos;t load time off.
+      </Band>
     );
   }
   const rows = (data ?? []).filter(r => new Date(r.endsAt) > new Date());
   if (rows.length === 0) {
     return (
-      <Card style={{ marginHorizontal: 16, marginBottom: 18, paddingHorizontal: 16, paddingVertical: 18 }}>
-        <Text style={{ fontSize: 13, color: T.muted, textAlign: 'center' }}>
-          No upcoming time off. Tap &ldquo;Request Time Off&rdquo; to plan a day.
+      <Card style={{ marginHorizontal: space[4], marginBottom: space[5], paddingHorizontal: space[4], paddingVertical: space[5] }}>
+        <Text style={[type.label, { color: T.text2, textAlign: 'center' }]}>
+          No upcoming time off. Tap &ldquo;Request time off&rdquo; to plan a day.
         </Text>
       </Card>
     );
@@ -228,7 +218,7 @@ function TimeOffList() {
   }
 
   return (
-    <Card style={{ marginHorizontal: 16, marginBottom: 18, paddingHorizontal: 16, paddingVertical: 14 }}>
+    <Card style={{ marginHorizontal: space[4], marginBottom: space[5], paddingHorizontal: space[5], paddingVertical: space[2] }}>
       {rows.map((t, i) => (
         <TimeOffRow
           key={t.id}
@@ -242,13 +232,11 @@ function TimeOffList() {
   );
 }
 
-function statusVisuals(T: ReturnType<typeof useTokens>, status: TimeOffStatus) {
-  switch (status) {
-    case 'pending':  return { dot: T.pendingDot, bg: T.pendingBg, fg: T.pendingFg, label: 'PENDING' };
-    case 'approved': return { dot: T.doneDot,    bg: T.doneBg,    fg: T.doneFg,    label: 'APPROVED' };
-    case 'rejected': return { dot: T.red,        bg: T.redSoft,   fg: T.redFg,     label: 'REJECTED' };
-  }
-}
+const STATUS_PILL: Record<TimeOffStatus, { label: string; tone: 'amber' | 'green' | 'red'; icon: 'clock' | 'circleCheck' | 'circleX' }> = {
+  pending:  { label: 'Pending',  tone: 'amber', icon: 'clock' },
+  approved: { label: 'Approved', tone: 'green', icon: 'circleCheck' },
+  rejected: { label: 'Rejected', tone: 'red',   icon: 'circleX' },
+};
 
 function formatRange(startsAt: string, endsAt: string): { range: string; days: number } {
   const s = new Date(startsAt);
@@ -260,7 +248,7 @@ function formatRange(startsAt: string, endsAt: string): { range: string; days: n
   // so rendering them device-local could show a different day than was booked.
   const fmt = (d: Date) => formatDate(d);
   const sameDay = myDateKey(s) === myDateKey(eInclusive);
-  const range = sameDay ? fmt(s) : `${fmt(s)} – ${fmt(eInclusive)}`;
+  const range = sameDay ? fmt(s) : `${fmt(s)} to ${fmt(eInclusive)}`;
   const days = Math.max(1, Math.round((eExclusive.getTime() - s.getTime()) / 86400000));
   return { range, days };
 }
@@ -269,35 +257,31 @@ function TimeOffRow({
   entry, last, onCancel, cancelling,
 }: { entry: TimeOffEntry; last: boolean; onCancel: () => void; cancelling: boolean }) {
   const T = useTokens();
-  const v = statusVisuals(T, entry.status);
+  const v = STATUS_PILL[entry.status];
   const { range, days } = formatRange(entry.startsAt, entry.endsAt);
   const canCancel = entry.status === 'pending';
 
   return (
     <View style={{
-      paddingVertical: 10,
-      flexDirection: 'row', alignItems: 'center', gap: 12,
-      borderBottomWidth: last ? 0 : 1, borderBottomColor: T.border,
+      paddingVertical: space[3],
+      flexDirection: 'row', alignItems: 'flex-start', gap: space[3],
+      borderBottomWidth: last ? 0 : 1, borderBottomColor: T.hairline,
     }}>
-      <View style={{ width: 4, height: 32, borderRadius: 2, backgroundColor: v.dot }}/>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 14, fontWeight: '700', color: T.text }}>{range}</Text>
-        <Text style={{ fontSize: 12, color: T.muted }}>
-          {days} {days === 1 ? 'day' : 'days'} · {REASON_LABEL[entry.reason]}
-        </Text>
-      </View>
-      <View style={{ alignItems: 'flex-end', gap: 6 }}>
-        <View style={{
-          paddingHorizontal: 10, paddingVertical: 3, borderRadius: 9999,
-          backgroundColor: v.bg,
-        }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.3, color: v.fg }}>
-            {v.label}
-          </Text>
+      <View style={{ flex: 1, minWidth: 0, gap: space[1] }}>
+        <Text style={[type.title, { color: T.text }]}>{range}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], rowGap: space[1] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>
+            <Icon name="calendarDays" size={13} color={T.text3}/>
+            <Text style={[type.caption, { color: T.text2 }]}>{days} {days === 1 ? 'day' : 'days'}</Text>
+          </View>
+          <Text style={[type.caption, { color: T.text2 }]}>{REASON_LABEL[entry.reason]}</Text>
         </View>
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: space[2] }}>
+        <Pill tone={v.tone} icon={v.icon}>{v.label}</Pill>
         {canCancel && (
-          <Pressable onPress={onCancel} disabled={cancelling} style={{ paddingVertical: 2 }}>
-            <Text style={{ fontSize: 12, color: T.red, fontWeight: '600' }}>
+          <Pressable onPress={onCancel} disabled={cancelling} accessibilityRole="button" hitSlop={8}>
+            <Text style={[type.caption, { fontFamily: fontFor('600'), fontWeight: '600', color: T.redText }]}>
               {cancelling ? 'Withdrawing…' : 'Withdraw'}
             </Text>
           </Pressable>
@@ -311,14 +295,11 @@ function InfoRow({ k, v, last }: { k: string; v: string; last?: boolean }) {
   const T = useTokens();
   return (
     <View style={{
-      paddingHorizontal: 16, paddingVertical: 14,
-      borderBottomWidth: last ? 0 : 1, borderBottomColor: T.border,
+      paddingHorizontal: space[5], paddingVertical: space[4], gap: space[1],
+      borderBottomWidth: last ? 0 : 1, borderBottomColor: T.hairline,
     }}>
-      <Text style={{
-        fontSize: 11, color: T.mutedLight, fontWeight: '700',
-        letterSpacing: 0.5, textTransform: 'uppercase',
-      }}>{k}</Text>
-      <Text style={{ fontSize: 15, fontWeight: '600', color: T.text, marginTop: 3 }}>{v}</Text>
+      <Text style={[type.label, { color: T.text2 }]}>{k}</Text>
+      <Text style={[type.title, { color: T.text }]}>{v}</Text>
     </View>
   );
 }

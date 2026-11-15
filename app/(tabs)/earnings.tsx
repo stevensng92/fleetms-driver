@@ -8,8 +8,12 @@ import { AppHeader, SectionLabel } from '../../components/AppHeader';
 import { Card } from '../../components/Card';
 import { StatusPill } from '../../components/StatusPill';
 import { CommissionPill } from '../../components/CommissionPill';
-import { Icon } from '../../components/Icon';
+import { Icon, IconName } from '../../components/Icon';
+import { Band } from '../../components/Band';
+import { Button } from '../../components/Button';
+import { Segmented } from '../../components/Segmented';
 import { useTokens } from '../../theme/ThemeProvider';
+import { fontFor, radius, space, TABULAR, type } from '../../theme/tokens';
 import {
   useDriverEarnings, useEarningsHistoryStart, ROW_LIMIT,
   type EarningsRow, type EarningsPaymentStatus,
@@ -106,61 +110,39 @@ export default function Earnings() {
   const missing         = data?.missingCommissionCount ?? 0;
 
   return (
-    <AppFrame>
+    <AppFrame bg={T.ground}>
       <AppHeader title="Earnings" subtitle={profile?.org.name ?? ''}/>
 
       <ScrollView
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={T.muted}/>
+          <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={T.text2}/>
         }
         contentContainerStyle={{ paddingBottom: 24 }}
       >
-        {/* Mode selector — three fixed, equal-width tabs again.
+        {/* Mode selector: three fixed, equal-width tabs again.
             The previous version grew a chip per past month and scrolled, which
             put the older months off the right edge with the scroll indicator
             disabled; the first person to use it concluded the app only went
             back one month. The period axis moved onto the card below, where the
             gesture has room and can advertise itself. */}
-        <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
-          <View style={{
-            flexDirection: 'row', backgroundColor: T.raised,
-            borderRadius: 8, padding: 4,
-          }}>
-            {MODES.map(m => {
-              const sel = m.mode === mode;
-              return (
-                <Pressable
-                  key={m.mode}
-                  onPress={() => { setMode(m.mode); setOffset(0); }}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: sel }}
-                  style={{
-                    flex: 1, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 6,
-                    alignItems: 'center',
-                    backgroundColor: sel ? T.surface : 'transparent',
-                  }}
-                >
-                  <Text style={{
-                    fontSize: 13, fontWeight: sel ? '700' : '500',
-                    color: sel ? T.text : T.muted,
-                  }}>
-                    {m.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+        <View style={{ paddingHorizontal: space[4], paddingBottom: space[4] }}>
+          <Segmented
+            block
+            options={MODES.map(m => ({ value: m.mode, label: m.label }))}
+            value={mode}
+            onChange={(m) => { setMode(m); setOffset(0); }}
+          />
         </View>
 
-        {/* Summary — also the pager. The card is the largest touch target on
+        {/* Summary, also the pager. The card is the largest touch target on
             the screen, so the swipe lives here rather than on a cramped chip
             row, and the chevrons + dots make it discoverable without one. */}
-        <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+        <View style={{ paddingHorizontal: space[4], paddingBottom: space[4] }}>
           <Card
             {...(pageable ? pan.panHandlers : {})}
-            style={{ paddingHorizontal: 18, paddingTop: 14, paddingBottom: 16, borderWidth: 1, borderColor: T.border }}
+            style={{ padding: space[5], gap: space[4] }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
               {pageable && (
                 <Pressable
                   onPress={goEarlier}
@@ -169,20 +151,22 @@ export default function Earnings() {
                   accessibilityRole="button"
                   accessibilityLabel="Show an earlier period"
                   accessibilityState={{ disabled: !canGoEarlier }}
-                  style={{ padding: 2, opacity: canGoEarlier ? 1 : 0.35 }}
+                  style={{
+                    width: 36, height: 36, borderRadius: radius.pill, backgroundColor: T.surfaceSunk,
+                    alignItems: 'center', justifyContent: 'center', opacity: canGoEarlier ? 1 : 0.35,
+                  }}
                 >
-                  <Icon name="chevL" size={16} color={T.muted}/>
+                  <Icon name="chevL" size={18} stroke={2.4} color={T.text2}/>
                 </Pressable>
               )}
-              {/* The period name lives on the card, not the tab — the tab says
+              {/* The period name lives on the card, not the tab: the tab says
                   which KIND of period, this says which one. */}
               <Text
                 numberOfLines={1}
-                style={{
+                style={[type.body, {
                   flex: 1, textAlign: pageable ? 'center' : 'left',
-                  fontSize: 12, color: T.muted, fontWeight: '700',
-                  letterSpacing: 0.4, textTransform: 'uppercase',
-                }}
+                  fontFamily: fontFor('600'), fontWeight: '600', color: T.text,
+                }]}
               >{periodHeadline(period, now)}</Text>
               {pageable && (
                 <Pressable
@@ -192,66 +176,59 @@ export default function Earnings() {
                   accessibilityRole="button"
                   accessibilityLabel="Show a later period"
                   accessibilityState={{ disabled: !canGoLater }}
-                  style={{ padding: 2, opacity: canGoLater ? 1 : 0.35 }}
+                  style={{
+                    width: 36, height: 36, borderRadius: radius.pill, backgroundColor: T.surfaceSunk,
+                    alignItems: 'center', justifyContent: 'center', opacity: canGoLater ? 1 : 0.35,
+                  }}
                 >
-                  <Icon name="chevR" size={16} color={T.muted}/>
+                  <Icon name="chevR" size={18} stroke={2.4} color={T.text2}/>
                 </Pressable>
               )}
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-              {isLoading ? (
-                <ActivityIndicator color={T.muted} style={{ marginTop: 12 }}/>
-              ) : (
-                <>
-                  <Text style={{ fontSize: 40, fontWeight: '800', color: T.text, letterSpacing: -1.4 }}>
-                    RM {commissionParts.whole}
-                  </Text>
-                  <Text style={{ fontSize: 16, color: T.muted, fontWeight: '600' }}>.{commissionParts.cents}</Text>
-                </>
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+                {isLoading ? (
+                  <ActivityIndicator color={T.text2} style={{ marginTop: space[3] }}/>
+                ) : (
+                  <>
+                    <Text style={[type.display, TABULAR, { color: T.text }]}>
+                      RM {commissionParts.whole}
+                    </Text>
+                    <Text style={[type.title, TABULAR, { color: T.text2 }]}>.{commissionParts.cents}</Text>
+                  </>
+                )}
+              </View>
+              {!isLoading && (
+                <Text style={[type.label, TABULAR, { color: T.text2, marginTop: space[1] }]}>
+                  RM {formatRM(fareTotal).whole} in fares
+                </Text>
               )}
             </View>
-            {!isLoading && (
-              <Text style={{ fontSize: 13, color: T.muted, marginTop: 2 }}>
-                RM {formatRM(fareTotal).whole} in fares
-              </Text>
-            )}
             {/* The totals above cover only the rows we fetched. Say so rather
-                than showing a number that silently understates — this screen is
+                than showing a number that silently understates: this screen is
                 what a driver uses to check they were paid correctly. */}
             {data?.truncated && (
-              <View style={{
-                marginTop: 10, paddingHorizontal: 10, paddingVertical: 7,
-                borderRadius: 6, backgroundColor: T.raised,
-              }}>
-                {/* One interpolated string, not mixed JSX children — split
+              <Band tone="neutral">
+                {/* One interpolated string, not mixed JSX children: split
                     children render as separate text nodes, which breaks both
                     text matching in tests and screen-reader continuity. */}
-                <Text style={{ fontSize: 12, color: T.muted, fontWeight: '600' }}>
-                  {`Showing your ${ROW_LIMIT} most recent jobs${
-                    data.totalCount != null && data.totalCount > ROW_LIMIT
-                      ? ` of ${data.totalCount}`
-                      : ''
-                  }. Older jobs aren't counted in these totals.`}
-                </Text>
-              </View>
+                {`Showing your ${ROW_LIMIT} most recent jobs${
+                  data.totalCount != null && data.totalCount > ROW_LIMIT
+                    ? ` of ${data.totalCount}`
+                    : ''
+                }. Older jobs aren't counted in these totals.`}
+              </Band>
             )}
             {missing > 0 && (
-              <View style={{
-                marginTop: 10, paddingHorizontal: 10, paddingVertical: 7,
-                borderRadius: 6, backgroundColor: T.amberSoft,
-                flexDirection: 'row', gap: 6, alignItems: 'flex-start',
-              }}>
-                <Text style={{ fontSize: 12, color: T.amberFg, fontWeight: '600' }}>
-                  {missing} {missing === 1 ? 'job is' : 'jobs are'} awaiting commission from dispatcher.
-                </Text>
-              </View>
+              <Band tone="amber" icon="clock">
+                {`${missing} ${missing === 1 ? 'job is' : 'jobs are'} awaiting commission from dispatcher.`}
+              </Band>
             )}
             <View style={{
-              flexDirection: 'row', gap: 14, marginTop: 12, paddingTop: 12,
-              borderTopWidth: 1, borderTopColor: T.border,
+              flexDirection: 'row', paddingTop: space[4],
+              borderTopWidth: 1, borderTopColor: T.hairline,
             }}>
-              <Mini label="Jobs" value={String(data?.jobsCount ?? 0)} color={T.text}/>
-              <View style={{ width: 1, backgroundColor: T.border }}/>
+              <Mini label="Jobs" value={String(data?.jobsCount ?? 0)} color={T.text} first/>
               <Mini
                 label="Pending"
                 value={
@@ -259,25 +236,23 @@ export default function Earnings() {
                     ? 'None'
                     : `${data!.pendingCount} ${data!.pendingCount === 1 ? 'job' : 'jobs'}`
                 }
-                color={(data?.pendingCount ?? 0) > 0 ? T.amber : T.text}
+                color={(data?.pendingCount ?? 0) > 0 ? T.amberText : T.text}
+                icon={(data?.pendingCount ?? 0) > 0 ? 'circleAlert' : undefined}
               />
-              <View style={{ width: 1, backgroundColor: T.border }}/>
               <Mini label="Avg / job" value={`RM ${avgParts.whole}`} color={T.text}/>
             </View>
 
             {/* Position indicator. Dots rather than "2 of 3" because the count
-                is small by design — MAX_PERIODS is 3 — and a dot row reads as
+                is small by design (MAX_PERIODS is 3) and a dot row reads as
                 "there is more this way" at a glance, which is the job. */}
             {pageable && (
-              <View style={{
-                flexDirection: 'row', gap: 5, justifyContent: 'center', marginTop: 14,
-              }}>
+              <View style={{ flexDirection: 'row', gap: 5, justifyContent: 'center' }}>
                 {periods.map((p, i) => (
                   <View
                     key={p}
                     style={{
-                      width: 5, height: 5, borderRadius: 2.5,
-                      backgroundColor: i === safeOffset ? T.text : T.borderHard,
+                      width: 6, height: 6, borderRadius: 3,
+                      backgroundColor: i === safeOffset ? T.text : T.track,
                     }}
                   />
                 ))}
@@ -285,14 +260,12 @@ export default function Earnings() {
             )}
           </Card>
 
-          {/* The gesture has to announce itself — the previous design hid its
+          {/* The gesture has to announce itself: the previous design hid its
               extra periods off-screen and the first driver to use it concluded
               they didn't exist. Drops away once they've paged, having done its
               job. */}
           {pageable && safeOffset === 0 && (
-            <Text style={{
-              fontSize: 11.5, color: T.mutedLight, textAlign: 'center', marginTop: 8,
-            }}>
+            <Text style={[type.caption, { color: T.text3, textAlign: 'center', marginTop: space[2] }]}>
               {`Swipe for earlier ${mode === 'week' ? 'weeks' : 'months'}`}
             </Text>
           )}
@@ -301,35 +274,30 @@ export default function Earnings() {
         <SectionLabel>Recent jobs</SectionLabel>
 
         {isError && (
-          <Card style={{ marginHorizontal: 16, padding: 14 }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: T.red, marginBottom: 4 }}>
+          <Band
+            tone="red"
+            style={{ marginHorizontal: space[4] }}
+            action={<Button variant="secondary" onPress={() => refetch()}>Retry</Button>}
+          >
+            <Text style={[type.title, { color: T.redText, marginBottom: space[1] }]}>
               Couldn&apos;t load earnings
             </Text>
-            <Text style={{ fontSize: 13, color: T.red, marginBottom: 10 }}>
+            <Text style={[type.label, { color: T.redText }]}>
               {(error as Error)?.message ?? 'Unknown error'}
             </Text>
-            <Pressable
-              onPress={() => refetch()}
-              style={{
-                alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7,
-                borderRadius: 6, borderWidth: 1, borderColor: T.red,
-              }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: T.red }}>Retry</Text>
-            </Pressable>
-          </Card>
+          </Band>
         )}
 
         {!isError && !isLoading && (data?.rows ?? []).length === 0 && (
-          <Card style={{ marginHorizontal: 16, paddingHorizontal: 16, paddingVertical: 22, alignItems: 'center' }}>
-            <Text style={{ fontSize: 14, color: T.muted, textAlign: 'center' }}>
+          <Card style={{ marginHorizontal: space[4], paddingHorizontal: space[4], paddingVertical: space[6], alignItems: 'center' }}>
+            <Text style={[type.body, { color: T.text2, textAlign: 'center' }]}>
               {emptyStateText(period, now)}
             </Text>
           </Card>
         )}
 
         {!isError && (data?.rows ?? []).length > 0 && (
-          <Card style={{ marginHorizontal: 16, overflow: 'hidden' }}>
+          <Card style={{ marginHorizontal: space[4], overflow: 'hidden' }}>
             {data!.rows.map((row, i) => (
               <EarningsRowItem
                 key={row.jobId}
@@ -353,38 +321,35 @@ function EarningsRowItem({ row, isLast }: { row: EarningsRow; isLast: boolean })
     <Pressable
       // Typed params, not an interpolated path. `job_number` is rendered from
       // the org-editable `organizations.job_format` template, so a format
-      // carrying "/" or "?" would break a hand-built path — and the `as '/'`
+      // carrying "/" or "?" would break a hand-built path, and the `as '/'`
       // cast the old form needed is exactly what let the uuid-vs-job_number bug
       // compile clean in the first place.
       onPress={() => router.push({ pathname: '/jobs/[id]', params: { id: row.jobNumber } })}
       style={({ pressed }) => ({
-        flexDirection: 'row', alignItems: 'center', gap: 12,
-        paddingHorizontal: 16, paddingVertical: 14,
-        borderBottomWidth: isLast ? 0 : 1, borderBottomColor: T.border,
+        flexDirection: 'row', alignItems: 'center', gap: space[3],
+        paddingHorizontal: space[4], paddingVertical: space[3], minHeight: 64,
+        borderBottomWidth: isLast ? 0 : 1, borderBottomColor: T.hairline,
         opacity: pressed ? 0.6 : 1,
       })}
     >
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{
-          fontSize: 14, fontWeight: '700', color: T.text,
-          fontFamily: MONO, letterSpacing: 0.2,
-        }}>{row.jobNumber}</Text>
-        <Text style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{formatRowDate(row.jobDate)}</Text>
-        {/* Only the handful of jobs that paid a non-standard rate get this —
+      <View style={{ flex: 1, minWidth: 0, gap: 2, alignItems: 'flex-start' }}>
+        <Text style={[type.body, TABULAR, {
+          fontFamily: MONO, fontWeight: '600', color: T.text,
+        }]}>{row.jobNumber}</Text>
+        <Text style={[type.caption, { color: T.text2 }]}>{formatRowDate(row.jobDate)}</Text>
+        {/* Only the handful of jobs that paid a non-standard rate get this:
             it's the answer to "why is my cut different on this one?". On a
             fixed-fee row it also explains a take-home that bears no relation to
             the fare printed beside it. */}
-        <CommissionPill commission={row.specialCommission} style={{ marginTop: 5 }}/>
+        <CommissionPill commission={row.specialCommission} style={{ marginTop: space[1] }}/>
       </View>
-      <View style={{ alignItems: 'flex-end', minWidth: 96 }}>
-        <Text style={{
-          fontSize: 16, fontWeight: '700',
-          color: row.commission == null ? T.muted : T.text,
-          letterSpacing: -0.3,
-        }}>{commissionLabel}</Text>
+      <View style={{ alignItems: 'flex-end', minWidth: 96, gap: 2 }}>
+        <Text style={[type.title, TABULAR, {
+          color: row.commission == null ? T.text2 : T.text,
+        }]}>{commissionLabel}</Text>
         {/* A fixed-fee job can have no fare at all, and "RM 0.00 fare" beside a
             real commission reads as a bug rather than as an absent figure. */}
-        <Text style={{ fontSize: 11, color: T.mutedLight, marginTop: 2 }}>
+        <Text style={[type.caption, TABULAR, { color: T.text3 }]}>
           {row.fare == null ? 'No fare set' : `RM ${row.fare.toFixed(2)} fare`}
         </Text>
       </View>
@@ -393,15 +358,20 @@ function EarningsRowItem({ row, isLast }: { row: EarningsRow; isLast: boolean })
   );
 }
 
-function Mini({ label, value, color }: { label: string; value: string; color: string }) {
+function Mini({ label, value, color, first, icon }: {
+  label: string; value: string; color: string; first?: boolean; icon?: IconName;
+}) {
   const T = useTokens();
   return (
-    <View style={{ flex: 1, paddingLeft: 14 }}>
-      <Text style={{
-        fontSize: 10.5, color: T.mutedLight, fontWeight: '700',
-        letterSpacing: 0.5, textTransform: 'uppercase',
-      }}>{label}</Text>
-      <Text style={{ fontSize: 18, fontWeight: '700', color, marginTop: 2 }}>{value}</Text>
+    <View style={{
+      flex: 1, paddingLeft: first ? 0 : space[3], paddingRight: space[3], gap: space[1],
+      ...(first ? {} : { borderLeftWidth: 1, borderLeftColor: T.hairline }),
+    }}>
+      <Text style={[type.caption, { color: T.text2 }]}>{label}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>
+        {icon && <Icon name={icon} size={14} stroke={2.4} color={color}/>}
+        <Text style={[type.title, TABULAR, { fontFamily: fontFor('700'), fontWeight: '700', color }]} numberOfLines={1}>{value}</Text>
+      </View>
     </View>
   );
 }

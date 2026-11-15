@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useTokens } from '../theme/ThemeProvider';
-import { radius } from '../theme/tokens';
+import { radius, fontFor } from '../theme/tokens';
 
 type Option<T extends string> = { value: T; label: string };
 
@@ -41,7 +41,7 @@ export function Segmented<T extends string>({ options, value, onChange, block }:
               ...(on ? { boxShadow: T_.shadow1 } : {}),
             }}
           >
-            <Text style={{ fontSize: 14, fontWeight: on ? '600' : '500', color: on ? T_.text : T_.text2 }}>{o.label}</Text>
+            <Text style={{ fontSize: 14, fontFamily: fontFor((on ? '600' : '500') as '500' | '600' | '700'), fontWeight: on ? '600' : '500', color: on ? T_.text : T_.text2 }}>{o.label}</Text>
           </Pressable>
         );
       })}

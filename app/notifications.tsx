@@ -3,7 +3,11 @@ import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-nati
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '../components/Icon';
+import { Card } from '../components/Card';
+import { Band } from '../components/Band';
+import { Button } from '../components/Button';
 import { useTokens } from '../theme/ThemeProvider';
+import { TABULAR, radius, space, type } from '../theme/tokens';
 import {
   useNotifications,
   useMarkNotificationsRead,
@@ -30,81 +34,78 @@ export default function Notifications() {
   }, [data?.length]);
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: T.surface }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: T.ground }}>
       <View style={{
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 20, paddingVertical: 12,
-        borderBottomWidth: 1, borderBottomColor: T.border,
+        paddingHorizontal: space[5], paddingTop: space[2], paddingBottom: space[4],
       }}>
-        <Text style={{ fontSize: 20, fontWeight: '700', color: T.text, letterSpacing: -0.4 }}>
+        <Text style={[type.figure, { color: T.text }]}>
           Notifications
         </Text>
         <Pressable
           onPress={() => router.back()}
-          // Icon-only — no fill. Avoids the contrast block on top of the
-          // header that didn't match the rest of the surface.
+          accessibilityRole="button"
+          accessibilityLabel="Close"
           style={({ pressed }) => ({
-            width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
+            width: 44, height: 44, marginRight: -space[3], alignItems: 'center', justifyContent: 'center',
             opacity: pressed ? 0.5 : 1,
           })}
           hitSlop={8}
         >
-          <Icon name="x" size={18} color={T.muted}/>
+          <Icon name="x" size={20} color={T.text2}/>
         </Pressable>
       </View>
 
       {isLoading && (
         <View style={{ paddingTop: 60, alignItems: 'center' }}>
-          <ActivityIndicator color={T.muted}/>
+          <ActivityIndicator color={T.text2}/>
         </View>
       )}
 
       {error && (
-        <View style={{ padding: 20 }}>
-          <View style={{
-            padding: 14, borderRadius: 10,
-            borderWidth: 1, borderColor: T.redSoft, backgroundColor: T.redSoft,
-          }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: T.redFg, marginBottom: 4 }}>
+        <View style={{ paddingHorizontal: space[4] }}>
+          <Band
+            tone="red"
+            action={<Button variant="secondary" onPress={() => refetch()}>Retry</Button>}
+          >
+            <Text style={[type.title, { color: T.redText, marginBottom: space[1] }]}>
               Couldn&apos;t load notifications
             </Text>
-            <Text style={{ fontSize: 13, color: T.redFg, marginBottom: 10 }}>
+            <Text style={[type.label, { color: T.redText }]}>
               {(error as Error).message}
             </Text>
-            <Pressable
-              onPress={() => refetch()}
-              style={{
-                alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7,
-                borderRadius: 6, borderWidth: 1, borderColor: T.red,
-              }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: T.red }}>Retry</Text>
-            </Pressable>
-          </View>
+          </Band>
         </View>
       )}
 
       {!isLoading && !error && data && data.length === 0 && (
-        <View style={{ paddingTop: 80, alignItems: 'center', paddingHorizontal: 32 }}>
-          <Icon name="bell" size={40} color={T.mutedLight}/>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: T.text, marginTop: 14 }}>
-            No notifications yet
-          </Text>
-          <Text style={{ fontSize: 13, color: T.muted, marginTop: 6, textAlign: 'center' }}>
-            New job assignments and pickup reminders will appear here.
-          </Text>
+        <View style={{ paddingHorizontal: space[4] }}>
+          <Card style={{ alignItems: 'center', paddingVertical: space[8], paddingHorizontal: space[8] }}>
+            <Icon name="bell" size={32} color={T.text3}/>
+            <Text style={[type.title, { color: T.text, marginTop: space[3] }]}>
+              No notifications yet
+            </Text>
+            <Text style={[type.label, { color: T.text2, marginTop: space[2], textAlign: 'center' }]}>
+              New job assignments and pickup reminders will appear here.
+            </Text>
+          </Card>
         </View>
       )}
 
       {data && data.length > 0 && (
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          {data.map((n, i) => (
-            <NotificationRow
-              key={n.id}
-              item={n}
-              isLast={i === data.length - 1}
-            />
-          ))}
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: space[4], paddingBottom: space[10] }}
+          showsVerticalScrollIndicator={false}
+        >
+          <Card style={{ overflow: 'hidden' }}>
+            {data.map((n, i) => (
+              <NotificationRow
+                key={n.id}
+                item={n}
+                isLast={i === data.length - 1}
+              />
+            ))}
+          </Card>
         </ScrollView>
       )}
     </SafeAreaView>
@@ -135,27 +136,28 @@ function NotificationRow({ item, isLast }: { item: NotificationItem; isLast: boo
       // No row-wide background tint — that read as "selected" rather than
       // "unread" and clashed visually with the header.
       style={({ pressed }) => ({
-        paddingHorizontal: 20, paddingVertical: 14,
-        borderBottomWidth: isLast ? 0 : 1, borderBottomColor: T.border,
-        backgroundColor: pressed ? T.raised : 'transparent',
-        flexDirection: 'row', gap: 12, alignItems: 'flex-start',
+        minHeight: 44,
+        paddingHorizontal: space[5], paddingVertical: space[4],
+        borderBottomWidth: isLast ? 0 : 1, borderBottomColor: T.hairline,
+        backgroundColor: pressed ? T.surfaceSunk : 'transparent',
+        flexDirection: 'row', gap: space[3], alignItems: 'flex-start',
       })}
     >
       <View style={{
         marginTop: 6,
-        width: 8, height: 8, borderRadius: 4,
+        width: 8, height: 8, borderRadius: radius.pill,
         backgroundColor: unread ? T.red : 'transparent',
       }}/>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 14, fontWeight: '700', color: T.text }} numberOfLines={1}>
+      <View style={{ flex: 1, minWidth: 0, gap: space[1] }}>
+        <Text style={[type.title, { color: T.text }]} numberOfLines={1}>
           {item.title}
         </Text>
         {!!item.body && (
-          <Text style={{ fontSize: 13, color: T.muted, marginTop: 3 }} numberOfLines={2}>
+          <Text style={[type.label, { color: T.text2 }]} numberOfLines={2}>
             {item.body}
           </Text>
         )}
-        <Text style={{ fontSize: 11, color: T.mutedLight, marginTop: 4 }}>
+        <Text style={[type.caption, TABULAR, { color: T.text3 }]}>
           {time}
         </Text>
       </View>

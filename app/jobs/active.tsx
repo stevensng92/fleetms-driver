@@ -2,17 +2,22 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppFrame } from '../../components/AppFrame';
-import { AppHeader, SectionLabel } from '../../components/AppHeader';
+import { AppHeader } from '../../components/AppHeader';
 import { StatusPill } from '../../components/StatusPill';
+import { Band } from '../../components/Band';
 import { Button } from '../../components/Button';
-import { TimelineStop, Stop } from '../../components/TimelineStop';
+import { Card } from '../../components/Card';
+import { FeatureCard } from '../../components/FeatureCard';
+import { GoFill } from '../../components/GoFill';
+import { RouteLine } from '../../components/JobCard';
+import { TimelineStop, Stop, pinFor } from '../../components/TimelineStop';
 import { ClientCard } from '../../components/ClientCard';
 import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
 import { SurchargesCard } from '../../components/SurchargesCard';
-import { CommissionRateCard } from '../../components/CommissionRateCard';
-import { JobAmountCard } from '../../components/JobAmountCard';
+import { PayCard } from '../../components/JobAmountCard';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
+import { fontFor, space, type, TABULAR } from '../../theme/tokens';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { formatClock } from '../../lib/timeFormat';
 import { useCompleteJob } from '../../lib/mutations/jobActions';
@@ -34,7 +39,7 @@ export default function ActiveJob() {
           <ErrorBox message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>
         ) : (
           <View style={{ paddingTop: 60, alignItems: 'center' }}>
-            <ActivityIndicator color={T.muted}/>
+            <ActivityIndicator color={T.text2}/>
           </View>
         )}
       </AppFrame>
@@ -78,6 +83,8 @@ export default function ActiveJob() {
   const progressPct = stopsForUi.length > 1 ? Math.round(((currentIdx + 0.5) / stopsForUi.length) * 100) : 50;
 
   const isInProgress = job.rawStatus === 'in_progress';
+  const firstStop = stopsForUi[0];
+  const lastStop = stopsForUi[stopsForUi.length - 1];
 
   const onMarkDone = async () => {
     try {
@@ -98,28 +105,43 @@ export default function ActiveJob() {
       <AppHeader
         title={job.jobNumber}
         onBack={() => router.back()}
-        right={<StatusPill kind={job.status} pulse={isInProgress}/>}
       />
 
-      {isInProgress && (
-        <View style={{ paddingHorizontal: 20, paddingBottom: 14 }}>
-          <View style={{
-            flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6,
-          }}>
-            <Text style={{ fontSize: 11, color: T.muted, fontWeight: '600', letterSpacing: 0.4 }}>
-              STOP {currentIdx + 1} OF {stopsForUi.length}
+      <ScrollView contentContainerStyle={{ paddingHorizontal: space[4], paddingBottom: space[5], gap: space[4] }}>
+        {/* The trip in one dark card: the time window, where it runs and,
+            while the job is live, how far along the stops it is. */}
+        <FeatureCard style={{ padding: space[5], gap: space[4] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3] }}>
+            <Text style={[type.figure, TABULAR, { color: T.onFeature, flexShrink: 1 }]}>
+              {firstStop.arrive}
+              {stopsForUi.length > 1 && lastStop.arrive !== '—' && (
+                <Text style={[type.heading, { fontFamily: fontFor('600'), fontWeight: '600', color: T.onFeature2 }]}>
+                  {' '}to {lastStop.arrive}
+                </Text>
+              )}
             </Text>
-            <Text style={{ fontSize: 11, color: T.accentFg, fontWeight: '600', letterSpacing: 0.4 }}>
-              IN PROGRESS
-            </Text>
+            <StatusPill kind={job.status}/>
           </View>
-          <View style={{ height: 6, borderRadius: 3, backgroundColor: T.border, overflow: 'hidden' }}>
-            <View style={{ width: `${progressPct}%`, height: '100%', backgroundColor: T.accent }}/>
-          </View>
-        </View>
-      )}
+          <RouteLine from={firstStop.place} to={lastStop.place} onFeature/>
+          {isInProgress && (
+            <View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={[type.caption, { fontFamily: fontFor('600'), fontWeight: '600', color: T.onFeature2 }]}>
+                  Stop {currentIdx + 1} of {stopsForUi.length}
+                </Text>
+                <Text style={[type.caption, { fontFamily: fontFor('600'), fontWeight: '600', color: T.goLime }]}>
+                  In progress
+                </Text>
+              </View>
+              <View style={{ height: 6, borderRadius: 3, backgroundColor: T.featureTrack, overflow: 'hidden' }}>
+                <View style={{ width: `${progressPct}%`, height: '100%' }}>
+                  <GoFill radius={3}/>
+                </View>
+              </View>
+            </View>
+          )}
+        </FeatureCard>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}>
         <ClientCard
           clientName={job.client}
           passengerName={job.passengerName}
@@ -134,15 +156,15 @@ export default function ActiveJob() {
           <SpecialInstructionsCard text={job.specialInstructions}/>
         )}
 
-        <SectionLabel>Route</SectionLabel>
-        <View style={{
-          backgroundColor: T.surface, borderRadius: 12,
-          paddingHorizontal: 14, paddingTop: 14, paddingBottom: 8, marginBottom: 18,
-          shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-          elevation: 2,
-        }}>
-          <RouteWithCollapsedDoneStops stops={stopsForUi} states={states}/>
-        </View>
+        <Card style={{ padding: space[5], gap: space[4] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space[3] }}>
+            <Text style={[type.title, { color: T.text }]}>Route</Text>
+            <Text style={[type.label, { color: T.text2 }]}>{stopsForUi.length} stops</Text>
+          </View>
+          <View>
+            <RouteWithCollapsedDoneStops stops={stopsForUi} states={states}/>
+          </View>
+        </Card>
 
         {/* Pay breakdown, same order and components as Job Detail: what the
             job includes, then the fare, then what the driver gets out of it. A
@@ -153,34 +175,28 @@ export default function ActiveJob() {
             silent last time, because the markup lived in the other file. */}
         <SurchargesCard items={job.surcharges}/>
 
-        <JobAmountCard amount={job.amount} commission={job.specialCommission}/>
-
-        <CommissionRateCard
-          commission={job.specialCommission}
-          style={{ marginTop: job.amount !== null ? 10 : 0 }}
-        />
+        <PayCard amount={job.amount} commission={job.specialCommission}/>
       </ScrollView>
 
       <View style={{
         position: 'absolute', left: 0, right: 0, bottom: 0,
-        paddingHorizontal: 20, paddingTop: 14, paddingBottom: 30,
-        backgroundColor: T.page,
+        paddingHorizontal: space[4], paddingTop: space[3], paddingBottom: 30,
+        backgroundColor: T.ground,
       }}>
         {isInProgress ? (
-          <Button variant="green" full size="lg" onPress={onMarkDone}>
-            <Icon name="check" size={20} stroke={3} color="#fff"/>
-            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>
-              {completeJob.isPending ? 'Marking…' : 'Mark as Done'}
-            </Text>
+          <Button full size="lg" icon="check" onPress={onMarkDone}>
+            {completeJob.isPending ? 'Marking…' : 'Mark as Done'}
           </Button>
         ) : (
           <Button variant="secondary" full size="lg" onPress={() => router.back()}>
             Job is {job.status}
           </Button>
         )}
-        <View style={{ alignItems: 'center', marginTop: 10 }}>
+        <View style={{ alignItems: 'center', marginTop: space[3] }}>
           <Pressable>
-            <Text style={{ fontSize: 13, color: T.red, fontWeight: '600', textDecorationLine: 'underline' }}>
+            <Text style={[type.label, {
+              fontFamily: fontFor('600'), fontWeight: '600', color: T.text2, textDecorationLine: 'underline',
+            }]}>
               Report an Issue
             </Text>
           </Pressable>
@@ -206,7 +222,7 @@ function RouteWithCollapsedDoneStops({
     return (
       <>
         {stops.map((s, i) => (
-          <TimelineStop key={i} stop={s} isLast={i === stops.length - 1} state={states[i]}/>
+          <TimelineStop key={i} stop={s} isLast={i === stops.length - 1} state={states[i]} pin={pinFor(i, stops.length)}/>
         ))}
       </>
     );
@@ -222,7 +238,7 @@ function RouteWithCollapsedDoneStops({
   // Build the summary text: time range + place chain abbreviated.
   const firstDone = doneStops[0];
   const lastDone = doneStops[doneStops.length - 1];
-  const timeRange = `${firstDone.arrive} – ${lastDone.arrive}`;
+  const timeRange = `${firstDone.arrive} to ${lastDone.arrive}`;
   const placeChain = doneStops.map(s => s.place.split(',')[0]).join(' · ');
 
   return (
@@ -230,20 +246,20 @@ function RouteWithCollapsedDoneStops({
       {expanded ? (
         <>
           {doneStops.map((s, i) => (
-            <TimelineStop key={`done-${i}`} stop={s} isLast={false} state="done"/>
+            <TimelineStop key={`done-${i}`} stop={s} isLast={false} state="done" pin={pinFor(i, stops.length)}/>
           ))}
           <Pressable
             onPress={() => setExpanded(false)}
             style={({ pressed }) => ({
-              paddingVertical: 8, marginBottom: 6,
+              paddingVertical: space[2], marginBottom: 6,
               flexDirection: 'row', alignItems: 'center', gap: 6,
               opacity: pressed ? 0.5 : 1,
             })}
             hitSlop={8}
           >
-            <Icon name="chevR" size={14} color={T.muted}/>
-            <Text style={{ fontSize: 12, color: T.muted, fontWeight: '700', letterSpacing: 0.3 }}>
-              HIDE COMPLETED
+            <Icon name="chevUp" size={14} stroke={2.4} color={T.text2}/>
+            <Text style={[type.label, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text2 }]}>
+              Hide completed
             </Text>
           </Pressable>
         </>
@@ -251,34 +267,38 @@ function RouteWithCollapsedDoneStops({
         <Pressable
           onPress={() => setExpanded(true)}
           style={({ pressed }) => ({
-            paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10,
-            backgroundColor: T.raised, marginBottom: 10,
-            flexDirection: 'row', alignItems: 'center', gap: 10,
+            paddingVertical: space[3], paddingHorizontal: space[3], borderRadius: 12,
+            backgroundColor: T.surfaceSunk, marginBottom: space[3],
+            flexDirection: 'row', alignItems: 'center', gap: space[3],
             opacity: pressed ? 0.7 : 1,
           })}
         >
-          <Icon name="checkCirc" size={18} color={T.green}/>
+          <Icon name="checkCirc" size={18} color={T.goText}/>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: T.text }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space[2] }}>
+              <Text style={[type.label, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text }]}>
                 {doneCount} {doneCount === 1 ? 'stop' : 'stops'} completed
               </Text>
-              <Text style={{ fontSize: 11.5, color: T.muted, fontWeight: '600' }} numberOfLines={1}>
+              <Text style={[type.caption, TABULAR, { color: T.text2 }]} numberOfLines={1}>
                 {timeRange}
               </Text>
             </View>
-            <Text style={{ fontSize: 12, color: T.muted, marginTop: 2 }} numberOfLines={1}>
+            <Text style={[type.caption, { color: T.text2, marginTop: 2 }]} numberOfLines={1}>
               {placeChain}
             </Text>
           </View>
-          <Text style={{ fontSize: 11, color: T.muted, fontWeight: '700', letterSpacing: 0.4 }}>
-            SHOW ▾
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <Text style={[type.caption, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text2 }]}>Show</Text>
+            <Icon name="chevDown" size={14} stroke={2.4} color={T.text2}/>
+          </View>
         </Pressable>
       )}
 
       {restStops.map((s, i) => (
-        <TimelineStop key={`rest-${i}`} stop={s} isLast={i === restStops.length - 1} state={restStates[i]}/>
+        <TimelineStop
+          key={`rest-${i}`} stop={s} isLast={i === restStops.length - 1} state={restStates[i]}
+          pin={pinFor(doneStops.length + i, stops.length)}
+        />
       ))}
     </>
   );
@@ -287,18 +307,12 @@ function RouteWithCollapsedDoneStops({
 function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) {
   const T = useTokens();
   return (
-    <View style={{
-      marginHorizontal: 16, padding: 16, borderRadius: 12,
-      backgroundColor: T.redSoft, borderWidth: 1, borderColor: T.red,
-    }}>
-      <Text style={{ fontSize: 14, fontWeight: '700', color: T.redFg }}>Couldn't load active job</Text>
-      <Text style={{ fontSize: 13, color: T.redFg, lineHeight: 19, marginTop: 4 }}>{message}</Text>
-      <Pressable
-        onPress={onRetry}
-        style={{ marginTop: 12, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: T.red }}
-      >
-        <Text style={{ fontSize: 13, color: T.redFg, fontWeight: '600' }}>Retry</Text>
-      </Pressable>
-    </View>
+    <Band tone="red" style={{ marginHorizontal: space[4] }}>
+      <Text style={[type.body, { fontFamily: fontFor('600'), fontWeight: '600', color: T.redText }]}>Couldn't load active job</Text>
+      <Text style={[type.body, { color: T.redText, marginTop: 4 }]}>{message}</Text>
+      <View style={{ marginTop: space[3], alignSelf: 'flex-start' }}>
+        <Button variant="secondary" onPress={onRetry}>Retry</Button>
+      </View>
+    </Band>
   );
 }
