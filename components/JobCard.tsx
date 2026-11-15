@@ -98,7 +98,7 @@ function Meta({ job, onFeature }: { job: Job; onFeature: boolean }) {
 const rawLabel = (raw: string) => (raw.toLowerCase() === 'rejected' ? 'Rejected' : raw);
 
 export function JobCard({
-  job, dim, overdue, hideActions, onAccept, onReject, onView, onPress,
+  job, dim, overdue, hideActions, onAccept, onReject, onPress,
 }: {
   job: Job;
   dim?: boolean;
