@@ -16,6 +16,7 @@ import { useMyVehicles } from '../../lib/queries/vehicles';
 import { useLogExpense } from '../../lib/mutations/logExpense';
 import type { ExpenseCategory } from '../../lib/queries/expenses';
 import { formatDateLong, myDateKey } from '../../lib/timeFormat';
+import { amountValue, checkExpense } from '../../lib/expenses';
 
 const CATS: { value: ExpenseCategory; label: string; icon: IconName }[] = [
   { value: 'fuel',  label: 'Fuel',  icon: 'fuel' },
@@ -33,6 +34,8 @@ export default function LogExpense() {
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const [showVehiclePicker, setShowVehiclePicker] = useState(false);
   const [amountFocused, setAmountFocused] = useState(false);
+  // Messages sit under their field. A pop-up hides the form it is about.
+  const [errors, setErrors] = useState<{ amount?: string; vehicle?: string }>({});
 
   const { data: vehicles, isLoading: vehiclesLoading } = useMyVehicles();
   const logExpense = useLogExpense();
@@ -95,15 +98,13 @@ export default function LogExpense() {
   }
 
   async function onSave() {
-    const num = parseFloat(amount);
-    if (!num || num <= 0) {
-      Alert.alert('Amount required', 'Enter an amount greater than zero.');
+    const found = checkExpense(amount, vehicleId);
+    if (found.amount || found.vehicle) {
+      setErrors({ amount: found.amount, vehicle: found.vehicle });
       return;
     }
-    if (!vehicleId) {
-      Alert.alert('Vehicle required', 'Pick a vehicle for this expense.');
-      return;
-    }
+    const num = amountValue(amount);
+    if (num === null || !vehicleId) return;
     try {
       await logExpense.mutateAsync({
         category: cat,
@@ -152,17 +153,18 @@ export default function LogExpense() {
           />
         </FormField>
 
-        <FormField label="Amount">
+        <FormField label="Amount" error={errors.amount}>
           <View style={{
             flexDirection: 'row', alignItems: 'center',
             backgroundColor: T.surfaceSunk, borderRadius: radius.md, borderWidth: 2,
-            borderColor: amountFocused ? T.ink : 'transparent',
+            borderColor: errors.amount ? T.red : amountFocused ? T.ink : 'transparent',
             paddingLeft: space[4],
           }}>
             <Text style={[type.title, { color: T.text2, marginRight: space[2] }]}>RM</Text>
             <Input
               value={amount}
-              onChangeText={setAmount}
+              onChangeText={(t) => { setAmount(t); if (errors.amount) setErrors(x => ({ ...x, amount: undefined })); }}
+              invalid={!!errors.amount}
               keyboardType="decimal-pad"
               placeholder="0.00"
               onFocus={() => setAmountFocused(true)}
@@ -186,7 +188,7 @@ export default function LogExpense() {
           </View>
         </FormField>
 
-        <FormField label="Vehicle">
+        <FormField label="Vehicle" error={errors.vehicle}>
           <Pressable
             onPress={() => setShowVehiclePicker(true)}
             disabled={vehiclesLoading || !vehicles?.length}
@@ -194,7 +196,7 @@ export default function LogExpense() {
             style={{
               flexDirection: 'row', alignItems: 'center', gap: space[2],
               minHeight: 44, paddingHorizontal: space[5], borderRadius: radius.pill,
-              backgroundColor: T.surface, borderWidth: 1, borderColor: T.controlRing,
+              backgroundColor: T.surface, borderWidth: 1, borderColor: errors.vehicle ? T.red : T.controlRing,
               boxShadow: T.shadow1,
             }}
           >
@@ -267,7 +269,7 @@ export default function LogExpense() {
         visible={showVehiclePicker}
         vehicles={vehicles ?? []}
         selectedId={vehicleId}
-        onPick={id => { setVehicleId(id); setShowVehiclePicker(false); }}
+        onPick={id => { setVehicleId(id); setErrors(x => ({ ...x, vehicle: undefined })); setShowVehiclePicker(false); }}
         onClose={() => setShowVehiclePicker(false)}
       />
     </SafeAreaView>
