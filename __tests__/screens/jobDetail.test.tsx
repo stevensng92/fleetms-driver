@@ -90,3 +90,49 @@ describe('Job detail: not found and failed (change 20)', () => {
     await waitFor(() => expect(refetch).toHaveBeenCalled());
   });
 });
+
+describe('Job detail: Reject asks first (matches the Jobs list)', () => {
+  const reject = jest.fn();
+  beforeEach(() => {
+    reject.mockReset().mockResolvedValue(undefined);
+    (useRejectAssignment as jest.Mock).mockReturnValue({ mutateAsync: reject, isPending: false });
+    mockJob(job({ rawStatus: 'pending', status: 'pending' }));
+  });
+
+  async function openDialog() {
+    await render(<JobDetail/>);
+    await fireEvent.press(screen.getByText('Reject'));
+    await screen.findByText('Reject JOB-137?');
+  }
+
+  it('opens the dialog with the agreed words and sends nothing yet', async () => {
+    await openDialog();
+    expect(screen.getByText('Dispatch will give it to another driver.')).toBeTruthy();
+    expect(screen.getByText('Keep job')).toBeTruthy();
+    expect(screen.getByText('Reject job')).toBeTruthy();
+    expect(screen.getByText('Reason (optional)')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Dispatch will see this.')).toBeTruthy();
+    expect(reject).not.toHaveBeenCalled();
+  });
+
+  it('Keep job sends nothing', async () => {
+    await openDialog();
+    await fireEvent.press(screen.getByText('Keep job'));
+    await waitFor(() => expect(screen.queryByText('Reject JOB-137?')).toBeNull());
+    expect(reject).not.toHaveBeenCalled();
+  });
+
+  it('sends the typed reason', async () => {
+    await openDialog();
+    await fireEvent.changeText(screen.getByPlaceholderText('Dispatch will see this.'), 'Car in the workshop');
+    await fireEvent.press(screen.getByText('Reject job'));
+    await waitFor(() => expect(reject).toHaveBeenCalledWith({ assignmentId: 'asg-1', reason: 'Car in the workshop' }));
+  });
+
+  it('sends no reason (undefined) when the box is empty', async () => {
+    await openDialog();
+    await fireEvent.press(screen.getByText('Reject job'));
+    await waitFor(() => expect(reject).toHaveBeenCalledWith({ assignmentId: 'asg-1', reason: undefined }));
+    await waitFor(() => expect(router.back).toHaveBeenCalled());
+  });
+});

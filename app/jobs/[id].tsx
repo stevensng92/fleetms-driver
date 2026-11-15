@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppFrame } from '../../components/AppFrame';
@@ -7,6 +7,7 @@ import { StatusPill } from '../../components/StatusPill';
 import { Band } from '../../components/Band';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { TimelineStop, Stop, pinFor } from '../../components/TimelineStop';
 import { ClientCard } from '../../components/ClientCard';
 import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
@@ -28,6 +29,8 @@ export default function JobDetail() {
   const startJob = useStartJob();
   const confirmAsg = useConfirmAssignment();
   const rejectAsg = useRejectAssignment();
+  // Reject asks first; nothing is sent until the driver confirms.
+  const [askingReject, setAskingReject] = useState(false);
 
   if (isLoading || !job) {
     return (
@@ -110,7 +113,7 @@ export default function JobDetail() {
             <View style={{ flexDirection: 'row', gap: space[3] }}>
               <Button
                 variant="secondary" full size="lg" style={{ flex: 1 }}
-                onPress={() => promptReject(job.assignmentId!, rejectAsg.mutateAsync, () => router.back())}
+                onPress={() => setAskingReject(true)}
               >
                 Reject
               </Button>
@@ -165,44 +168,24 @@ export default function JobDetail() {
           </Pressable>
         </View>
       </View>
+      <ConfirmDialog
+        visible={askingReject}
+        title={`Reject ${job.jobNumber}?`}
+        body="Dispatch will give it to another driver."
+        cancelLabel="Keep job"
+        confirmLabel="Reject job"
+        tone="danger"
+        reason={{ label: 'Reason (optional)', placeholder: 'Dispatch will see this.', optional: true }}
+        onCancel={() => setAskingReject(false)}
+        onConfirm={(reason) => {
+          setAskingReject(false);
+          rejectAsg.mutateAsync({ assignmentId: job.assignmentId!, reason: reason || undefined })
+            .then(() => router.back())
+            .catch((e: any) => Alert.alert('Could not reject', e?.message ?? 'Unknown error'));
+        }}
+      />
     </AppFrame>
   );
-}
-
-// Simple Alert.prompt-style reject flow. Alert.prompt is iOS-only; on Android
-// we fall through to a no-reason reject. Replace with a proper sheet later.
-function promptReject(
-  assignmentId: string,
-  mutate: (args: { assignmentId: string; reason?: string }) => Promise<unknown>,
-  onDone: () => void,
-) {
-  const doReject = (reason?: string) => {
-    mutate({ assignmentId, reason })
-      .then(onDone)
-      .catch((e: any) => Alert.alert('Could not reject', e?.message ?? 'Unknown error'));
-  };
-
-  if ((Alert as any).prompt) {
-    (Alert as any).prompt(
-      'Reject this job?',
-      'Optional reason — dispatcher will see this.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Reject', style: 'destructive', onPress: (text: string) => doReject(text || undefined) },
-      ],
-      'plain-text',
-      '',
-    );
-  } else {
-    Alert.alert(
-      'Reject this job?',
-      'Are you sure? Dispatcher will need to reassign.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Reject', style: 'destructive', onPress: () => doReject() },
-      ],
-    );
-  }
 }
 
 function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) {
