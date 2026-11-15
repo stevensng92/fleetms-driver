@@ -12,6 +12,7 @@ import { Input } from '../components/Input';
 import { useTokens } from '../theme/ThemeProvider';
 import { TABULAR, fontFor, radius, space, type } from '../theme/tokens';
 import { signInWithPin, fetchDriverProfile } from '../lib/auth';
+import { checkSignIn, phoneChars, pinDigits, type SignInErrors } from '../lib/phone';
 
 const APP_VERSION = Constants.expoConfig?.version ?? '';
 
@@ -24,11 +25,21 @@ export default function SignIn() {
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  const digitCount = phone.replace(/\D/g, '').length;
-  const canSubmit = digitCount >= 9 && digitCount <= 15 && pin.length === 6 && !submitting;
+  const [fieldErrors, setFieldErrors] = React.useState<SignInErrors>({});
+  const phoneRef = React.useRef<TextInput>(null);
+  const pinRef = React.useRef<TextInput>(null);
 
   async function onSubmit() {
-    if (!canSubmit) return;
+    if (submitting) return;
+    // The button is always on. A bad field is named at the field, nothing is sent.
+    const found = checkSignIn(phone, pin);
+    if (found.phone || found.pin) {
+      setFieldErrors(found);
+      setError(null);
+      (found.phone ? phoneRef : pinRef).current?.focus();
+      return;
+    }
+    setFieldErrors({});
     setError(null);
     setSubmitting(true);
     const signIn = await signInWithPin(phone, pin);
@@ -83,18 +94,22 @@ export default function SignIn() {
             </View>
 
             <View style={{ gap: space[4] }}>
-              <FormField label="Phone number">
+              <FormField label="Phone number" error={fieldErrors.phone}>
                 {/* The +60 prefix is plain text inside the field (change 8), not a flag. */}
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', height: 48,
                   backgroundColor: T.surfaceSunk, borderRadius: radius.md,
-                  borderWidth: 2, borderColor: phoneFocused ? T.ink : 'transparent',
+                  borderWidth: 2, borderColor: fieldErrors.phone ? T.red : phoneFocused ? T.ink : 'transparent',
                   paddingHorizontal: space[4], gap: space[3],
                 }}>
                   <Text style={{ fontFamily: fontFor('600'), fontWeight: '600', fontSize: 16, color: T.text2 }}>+60</Text>
                   <TextInput
+                    ref={phoneRef}
                     value={phone}
-                    onChangeText={setPhone}
+                    onChangeText={(t) => {
+                      setPhone(phoneChars(t));
+                      setFieldErrors((x) => ({ ...x, phone: undefined }));
+                    }}
                     onFocus={() => setPhoneFocused(true)}
                     onBlur={() => setPhoneFocused(false)}
                     keyboardType="phone-pad"
@@ -109,10 +124,15 @@ export default function SignIn() {
                 </View>
               </FormField>
 
-              <FormField label="PIN">
+              <FormField label="PIN" error={fieldErrors.pin}>
                 <Input
+                  ref={pinRef}
                   value={pin}
-                  onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 6))}
+                  invalid={!!fieldErrors.pin}
+                  onChangeText={(t) => {
+                    setPin(pinDigits(t));
+                    setFieldErrors((x) => ({ ...x, pin: undefined }));
+                  }}
                   keyboardType="number-pad"
                   placeholder="••••••"
                   maxLength={6}
@@ -123,7 +143,7 @@ export default function SignIn() {
 
               {error && <Band tone="red">{error}</Band>}
 
-              <Button full size="lg" disabled={!canSubmit} onPress={onSubmit}>
+              <Button full size="lg" disabled={submitting} onPress={onSubmit}>
                 {submitting ? <ActivityIndicator color={T.onInk}/> : 'Sign in'}
               </Button>
             </View>

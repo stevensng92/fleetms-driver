@@ -40,7 +40,7 @@ export function UpdateRequiredScreen({ currentVersion, minimumVersion }: Props) 
               Update required
             </Text>
             <Text style={[type.body, { color: T.text2, textAlign: 'center' }]}>
-              This version of FleetMS Driver is no longer supported. Please update the app to keep using it.
+              This version of FleetMS Driver is no longer supported. Update the app to keep using it.
             </Text>
           </View>
 
