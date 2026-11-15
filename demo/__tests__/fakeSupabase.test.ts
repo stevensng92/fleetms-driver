@@ -393,7 +393,7 @@ describe('real query hooks over the fake client', () => {
     const { useNotifications } = require('../../lib/queries/notifications');
     const n: any = await run(() => useNotifications());
     expect(n.length).toBe(6);
-    expect(n[0].title).toBe('New job · JOB-143');
+    expect(n[0]).toMatchObject({ title: 'New job', jobNumber: 'JOB-143' });
     expect(n.filter((i: any) => i.readAt === null)).toHaveLength(2);
   });
 

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../supabase';
-import { formatDateTime } from '../timeFormat';
+import { notificationText, notificationLink, type NotificationKind } from '../notificationText';
 
 // In-app inbox backed by public.push_log (the same table that drives push
 // delivery). Each row is one outbound push for this driver; the inbox is
@@ -9,13 +9,7 @@ import { formatDateTime } from '../timeFormat';
 // Kinds (Phase-1 push events — see fleetms migration 20260523):
 //   - job_assigned, job_updated, job_cancelled, reassigned, pickup_reminder.
 
-export type NotificationKind =
-  | 'job_assigned'
-  | 'job_updated'
-  | 'job_cancelled'
-  | 'reassigned'
-  | 'pickup_reminder'
-  | string; // open for future kinds
+export type { NotificationKind } from '../notificationText';
 
 export type NotificationItem = {
   id: string;
@@ -23,63 +17,13 @@ export type NotificationItem = {
   enqueuedAt: string;       // ISO
   sentAt: string | null;
   readAt: string | null;
+  /** Only a link the app can open; null means the row leads nowhere. */
   deeplink: string | null;
   title: string;
+  /** The real job number, shown beside the title. */
+  jobNumber: string | null;
   body: string;
 };
-
-export const KIND_LABEL: Record<string, string> = {
-  job_assigned:    'New job',
-  job_updated:     'Job updated',
-  job_cancelled:   'Job cancelled',
-  reassigned:      'Reassigned',
-  pickup_reminder: 'Pickup reminder',
-};
-
-// Synthesize a one-line title + body from the payload jsonb. Each kind shapes
-// its own copy; payloads come from the dispatcher's push-event triggers.
-function renderNotification(row: { kind: string; payload: any }): { title: string; body: string; deeplink: string | null } {
-  const p = row.payload ?? {};
-  const deeplink: string | null = p.deeplink ?? null;
-  const title = KIND_LABEL[row.kind] ?? row.kind.replace(/_/g, ' ');
-
-  const pickupTime = p.pickup_datetime ? formatDateTime(p.pickup_datetime) : null;
-
-  switch (row.kind) {
-    case 'job_assigned':
-      return {
-        title: `New job · ${p.job_number ?? ''}`.trim(),
-        body: [p.client_name, p.pickup_location, pickupTime].filter(Boolean).join(' · '),
-        deeplink,
-      };
-    case 'pickup_reminder':
-      return {
-        title: `Pickup soon · ${p.job_number ?? ''}`.trim(),
-        body: [p.pickup_location, pickupTime].filter(Boolean).join(' · '),
-        deeplink,
-      };
-    case 'job_updated':
-      return {
-        title: `Job updated · ${p.job_number ?? ''}`.trim(),
-        body: [p.pickup_location, pickupTime].filter(Boolean).join(' · '),
-        deeplink,
-      };
-    case 'job_cancelled':
-      return {
-        title: `Job cancelled · ${p.job_number ?? ''}`.trim(),
-        body: p.pickup_location ?? '',
-        deeplink,
-      };
-    case 'reassigned':
-      return {
-        title: `Reassigned · ${p.job_number ?? ''}`.trim(),
-        body: p.pickup_location ?? '',
-        deeplink,
-      };
-    default:
-      return { title, body: JSON.stringify(p).slice(0, 120), deeplink };
-  }
-}
 
 export function useNotifications() {
   return useQuery({
@@ -92,7 +36,8 @@ export function useNotifications() {
         .limit(50);
       if (error) throw error;
       return (data ?? []).map((r: any) => {
-        const { title, body, deeplink } = renderNotification({ kind: r.kind, payload: r.payload });
+        const { title, jobNumber, body } = notificationText(r.kind, r.payload);
+        const deeplink = notificationLink(r.payload?.deeplink ?? null);
         return {
           id: r.id,
           kind: r.kind,
@@ -101,6 +46,7 @@ export function useNotifications() {
           readAt: r.read_at,
           deeplink,
           title,
+          jobNumber,
           body,
         };
       });
