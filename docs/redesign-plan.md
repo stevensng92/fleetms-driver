@@ -174,7 +174,7 @@ screens are where the look and the fixes meet.
 Each phase is one screen area, one branch, one pull request. Each change is
 test first. Order is by how often drivers use the screen.
 
-### Phase 2: Jobs tab (changes 10, 11, 14, 15, 19, 32)
+### Phase 2: Jobs tab (changes 10, 11, 14, 15, 19, 32, 35, 36)
 
 | # | Change | Test first |
 |---|---|---|
@@ -184,6 +184,8 @@ test first. Order is by how often drivers use the screen.
 | 15 | "No jobs scheduled today" only when nothing is coming at all | `jobGroups(...).empty` port |
 | 19 | "View details" and "Completed" lines fold into the card | card render test |
 | 32 | Today leads with the job under way, then jobs still to do by pickup time; done and cancelled jobs sit in a "Finished today" fold, closed by default (added to the mock 15 Nov) | port the mock's `jobGroups` cases: `today` order, `todayFinished`, a day of only finished jobs is not empty; fold starts closed and opens on tap |
+| 35 | Accept: the buttons fade out (120ms) and lock, then the job turns Confirmed and the pill settles; a light success haptic on the tap (`expo-haptics`, already a dependency) | a second tap during the fade does nothing; accept fires once; haptic called once |
+| 36 | Finished today: the panel opens at once and its jobs fade in (never animate height); its count bumps once when it grew since the driver last saw it, including after Mark done on the trip screen | port `countRose` cases; count bumps after a job is marked done, not on first draw |
 
 New pure file: `lib/jobGroups.ts` (groups, which screen opens, "1 job" / "2 jobs").
 
