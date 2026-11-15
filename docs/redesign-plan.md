@@ -169,6 +169,11 @@ Remove the old token aliases. Turn on the "no literal colours" test. Fix what it
 finds (Logo, Waze and Maps icon colours become tokens; the Logo mark becomes the
 green chevron per the colour map).
 
+**Done 15 Nov.** By the time 1d ran, 1c had already moved every screen to the
+new names and fixed the Logo and icon colours, so the only thing the test found
+was the hex-to-rgba helper in `StatusPill`. It moved to `theme/tokens.ts`
+(`withAlpha`). The test is `theme/__tests__/noLiteralColours.test.ts`.
+
 **Phase 1 done when**: every screen matches the mock's look in light and dark,
 all tests pass, and a driver could not tell anything works differently.
 
@@ -355,7 +360,7 @@ Why the waits:
 - **7 waits for 3**: the vehicle names (28c) use `lib/route.ts`, which phase 3 creates.
 - **Release**: nothing ships until you say so. My suggestion stays: release once 1 to 3 are in, then the rest as they land.
 
-How I'll run it: one phase per branch (`redesign/phase-N-name`, off `master`), test first for every logic change, the checks table on every PR, and the before/after page as the look check. I open each PR and stop; you merge. When phases run side by side, each gets its own worktree, so no two touch the same files.
+How I'll run it: one phase per branch (`redesign/phase-N-name`, off `master`), test first for every logic change, the checks table on every PR, and the before/after page as the look check. I open each PR and stop; you merge. (15 Nov: Steven asked me to carry on through every phase and merge each PR once its checks pass. Releases still wait for him.) When phases run side by side, each gets its own worktree, so no two touch the same files.
 
 ## Risks
 

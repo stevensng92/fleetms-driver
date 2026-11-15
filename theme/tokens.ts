@@ -12,9 +12,9 @@
 // - The accent is a gradient. Its two ends are goFrom/goTo; a small SVG piece
 //   (GoFill, phase 1b) draws it.
 //
-// The OLD names (primary, accent, muted, heroBg...) are kept as aliases onto the
-// new palette, so every screen repaints without being touched. Phase 1d removes
-// them once the screens read the new names.
+// Screens and shared pieces read colours only from here; a test
+// (theme/__tests__/noLiteralColours.test.ts) fails on a raw colour in app/ or
+// components/.
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -109,33 +109,20 @@ const FEATURE_STATUS: FeatureStatus = {
   neutralSoft: DARK.neutralSoft, neutralText: DARK.neutralText,
 };
 
-/** Today's token names, pointed at the new palette. Removed in phase 1d. */
-function legacy(p: Palette) {
-  return {
-    page: p.ground, surfaceAlt: p.surfaceSunk, raised: p.track,
-    muted: p.text2, mutedLight: p.text3, textInverse: p.onInk,
-    border: p.hairlineStrong, borderHard: p.track,
-    pendingBg: p.amberSoft, pendingFg: p.amberText, pendingDot: p.amber,
-    confirmBg: p.greenSoft, confirmFg: p.greenText, confirmDot: p.go,
-    progressBg: p.blueSoft, progressFg: p.blueText, progressDot: p.blue,
-    doneBg: p.neutralSoft, doneFg: p.neutralText, doneDot: p.neutral,
-    voidedBg: p.neutralSoft, voidedFg: p.neutralText, voidedDot: p.neutral,
-    accent: p.go, accentSoft: p.greenSoft, accentFg: p.goText,
-    amberFg: p.amberText, redFg: p.redText, greenFg: p.greenText,
-    heroBg: p.feature, heroFg: p.onFeature, heroMuted: p.onFeature2, heroLine: p.featureTrack,
-    pageFadeFrom: p.ground.length === 7 ? `${p.ground}00` : p.ground, pageFadeTo: p.ground,
-    primary: p.ink, primaryFg: p.onInk, primaryHover: p.ink2, primaryRing: p.hairlineStrong,
-  };
-}
-
-export type Tokens = Palette & ReturnType<typeof legacy> & {
+export type Tokens = Palette & {
   theme: ThemeMode;
   onFeatureStatus: FeatureStatus;
 };
 
 export function makeTokens(theme: ThemeMode = 'light'): Tokens {
   const p = theme === 'dark' ? DARK : LIGHT;
-  return { ...p, ...legacy(p), theme, onFeatureStatus: FEATURE_STATUS };
+  return { ...p, theme, onFeatureStatus: FEATURE_STATUS };
+}
+
+/** 'rgba' of a #RRGGBB colour. */
+export function withAlpha(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
 }
 
 /** Space, 4px steps. */
