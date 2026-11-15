@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ScrollView, Image, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -16,7 +16,7 @@ import { useMyVehicles } from '../../lib/queries/vehicles';
 import { useLogExpense } from '../../lib/mutations/logExpense';
 import type { ExpenseCategory } from '../../lib/queries/expenses';
 import { formatDateLong, myDateKey } from '../../lib/timeFormat';
-import { amountValue, checkExpense, checkReceiptFile, receiptFileOf } from '../../lib/expenses';
+import { amountValue, checkExpense, checkReceiptFile, receiptFileOf, vehicleOptionLine } from '../../lib/expenses';
 
 const CATS: { value: ExpenseCategory; label: string; icon: IconName }[] = [
   { value: 'fuel',  label: 'Fuel',  icon: 'fuel' },
@@ -200,7 +200,7 @@ export default function LogExpense() {
         <FormField label="Vehicle" error={errors.vehicle}>
           <Pressable
             onPress={() => setShowVehiclePicker(true)}
-            disabled={vehiclesLoading || !vehicles?.length}
+            disabled={vehiclesLoading}
             accessibilityRole="button"
             style={{
               flexDirection: 'row', alignItems: 'center', gap: space[2],
@@ -299,8 +299,7 @@ function VehicleSheet({
     <Sheet visible={visible} onClose={onClose} title="Pick vehicle">
       {vehicles.length === 0 ? (
         <View style={{ padding: space[5], alignItems: 'center' }}>
-          <ActivityIndicator color={T.text2}/>
-          <Text style={[type.label, { marginTop: space[3], color: T.text2 }]}>
+          <Text style={[type.label, { color: T.text2 }]}>
             No active vehicles in your org.
           </Text>
         </View>
@@ -328,7 +327,7 @@ function VehicleSheet({
                     {v.isDefault && <Pill tone="neutral">Default</Pill>}
                   </View>
                   <Text style={[type.caption, { color: T.text2 }]}>
-                    {v.type}{v.model ? `, ${v.model}` : ''}
+                    {vehicleOptionLine(v)}
                   </Text>
                 </View>
                 {sel && <Icon name="check" size={20} stroke={2.6} color={T.text}/>}

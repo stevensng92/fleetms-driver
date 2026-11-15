@@ -158,3 +158,33 @@ describe('Log expense: the receipt is really checked (28b)', () => {
     expect(screen.queryByText('Take photo or upload')).toBeNull();
   });
 });
+
+describe('Log expense: the vehicle list (28c)', () => {
+  it('shows "MPV, Toyota Alphard", not the raw type', async () => {
+    await render(<LogExpense/>);
+    await fireEvent.press(screen.getByText('VKA 2231'));
+
+    expect(screen.getByText('MPV, Toyota Alphard')).toBeTruthy();
+    expect(screen.getByText('Executive')).toBeTruthy();
+    expect(screen.queryByText(/sedan_executive/)).toBeNull();
+    expect(screen.queryByText(/^mpv/)).toBeNull();
+  });
+
+  it('an empty list says so and does not spin', async () => {
+    mockVehicles([]);
+    await render(<LogExpense/>);
+    await fireEvent.press(screen.getByText('Pick vehicle'));
+
+    expect(screen.getByText('No active vehicles in your org.')).toBeTruthy();
+    expect(screen.queryByRole('progressbar')).toBeNull();
+  });
+
+  it('while the list is loading the button says so and cannot be opened', async () => {
+    mockVehicles(undefined, true);
+    await render(<LogExpense/>);
+
+    expect(screen.getByText('Loading…')).toBeTruthy();
+    await fireEvent.press(screen.getByText('Loading…'));
+    expect(screen.queryByText('No active vehicles in your org.')).toBeNull();
+  });
+});

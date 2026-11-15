@@ -1,4 +1,5 @@
 import { parseAmount } from './amount';
+import { vehicleTypeLabel } from './route';
 
 // Plain decisions about the expense form, kept apart from the screen so they
 // can be tested without a database client. Ported from the design mock's
@@ -49,4 +50,14 @@ const TYPE_BY_ENDING: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image
 export function receiptFileOf(asset: { uri: string; mimeType?: string | null; fileSize?: number | null }): { type: string; size: number } {
   const ending = asset.uri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
   return { type: asset.mimeType ?? TYPE_BY_ENDING[ending] ?? '', size: asset.fileSize ?? 0 };
+}
+
+/**
+ * The second line of a vehicle in the picker: "MPV, Toyota Alphard". The type
+ * name comes from the one list in lib/route.ts, so "sedan_executive" never
+ * reaches the screen. No model means just the type name.
+ */
+export function vehicleOptionLine(v: { type: string; model: string | null }): string {
+  const model = v.model?.trim();
+  return model ? `${vehicleTypeLabel(v.type)}, ${model}` : vehicleTypeLabel(v.type);
 }

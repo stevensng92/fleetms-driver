@@ -1,4 +1,4 @@
-import { amountValue, checkExpense, checkReceiptFile, receiptFileOf } from '../expenses';
+import { amountValue, checkExpense, checkReceiptFile, receiptFileOf, vehicleOptionLine } from '../expenses';
 
 describe('checkExpense', () => {
   it('needs an amount over zero', () => {
@@ -62,5 +62,19 @@ describe('receiptFileOf', () => {
   });
   it('leaves the type empty when it cannot be told, so the check refuses it', () => {
     expect(receiptFileOf({ uri: 'file:///a/b.heic' })).toEqual({ type: '', size: 0 });
+  });
+});
+
+describe('vehicleOptionLine', () => {
+  it('is the type name, then the model', () => {
+    expect(vehicleOptionLine({ type: 'mpv', model: 'Toyota Alphard' })).toBe('MPV, Toyota Alphard');
+    expect(vehicleOptionLine({ type: 'sedan_executive', model: 'Mercedes E-Class' })).toBe('Executive, Mercedes E-Class');
+  });
+  it('is just the type name when there is no model', () => {
+    expect(vehicleOptionLine({ type: 'van', model: null })).toBe('Van');
+    expect(vehicleOptionLine({ type: 'van', model: '  ' })).toBe('Van');
+  });
+  it('passes a type we do not know through unchanged', () => {
+    expect(vehicleOptionLine({ type: 'bus', model: 'Yutong' })).toBe('bus, Yutong');
   });
 });
