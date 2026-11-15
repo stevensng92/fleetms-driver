@@ -1,4 +1,4 @@
-import { amountValue, checkExpense, checkReceiptFile, receiptFileOf, vehicleOptionLine } from '../expenses';
+import { amountValue, checkExpense, checkReceiptFile, receiptFileOf, vehicleOptionLine, hasDraft } from '../expenses';
 
 describe('checkExpense', () => {
   it('needs an amount over zero', () => {
@@ -76,5 +76,16 @@ describe('vehicleOptionLine', () => {
   });
   it('passes a type we do not know through unchanged', () => {
     expect(vehicleOptionLine({ type: 'bus', model: 'Yutong' })).toBe('bus, Yutong');
+  });
+});
+
+describe('hasDraft', () => {
+  it('an untouched form is not a draft, and spaces do not count', () => {
+    expect(hasDraft({ amount: '', notes: '  ', photo: false })).toBe(false);
+  });
+  it('a typed amount, typed notes or a chosen photo is a draft', () => {
+    expect(hasDraft({ amount: '1', notes: '', photo: false })).toBe(true);
+    expect(hasDraft({ amount: '', notes: 'Plus', photo: false })).toBe(true);
+    expect(hasDraft({ amount: '', notes: '', photo: true })).toBe(true);
   });
 });

@@ -10,13 +10,14 @@ import { Input } from '../../components/Input';
 import { Segmented } from '../../components/Segmented';
 import { Sheet } from '../../components/Sheet';
 import { Pill } from '../../components/Pill';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useTokens } from '../../theme/ThemeProvider';
 import { fontFor, radius, space, TABULAR, type } from '../../theme/tokens';
 import { useMyVehicles } from '../../lib/queries/vehicles';
 import { useLogExpense } from '../../lib/mutations/logExpense';
 import type { ExpenseCategory } from '../../lib/queries/expenses';
 import { formatDateLong, myDateKey } from '../../lib/timeFormat';
-import { amountValue, checkExpense, checkReceiptFile, receiptFileOf, vehicleOptionLine } from '../../lib/expenses';
+import { amountValue, checkExpense, checkReceiptFile, receiptFileOf, vehicleOptionLine, hasDraft } from '../../lib/expenses';
 
 const CATS: { value: ExpenseCategory; label: string; icon: IconName }[] = [
   { value: 'fuel',  label: 'Fuel',  icon: 'fuel' },
@@ -34,6 +35,7 @@ export default function LogExpense() {
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const [showVehiclePicker, setShowVehiclePicker] = useState(false);
   const [amountFocused, setAmountFocused] = useState(false);
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
   // Messages sit under their field. A pop-up hides the form it is about.
   const [errors, setErrors] = useState<{ amount?: string; vehicle?: string; receipt?: string }>({});
 
@@ -60,6 +62,11 @@ export default function LogExpense() {
   const now = new Date();
   const todayLocal = formatDateLong(now);
   const todayIso = myDateKey(now);
+
+  // Leaving a form with something in it asks first; an empty one just leaves.
+  // Saving goes back directly, not through here.
+  const draft = hasDraft({ amount, notes, photo: receiptUri != null });
+  const leave = () => (draft ? setConfirmingLeave(true) : router.back());
 
   async function pickReceipt(source: 'camera' | 'library') {
     const perm = source === 'camera'
@@ -140,7 +147,7 @@ export default function LogExpense() {
           Log expense
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={leave}
           accessibilityRole="button"
           accessibilityLabel="Close"
           style={{
@@ -266,13 +273,24 @@ export default function LogExpense() {
         paddingHorizontal: space[5], paddingVertical: space[4], paddingBottom: 30,
         borderTopWidth: 1, borderTopColor: T.hairline, backgroundColor: T.surface,
       }}>
-        <Button variant="secondary" style={{ flex: 1 }} onPress={() => router.back()} >
+        <Button variant="secondary" style={{ flex: 1 }} onPress={leave}>
           Cancel
         </Button>
         <Button style={{ flex: 2 }} onPress={onSave}>
           {logExpense.isPending ? 'Saving…' : 'Save expense'}
         </Button>
       </View>
+
+      <ConfirmDialog
+        visible={confirmingLeave}
+        title="Discard this expense?"
+        body="What you typed will be lost."
+        confirmLabel="Discard expense"
+        cancelLabel="Keep expense"
+        tone="danger"
+        onConfirm={() => { setConfirmingLeave(false); router.back(); }}
+        onCancel={() => setConfirmingLeave(false)}
+      />
 
       <VehicleSheet
         visible={showVehiclePicker}

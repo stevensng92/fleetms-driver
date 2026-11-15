@@ -61,3 +61,8 @@ export function vehicleOptionLine(v: { type: string; model: string | null }): st
   const model = v.model?.trim();
   return model ? `${vehicleTypeLabel(v.type)}, ${model}` : vehicleTypeLabel(v.type);
 }
+
+/** Anything typed or chosen that leaving the form would lose. */
+export function hasDraft(f: { amount: string; notes: string; photo: boolean }): boolean {
+  return f.amount.trim() !== '' || f.notes.trim() !== '' || f.photo;
+}

@@ -188,3 +188,81 @@ describe('Log expense: the vehicle list (28c)', () => {
     expect(screen.queryByText('No active vehicles in your org.')).toBeNull();
   });
 });
+
+describe('Log expense: leaving a filled form asks first (28d)', () => {
+  const TITLE = 'Discard this expense?';
+
+  it.each(['Cancel', 'Close'])('%s on an empty form just leaves', async (name) => {
+    await render(<LogExpense/>);
+    await fireEvent.press(name === 'Cancel' ? screen.getByText('Cancel') : screen.getByLabelText('Close'));
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(TITLE)).toBeNull();
+  });
+
+  it('spaces only in the notes still counts as empty', async () => {
+    await render(<LogExpense/>);
+    await fireEvent.changeText(screen.getByPlaceholderText('e.g. Plus highway, KL–Seremban'), '   ');
+    await fireEvent.press(screen.getByText('Cancel'));
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['Cancel', 'Close'])('%s on a typed amount asks, and leaves nothing done until answered', async (name) => {
+    await render(<LogExpense/>);
+    await fireEvent.changeText(screen.getByPlaceholderText('0.00'), '5');
+    await fireEvent.press(name === 'Cancel' ? screen.getByText('Cancel') : screen.getByLabelText('Close'));
+
+    expect(screen.getByText(TITLE)).toBeTruthy();
+    expect(screen.getByText('What you typed will be lost.')).toBeTruthy();
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('typed notes alone are a draft', async () => {
+    await render(<LogExpense/>);
+    await fireEvent.changeText(screen.getByPlaceholderText('e.g. Plus highway, KL–Seremban'), 'Plus');
+    await fireEvent.press(screen.getByText('Cancel'));
+
+    expect(screen.getByText(TITLE)).toBeTruthy();
+  });
+
+  it('a chosen photo alone is a draft', async () => {
+    mockPick({ uri: 'file:///ok.jpg', mimeType: 'image/jpeg', fileSize: 1000 });
+    await render(<LogExpense/>);
+    await chooseFromLibrary();
+    await waitFor(() => expect(screen.queryByText('Take photo or upload')).toBeNull());
+    await fireEvent.press(screen.getByText('Cancel'));
+
+    expect(screen.getByText(TITLE)).toBeTruthy();
+  });
+
+  it('"Keep expense" closes the dialog and stays', async () => {
+    await render(<LogExpense/>);
+    await fireEvent.changeText(screen.getByPlaceholderText('0.00'), '5');
+    await fireEvent.press(screen.getByText('Cancel'));
+    await fireEvent.press(screen.getByText('Keep expense'));
+
+    expect(screen.queryByText(TITLE)).toBeNull();
+    expect(router.back).not.toHaveBeenCalled();
+    expect(screen.getByPlaceholderText('0.00').props.value).toBe('5');
+  });
+
+  it('"Discard expense" leaves', async () => {
+    await render(<LogExpense/>);
+    await fireEvent.changeText(screen.getByPlaceholderText('0.00'), '5');
+    await fireEvent.press(screen.getByText('Cancel'));
+    await fireEvent.press(screen.getByText('Discard expense'));
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('saving a filled form goes back without asking', async () => {
+    await render(<LogExpense/>);
+    await fireEvent.changeText(screen.getByPlaceholderText('0.00'), '5');
+    await fireEvent.press(screen.getByText('Save expense'));
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(TITLE)).toBeNull();
+  });
+});
