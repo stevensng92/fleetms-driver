@@ -179,3 +179,48 @@ export function emptyStateText(p: EarningsPeriod, now: Date = new Date()): strin
   }
   return `No completed jobs in ${head}.`;
 }
+
+/** How far a horizontal drag must travel before it counts as a page turn. */
+export const SWIPE_THRESHOLD = 40;
+
+/**
+ * A horizontal drag of 40px or more pages; a mostly vertical one is a scroll.
+ * Right is earlier, so the swipe agrees with the arrows (Earlier is the left
+ * one). Changed 15 Nov: the app used to swipe left for earlier.
+ */
+export function swipeStep(dx: number, dy: number): 'earlier' | 'later' | null {
+  if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dy) > Math.abs(dx)) return null;
+  return dx > 0 ? 'earlier' : 'later';
+}
+
+/** The line under the card that says the card can be swiped. Null on All time. */
+export const pagerHint = (mode: EarningsMode): string | null =>
+  mode === 'all' ? null : `Swipe right for earlier ${mode}s`;
+
+/** The Unpaid figure: "None", "1 job", "3 jobs". */
+export const unpaidText = (n: number): string =>
+  n === 0 ? 'None' : `${n} ${n === 1 ? 'job' : 'jobs'}`;
+
+/** Which side a page turn comes in from. */
+export type SlideSide = 'left' | 'right';
+
+/** An arrow brings the new page in from its own side (Earlier is the left arrow). */
+export const arrowSlide = (dir: 'earlier' | 'later'): SlideSide =>
+  dir === 'earlier' ? 'left' : 'right';
+
+/** A swipe brings it in from the side the finger moved away from, so it follows the finger. */
+export const swipeSlide = (dx: number): SlideSide => (dx > 0 ? 'left' : 'right');
+
+/**
+ * The look at `progress` (0 to 1) of a page turn: fade in and slide 16px in from
+ * `from`. Reduce Motion keeps the fade and drops the slide. With no side (a
+ * Week / Month / All switch) nothing moves and nothing fades. Runs inside
+ * reanimated worklets, hence the directive.
+ */
+export function slideFrame(progress: number, from: SlideSide | null, reduced: boolean) {
+  'worklet';
+  if (from === null) return { opacity: 1, translateX: 0 };
+  const left = 1 - progress;
+  const distance = reduced ? 0 : 16 * left;
+  return { opacity: progress, translateX: from === 'left' ? 0 - distance : distance };
+}

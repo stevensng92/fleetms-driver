@@ -1,6 +1,7 @@
 import {
   periodRange, periodCount, periodKeysDesc, periodHeadline, emptyStateText,
   monthPeriod, weekPeriod, modeOf, keyOf, MAX_PERIODS,
+  swipeStep, pagerHint, unpaidText, arrowSlide, swipeSlide, slideFrame,
   type EarningsPeriod,
 } from '../earningsPeriod';
 
@@ -219,5 +220,63 @@ describe('emptyStateText', () => {
 
   it('handles all time', () => {
     expect(emptyStateText('all', NOW)).toBe('No completed jobs yet.');
+  });
+});
+
+describe('swipeStep', () => {
+  it('right is earlier, left is later, past 40px, matching the arrows', () => {
+    expect(swipeStep(41, 0)).toBe('earlier');
+    expect(swipeStep(-41, 5)).toBe('later');
+    expect(swipeStep(40, 0)).toBe('earlier');
+    expect(swipeStep(-40, 0)).toBe('later');
+  });
+  it('ignores short and mostly vertical moves', () => {
+    expect(swipeStep(39, 0)).toBeNull();
+    expect(swipeStep(-39, 0)).toBeNull();
+    expect(swipeStep(-60, 70)).toBeNull();
+    expect(swipeStep(60, -61)).toBeNull();
+  });
+});
+
+describe('pagerHint', () => {
+  it('names the direction and the kind of period', () => {
+    expect(pagerHint('week')).toBe('Swipe right for earlier weeks');
+    expect(pagerHint('month')).toBe('Swipe right for earlier months');
+    expect(pagerHint('all')).toBeNull();
+  });
+});
+
+describe('unpaidText', () => {
+  it('words the count', () => {
+    expect(unpaidText(0)).toBe('None');
+    expect(unpaidText(1)).toBe('1 job');
+    expect(unpaidText(3)).toBe('3 jobs');
+  });
+});
+
+describe('which side the page comes in from', () => {
+  it('an arrow brings it from its own side', () => {
+    expect(arrowSlide('earlier')).toBe('left');
+    expect(arrowSlide('later')).toBe('right');
+  });
+  it('a swipe brings it from the side the finger moved away from', () => {
+    expect(swipeSlide(50)).toBe('left');   // finger moved right, left edge is where it started
+    expect(swipeSlide(-50)).toBe('right');
+  });
+});
+
+describe('slideFrame', () => {
+  it('starts 16px out and invisible, and ends in place', () => {
+    expect(slideFrame(0, 'left', false)).toEqual({ opacity: 0, translateX: -16 });
+    expect(slideFrame(0, 'right', false)).toEqual({ opacity: 0, translateX: 16 });
+    expect(slideFrame(1, 'left', false)).toEqual({ opacity: 1, translateX: 0 });
+    expect(slideFrame(0.5, 'right', false)).toEqual({ opacity: 0.5, translateX: 8 });
+  });
+  it('under Reduce Motion it only fades', () => {
+    expect(slideFrame(0, 'left', true)).toEqual({ opacity: 0, translateX: 0 });
+    expect(slideFrame(0.5, 'right', true)).toEqual({ opacity: 0.5, translateX: 0 });
+  });
+  it('with no side (a mode switch) it does not move or fade', () => {
+    expect(slideFrame(0, null, false)).toEqual({ opacity: 1, translateX: 0 });
   });
 });
