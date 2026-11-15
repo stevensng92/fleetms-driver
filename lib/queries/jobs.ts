@@ -72,7 +72,8 @@ const OPEN_STATUSES = ['pending', 'confirmed', 'in_progress'] as const;
 // Pulls the current driver's upcoming jobs (today + tomorrow + next 14 days).
 // RLS scopes results via private.is_driver_self(driver_id) so the anon JWT
 // only sees its own. PostgREST embedding handles the FK join automatically.
-async function fetchJobs(): Promise<FetchedJobs> {
+// Exported for lib/queries/__tests__/jobs.test.ts; the screen goes through useTodaysJobs.
+export async function fetchJobs(): Promise<FetchedJobs> {
   // Every boundary derived independently from the same MY day, rather than by
   // walking forward from startToday with setDate(). setDate() operates in the
   // DEVICE's local terms, so on a phone that observes DST it would add 23 or 25
@@ -172,6 +173,10 @@ async function fetchJobs(): Promise<FetchedJobs> {
     client: r.job.client_name,
     pax: r.job.pax ?? 0,
     status: mapStatus(r.job.status),
+    // The raw database status: a cancelled job's pill reads "Cancelled", not "Voided".
+    rawStatus: r.job.status,
+    // The real pickup time, so today's jobs can be put in order.
+    pickupAt: r.job.pickup_datetime,
     // null unless this job pays something other than the driver's normal cut —
     // a rate override pinned to the driver's own rate is not "special", but a
     // flat fee always is, including the driver's own standing fee.
