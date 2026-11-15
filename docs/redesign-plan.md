@@ -146,7 +146,7 @@ display only:
 | 1 | Violet becomes ink, cyan becomes green, pills get icons | everywhere, via 1a and 1b |
 | 2 | Capital labels become sentence case | every `SectionLabel` and field label |
 | 3 | Dot-joined lines become separate items with icons | job card meta, client card vehicle line, expense rows, notifications |
-| 4 | Times in 24 hour: "14:30", not "14:30 pm". Applies to the 24-hour choice only. Drivers can now pick 12-hour ("2:30 pm") on Profile, added 15 Nov outside the redesign; that option stays as is | `formatClock` in `lib/timeFormat.ts` (tests updated first) |
+| 4 | Times in 24 hour: "14:30", not "14:30 pm". This is the default; phase 5 adds a 12-hour choice | `formatClock` in `lib/timeFormat.ts` (tests updated first) |
 | 5 | "Sat, 12 Dec" and "Saturday, 12 December 2026"; ranges say "to" | `lib/timeFormat.ts` (`formatDate`, `formatWeekRange`) |
 | 6 | Nothing pulses; the job being driven is the dark card | `JobCard`, `active.tsx` |
 | 7 | Floating tab bar | `app/(tabs)/_layout.tsx` |
@@ -212,7 +212,7 @@ and `driverProfile.ts`) into one.
 Extends the existing `lib/earningsPeriod.ts` (already tested) and adds
 `lib/money.ts` (`formatRM`, `splitRM`).
 
-### Phase 5: Profile and time off (changes 24, 26, 27)
+### Phase 5: Profile and time off (changes 24, 26, 27, plus Time format)
 
 | # | Change | Test first |
 |---|---|---|
@@ -220,7 +220,7 @@ Extends the existing `lib/earningsPeriod.ts` (already tested) and adds
 | 26 | An inactive driver never shows a green pill; initials skip "bin" and "binti" | `availabilityPill`, `initials` ports |
 | 27 | Sign out asks first | nothing happens until confirmed |
 
-The mock's Profile has no Time format setting. The real app now has one (24-hour or 12-hour, under Appearance). The repaint keeps it, styled like the Theme setting beside it.
+**New, added to the mock 15 Nov: Time format.** Profile > Appearance gets a Time format choice under Theme: 24-hour ("14:30", the default) or 12-hour ("2:30 pm", "12:15 am"). It is saved on the phone and every clock follows it: job cards, the job and trip screens, notification text and sent times. Test first: port the mock's `clockTime` cases (`rules.test.ts`) into `lib/__tests__/timeFormat.test.ts`, then add the style to `formatClock`. Job cards and notification rows build their times inside query functions, so a change must also refetch those queries. Today's app does not get this before the redesign.
 
 New pure files: `lib/timeOff.ts`, `lib/profile.ts`.
 
