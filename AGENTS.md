@@ -21,10 +21,14 @@ Run with `npm test`. Full guide, including the sharp edges that will bite you
 - Never commit code that makes existing tests fail.
 
 Currently covered: pure helpers (`lib/timeFormat.ts`, `lib/commissionRate.ts`,
-`lib/semver.ts`, `lib/earningsPeriod.ts`, `lib/jobContact.ts`) and shared
+`lib/semver.ts`, `lib/earningsPeriod.ts`, `lib/jobContact.ts`, `lib/jobStatus.ts`) and shared
 components, plus the Earnings screen and `fetchClientPhone` in
 `lib/queries/jobDetail.ts`. NOT covered: the other screens, the remaining React
 Query data hooks, realtime, auth.
+
+A job status is read ONLY through `lib/jobStatus.ts` (words, pill, open or
+finished, the allowed action, which screen opens). Never compare status
+strings in a screen; add a row there instead.
 
 Note the shape that makes the pure helpers coverable: anything importing
 `lib/supabase.ts` builds a live client at import time, so pure decisions belong
