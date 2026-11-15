@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { AppFrame } from '../../components/AppFrame';
 import { AppHeader } from '../../components/AppHeader';
 import { StatusPill } from '../../components/StatusPill';
+import { jobStatus } from '../../lib/jobStatus';
 import { Band } from '../../components/Band';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
@@ -57,7 +58,8 @@ export default function ActiveJob() {
     kind: r.label, arrive: r.time, place: r.place, lat: r.lat, lng: r.lng,
   }));
 
-  const isInProgress = job.rawStatus === 'in_progress';
+  // Only an In progress job can be marked done; any other status gets "Back to jobs".
+  const isInProgress = jobStatus(job.status).action === 'openTrip';
   const firstStop = stopsForUi[0];
   const lastStop = stopsForUi[stopsForUi.length - 1];
 
@@ -95,7 +97,7 @@ export default function ActiveJob() {
                 </Text>
               )}
             </Text>
-            <StatusPill kind={job.status}/>
+            <StatusPill kind="job" status={job.status}/>
           </View>
           <RouteLine from={firstStop.place} to={lastStop.place} onFeature/>
         </FeatureCard>
@@ -149,7 +151,7 @@ export default function ActiveJob() {
           </Button>
         ) : (
           <Button variant="secondary" full size="lg" onPress={() => router.back()}>
-            Job is {job.status}
+            Back to jobs
           </Button>
         )}
         <View style={{ alignItems: 'center', marginTop: space[3] }}>

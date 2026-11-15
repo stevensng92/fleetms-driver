@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Card } from './Card';
 import { FeatureCard } from './FeatureCard';
-import { StatusPill, StatusKind } from './StatusPill';
+import { StatusPill } from './StatusPill';
 import { Button } from './Button';
 import { GoFill } from './GoFill';
 import { Icon } from './Icon';
@@ -12,6 +12,7 @@ import { CommissionPill } from './CommissionPill';
 import { useTokens } from '../theme/ThemeProvider';
 import { EASE_OUT, fontFor, motionFor, radius, space, type, TABULAR } from '../theme/tokens';
 import type { SpecialCommission } from '../lib/commissionRate';
+import { jobStatus } from '../lib/jobStatus';
 
 export type Job = {
   /** Human-readable identifier from jobs.job_number, shown on cards. */
@@ -28,9 +29,8 @@ export type Job = {
   to: string;
   client: string;
   pax: number;
-  status: StatusKind;
-  /** The status as the database sends it ("cancelled"). The pill reads it, so a cancelled job says Cancelled. */
-  rawStatus?: string;
+  /** The job status as the dispatcher sends it ("in_progress"). Read it through lib/jobStatus.ts. */
+  status: string;
   /** The real pickup time (ISO). Orders today's jobs on the Jobs tab. */
   pickupAt?: string;
   /** What this job pays when it isn't the driver's normal cut — a rate
@@ -94,9 +94,6 @@ function Meta({ job, onFeature }: { job: Job; onFeature: boolean }) {
   );
 }
 
-/** "cancelled" and "rejected" are looked up by StatusPill; anything else it doesn't know is shown as sent, so capitalise it. */
-const rawLabel = (raw: string) => (raw.toLowerCase() === 'rejected' ? 'Rejected' : raw);
-
 export function JobCard({
   job, dim, overdue, hideActions, onAccept, onReject, onPress,
 }: {
@@ -115,8 +112,9 @@ export function JobCard({
 }) {
   const T = useTokens();
   const reduced = useReducedMotion();
+  const status = jobStatus(job.status);
   // The job being driven is the one dark card on the screen.
-  const live = job.status === 'progress';
+  const live = status.live;
 
   // Accept: a light success haptic on the tap, then the two buttons fade out
   // (120ms, opacity only) and stop taking taps, then accept fires once. The
@@ -171,9 +169,7 @@ export function JobCard({
           </View>
         )}
         <View style={{ marginLeft: 'auto' }}>
-          {job.status === 'voided' && job.rawStatus
-            ? <StatusPill kind="job" status={rawLabel(job.rawStatus)}/>
-            : <StatusPill kind={job.status}/>}
+          <StatusPill kind="job" status={job.status}/>
         </View>
       </View>
 
@@ -204,7 +200,7 @@ export function JobCard({
 
       {/* Action row, beside the card's link rather than inside it. Only a
           pending job has one: everything else is the card's own link. */}
-      {!hideActions && job.status === 'pending' && (
+      {!hideActions && status.action === 'acceptReject' && (
         <Animated.View
           pointerEvents={accepting ? 'none' : 'auto'}
           style={[{ flexDirection: 'row', gap: space[3], paddingHorizontal: space[5], paddingBottom: space[4] }, fadeStyle]}

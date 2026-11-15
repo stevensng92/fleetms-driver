@@ -1,11 +1,11 @@
-// One status table for the driver app: which tone, words and icon a job or
-// payment status gets. Pure, so it is tested alone. Ported from the design
-// source's src/lib/statusTone.ts and the statusGlyph map in src/ui/Status.tsx.
-// The real app has no "Invoiced" payment state, so it is left out.
+// The pill look shared by job and payment statuses, and the payment table.
+// Job statuses live in lib/jobStatus.ts, the one place that reads them. Pure,
+// so it is tested alone. Ported from the design source's src/lib/statusTone.ts
+// and the statusGlyph map in src/ui/Status.tsx. The real app has no "Invoiced"
+// payment state, so it is left out.
 import type { IconName } from '../components/Icon';
 
 export type Tone = 'green' | 'amber' | 'blue' | 'red' | 'neutral';
-export type StatusSort = 'job' | 'payment';
 
 export type StatusToneResult = {
   tone: Tone;
@@ -13,16 +13,8 @@ export type StatusToneResult = {
   icon: IconName | null;
   /** Shown with a tick, in the plain text colour (Done). */
   done?: boolean;
-  /** Shown with a line through it (Cancelled). */
+  /** Shown with a line through it (Cancelled, Rejected). */
   struck?: boolean;
-};
-
-const JOB: Record<string, StatusToneResult> = {
-  pending: { tone: 'amber', label: 'Pending', icon: 'clock' },
-  confirmed: { tone: 'green', label: 'Confirmed', icon: 'circleCheck' },
-  in_progress: { tone: 'blue', label: 'In Progress', icon: 'navigation' },
-  done: { tone: 'neutral', label: 'Done', icon: 'check', done: true },
-  cancelled: { tone: 'neutral', label: 'Cancelled', icon: 'ban', struck: true },
 };
 
 const PAYMENT: Record<string, StatusToneResult> = {
@@ -32,14 +24,13 @@ const PAYMENT: Record<string, StatusToneResult> = {
   refunded: { tone: 'red', label: 'Refunded', icon: 'undo2' },
 };
 
-const TABLES = { job: JOB, payment: PAYMENT };
-
 /** "In Progress", "in-progress", "IN_PROGRESS" all become "in_progress". */
-function toKey(status: string): string {
+export function toKey(status: string): string {
   return status.trim().toLowerCase().replace(/[\s-]+/g, '_');
 }
 
-export function statusTone(kind: StatusSort, status: string): StatusToneResult {
-  const hit = TABLES[kind][toKey(status)];
+/** A payment status's pill. Anything not in the table shows its own word, neutral. */
+export function paymentTone(status: string): StatusToneResult {
+  const hit = PAYMENT[toKey(status)];
   return hit ? { ...hit } : { tone: 'neutral', label: status, icon: null };
 }

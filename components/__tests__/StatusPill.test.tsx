@@ -54,8 +54,8 @@ describe('StatusPill: new API', () => {
   });
 
   it('an unknown status shows its word with no icon', async () => {
-    await render(<StatusPill kind="job" status="Weird"/>);
-    expect(screen.getByText('Weird')).toBeTruthy();
+    await render(<StatusPill kind="job" status="on_hold"/>);
+    expect(screen.getByText('On hold')).toBeTruthy();
     expect(screen.queryByTestId('status-pill-icon')).toBeNull();
   });
 
@@ -84,26 +84,24 @@ describe('StatusPill: new API', () => {
   });
 });
 
-describe('StatusPill: legacy API keeps today words', () => {
+describe('StatusPill: job words come from lib/jobStatus.ts', () => {
   it.each([
-    ['pending', 'Pending'], ['confirmed', 'Confirmed'], ['progress', 'In Progress'], ['done', 'Done'],
-    ['paid', 'Paid'], ['pendingPay', 'Pending'], ['voided', 'Voided'],
-  ] as const)('%s reads %s', async (kind, word) => {
-    await render(<StatusPill kind={kind}/>);
+    ['pending', 'Pending'], ['confirmed', 'Confirmed'], ['in_progress', 'In Progress'], ['done', 'Done'],
+    ['rejected', 'Rejected'], ['cancelled', 'Cancelled'],
+  ] as const)('%s reads %s, with an icon', async (status, word) => {
+    await render(<StatusPill kind="job" status={status}/>);
     expect(screen.getByText(word)).toBeTruthy();
     expect(screen.getByTestId('status-pill-icon')).toBeTruthy();
   });
 
-  it('pendingPay is amber and voided is neutral', async () => {
-    await render(<StatusPill kind="pendingPay"/>);
-    expect(screen.getByTestId('status-pill')).toHaveStyle({ backgroundColor: L.amberSoft });
-    await render(<StatusPill kind="voided"/>);
+  it('Rejected is struck through in text2, like Cancelled', async () => {
+    await render(<StatusPill kind="job" status="rejected"/>);
+    expect(screen.getByText('Rejected')).toHaveStyle({ color: L.text2, textDecorationLine: 'line-through' });
     expect(screen.getByTestId('status-pill')).toHaveStyle({ backgroundColor: L.neutralSoft });
   });
 
-  it('accepts pulse and ignores it for non-live statuses', async () => {
-    await render(<StatusPill kind="pending" pulse/>);
-    expect(R.withRepeat).not.toHaveBeenCalled();
+  it('a payment pill never glows, even for a word that is blue elsewhere', async () => {
+    await render(<StatusPill kind="payment" status="in_progress"/>);
     expect(screen.queryByTestId('status-glow')).toBeNull();
   });
 });
@@ -116,8 +114,8 @@ describe('StatusPill: In Progress glow', () => {
     expect(R.withRepeat).toHaveBeenCalledWith(expect.anything(), -1, true);
   });
 
-  it('the legacy "progress" kind glows too', async () => {
-    await render(<StatusPill kind="progress"/>);
+  it('"In Progress" as the dispatcher might spell it glows too', async () => {
+    await render(<StatusPill kind="job" status="In Progress"/>);
     expect(screen.getByTestId('status-glow')).toBeTruthy();
   });
 

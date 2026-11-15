@@ -8,7 +8,7 @@ import {
 // these tests start from its shape and check what the screen needs on top.
 
 type J = GroupableJob & { id: string };
-const job = (id: string, status: GroupableJob['status'], pickupAt: string, rawStatus?: string): J => ({ id, status, pickupAt, rawStatus });
+const job = (id: string, status: string, pickupAt: string): J => ({ id, status, pickupAt });
 const data = (over: Partial<JobsData<J>> = {}): JobsData<J> => ({ overdue: [], today: [], tomorrow: [], upcoming: [], ...over });
 const ids = (js: J[]) => js.map((j) => j.id);
 
@@ -42,25 +42,27 @@ describe('todayHeading (change 10)', () => {
 describe('groupJobs today (change 32)', () => {
   const today = [
     job('late', 'confirmed', '2026-12-12T11:00:00Z'),
-    job('under-way', 'progress', '2026-12-12T01:15:00Z'),
+    job('under-way', 'in_progress', '2026-12-12T01:15:00Z'),
     job('morning-done', 'done', '2026-12-11T22:30:00Z'),
     job('mid', 'pending', '2026-12-12T06:30:00Z'),
-    job('cancelled', 'voided', '2026-12-12T13:30:00Z', 'cancelled'),
+    job('cancelled', 'cancelled', '2026-12-12T13:30:00Z'),
+    job('turned-down', 'rejected', '2026-12-12T14:00:00Z'),
+    job('on-hold', 'on_hold', '2026-12-12T12:00:00Z'),
   ];
   const g = groupJobs(data({ today }));
 
   it('puts the job under way first, then the jobs still to do by pickup time', () => {
-    expect(ids(g.today)).toEqual(['under-way', 'mid', 'late']);
+    expect(ids(g.today)).toEqual(['under-way', 'mid', 'late', 'on-hold']);
   });
-  it('moves done and cancelled jobs into the finished fold, by pickup time', () => {
-    expect(ids(g.todayFinished)).toEqual(['morning-done', 'cancelled']);
+  it('moves done, cancelled and rejected jobs into the finished fold, by pickup time', () => {
+    expect(ids(g.todayFinished)).toEqual(['morning-done', 'cancelled', 'turned-down']);
   });
   it('orders several jobs under way by pickup time, ahead of every job still to do', () => {
     const day = groupJobs(data({
       today: [
         job('A', 'confirmed', '2026-12-12T00:00:00Z'),
-        job('B', 'progress', '2026-12-12T03:00:00Z'),
-        job('C', 'progress', '2026-12-12T02:00:00Z'),
+        job('B', 'in_progress', '2026-12-12T03:00:00Z'),
+        job('C', 'in_progress', '2026-12-12T02:00:00Z'),
       ],
     }));
     expect(ids(day.today)).toEqual(['C', 'B', 'A']);
@@ -104,7 +106,8 @@ describe('groupJobs empty (change 15)', () => {
 
 describe('jobScreen (change 14)', () => {
   it('opens an in-progress job on the trip screen, wherever its card sits', () => {
-    expect(jobScreen({ status: 'progress' })).toBe('trip');
+    expect(jobScreen({ status: 'in_progress' })).toBe('trip');
+    expect(jobScreen({ status: 'on_hold' })).toBe('job');
     expect(jobScreen({ status: 'confirmed' })).toBe('job');
     expect(jobScreen({ status: 'pending' })).toBe('job');
     expect(jobScreen({ status: 'done' })).toBe('job');

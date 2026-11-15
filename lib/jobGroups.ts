@@ -2,15 +2,16 @@
 // (jobGroups, jobScreen, jobCount, countRose, greeting). No Supabase import, so
 // tests load it alone. The query already splits jobs by Malaysia day; this adds
 // what the screen needs on top: today's order, the Finished today fold, and
-// whether the whole list is empty.
+// whether the whole list is empty. Open or finished, and which screen a job
+// opens on, come from lib/jobStatus.ts.
+import { jobStatus } from './jobStatus';
 
 /** What the grouping needs from a job. The real `Job` card type fits. */
 export type GroupableJob = {
-  /** The StatusPill kind: 'voided' is cancelled or rejected. */
-  status: 'pending' | 'confirmed' | 'progress' | 'done' | 'paid' | 'pendingPay' | 'voided';
+  /** The job status as the dispatcher sends it ("in_progress"). */
+  status: string;
   /** The real pickup time (ISO). Orders today's jobs. */
   pickupAt?: string;
-  rawStatus?: string;
 };
 
 export type JobsData<J extends GroupableJob> = {
@@ -24,7 +25,7 @@ export type JobGroups<J extends GroupableJob> = {
   overdue: J[];
   /** Today's jobs still to act on: the job under way first, then the rest by pickup time. */
   today: J[];
-  /** Today's done and cancelled jobs, by pickup time. Shown in a closed fold. */
+  /** Today's finished jobs (done, rejected, cancelled), by pickup time. Shown in a closed fold. */
   todayFinished: J[];
   tomorrow: J[];
   upcoming: JobsData<J>['upcoming'];
@@ -37,11 +38,12 @@ const byPickup = (a: GroupableJob, b: GroupableJob) => (a.pickupAt ?? '').locale
 
 export function groupJobs<J extends GroupableJob>(d: JobsData<J>): JobGroups<J> {
   const sorted = [...d.today].sort(byPickup);
+  const open = sorted.filter((j) => jobStatus(j.status).phase === 'open');
   const today = [
-    ...sorted.filter((j) => j.status === 'progress'),
-    ...sorted.filter((j) => j.status !== 'progress' && j.status !== 'done' && j.status !== 'voided'),
+    ...open.filter((j) => jobStatus(j.status).live),
+    ...open.filter((j) => !jobStatus(j.status).live),
   ];
-  const todayFinished = sorted.filter((j) => j.status === 'done' || j.status === 'voided');
+  const todayFinished = sorted.filter((j) => jobStatus(j.status).phase === 'finished');
   return {
     overdue: d.overdue,
     today,
@@ -53,7 +55,7 @@ export function groupJobs<J extends GroupableJob>(d: JobsData<J>): JobGroups<J> 
 }
 
 /** Every in-progress job opens the trip screen, from whichever group its card sits in. */
-export const jobScreen = (j: Pick<GroupableJob, 'status'>): 'trip' | 'job' => (j.status === 'progress' ? 'trip' : 'job');
+export const jobScreen = (j: Pick<GroupableJob, 'status'>): 'trip' | 'job' => jobStatus(j.status).screen;
 
 export const jobCount = (n: number) => `${n} ${n === 1 ? 'job' : 'jobs'}`;
 

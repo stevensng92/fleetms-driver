@@ -4,54 +4,27 @@ import Animated, {
   Easing, cancelAnimation, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming,
 } from 'react-native-reanimated';
 import { PillShell, useToneColors } from './Pill';
-import { statusTone, StatusToneResult } from '../lib/statusTone';
+import { paymentTone, type StatusToneResult } from '../lib/statusTone';
+import { jobStatus } from '../lib/jobStatus';
 import { useTokens } from '../theme/ThemeProvider';
 import { EASE_OUT, motionFor, radius, withAlpha } from '../theme/tokens';
 
-/** Today's kinds, still accepted so existing screens keep compiling. */
-export type StatusKind =
-  | 'pending' | 'confirmed' | 'progress' | 'done'
-  | 'paid' | 'pendingPay' | 'voided';
-
-type NewProps = {
+type Props = {
   kind: 'job' | 'payment';
-  /** The raw status: "in_progress", "In Progress", "paid"... */
+  /** As sent: "in_progress", "In Progress", "paid"... A job status is read by lib/jobStatus.ts. */
   status: string;
   /** Use the dark-card tints. Left out, it follows whether it sits in a FeatureCard. */
   onFeature?: boolean;
-  pulse?: boolean;
 };
-type LegacyProps = {
-  kind: StatusKind;
-  status?: undefined;
-  onFeature?: boolean;
-  /** Accepted and ignored: the glow now belongs to In Progress itself. */
-  pulse?: boolean;
-};
-type Props = NewProps | LegacyProps;
 
 type Resolved = StatusToneResult & { live: boolean };
 
-/** Today's words, drawn in the new style. */
-function resolveLegacy(kind: StatusKind): StatusToneResult {
-  switch (kind) {
-    case 'pending': return statusTone('job', 'pending');
-    case 'confirmed': return statusTone('job', 'confirmed');
-    case 'progress': return statusTone('job', 'in_progress');
-    case 'done': return statusTone('job', 'done');
-    case 'paid': return statusTone('payment', 'paid');
-    case 'pendingPay': return { ...statusTone('payment', 'unpaid'), label: 'Pending' };
-    case 'voided': return { tone: 'neutral', label: 'Voided', icon: 'ban' };
-  }
-}
-
 function resolve(props: Props): Resolved {
-  const isNew = props.status !== undefined;
-  const s = isNew
-    ? statusTone(props.kind as 'job' | 'payment', props.status as string)
-    : resolveLegacy(props.kind as StatusKind);
-  const live = s.tone === 'blue' && s.label === 'In Progress';
-  return { ...s, live };
+  if (props.kind === 'job') {
+    const s = jobStatus(props.status);
+    return { ...s.pill, live: s.live };
+  }
+  return { ...paymentTone(props.status), live: false };
 }
 
 /** The look at `progress` (0 to 1) of the settle: fade up from 0.4, scale up from 0.96. Reduce Motion: fade only. */

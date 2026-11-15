@@ -104,6 +104,13 @@ function parseLogic(expr: string, mode: 'or' | 'and'): (row: Json) => boolean {
     const m = /^([^.]+)\.([^.]+)\.(.*)$/s.exec(item);
     if (!m) return () => true;
     const [, col, op, raw] = m;
+    // `col.not.in.(a,b)`: the inner operator, negated. Like SQL, a null cell never passes.
+    if (op === 'not') {
+      const inner = /^([^.]+)\.(.*)$/s.exec(raw);
+      if (!inner) return () => true;
+      const t = makeTest(inner[1], parseValue(inner[1], inner[2]));
+      return row => row[col] != null && !t(row[col]);
+    }
     const test = makeTest(op, parseValue(op, raw));
     return row => test(row[col]);
   });

@@ -165,7 +165,13 @@ for a driver:
 Pure rules behind these live in their own tested files: `lib/jobGroups.ts`,
 `lib/route.ts`, `lib/money.ts`, `lib/earningsPeriod.ts`, `lib/timeOff.ts`,
 `lib/profile.ts`, `lib/clockPref.ts`, `lib/phone.ts`, `lib/notificationText.ts`,
-`lib/amount.ts`, `lib/expenses.ts`, `lib/statusTone.ts`.
+`lib/amount.ts`, `lib/expenses.ts`, `lib/statusTone.ts`, `lib/jobStatus.ts`.
+
+**Job status** is read in one place, `lib/jobStatus.ts`. Every screen shows the
+dispatcher's word (Pending, Confirmed, In Progress, Done, Rejected, Cancelled)
+and takes its buttons from the same rule. A status the app doesn't know yet
+shows the dispatcher's word, stays in the open list, offers only "Back to
+jobs", and is reported to Sentry once. Terms are in `GLOSSARY.md`.
 
 ## Run
 

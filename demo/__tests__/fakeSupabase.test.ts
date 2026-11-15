@@ -252,6 +252,23 @@ describe('rpc', () => {
     expect(await list()).not.toContain('JOB-139');
   });
 
+  it('honours status.not.in: a past job with an unknown status stays, a cancelled one leaves', async () => {
+    const { client, db } = fresh();
+    const list = async () => {
+      const r = await client.from('assignments').select('*').eq('is_current', true).or(
+        'and(pickup_datetime.gte.2026-11-14T16:00:00.000Z,pickup_datetime.lt.2026-11-30T16:00:00.000Z),' +
+        'and(pickup_datetime.gte.2026-10-15T16:00:00.000Z,pickup_datetime.lt.2026-11-14T16:00:00.000Z,status.not.in.(done,rejected,cancelled))',
+        { foreignTable: 'jobs' },
+      );
+      return (r.data as any[]).filter(x => x.jobs).map(x => x.jobs.job_number);
+    };
+    const j139 = db.jobs.find(j => j.job_number === 'JOB-139')!;
+    (j139 as any).status = 'on_hold';
+    expect(await list()).toContain('JOB-139');
+    (j139 as any).status = 'cancelled';
+    expect(await list()).not.toContain('JOB-139');
+  });
+
   it('driver_log_expense adds a pending expense and returns its id', async () => {
     const { client } = fresh();
     const { data: id } = await client.rpc('driver_log_expense', {
@@ -355,7 +372,8 @@ describe('real query hooks over the fake client', () => {
   it('job detail carries stops, surcharges, contact and the assignment', async () => {
     const { useJobDetailByNumber } = require('../../lib/queries/jobDetail');
     const d: any = await run(() => useJobDetailByNumber('JOB-137'));
-    expect(d).toMatchObject({ jobNumber: 'JOB-137', rawStatus: 'in_progress', client: 'Nusantara Weddings', vehiclePlate: 'VKA 2231' });
+    expect(d).not.toHaveProperty('rawStatus');
+    expect(d).toMatchObject({ jobNumber: 'JOB-137', status: 'in_progress', client: 'Nusantara Weddings', vehiclePlate: 'VKA 2231' });
     expect(d.stops.map((s: any) => s.kind)).toEqual(['Pickup', 'Stop 1', 'Dropoff']);
     expect(d.surcharges[0]).toMatchObject({ name: 'Decoration', amount: 50, treatment: 'pass_through' });
     expect(d.contact.source).toBe('passenger');
