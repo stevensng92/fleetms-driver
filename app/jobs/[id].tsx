@@ -14,7 +14,7 @@ import { SurchargesCard } from '../../components/SurchargesCard';
 import { PayCard } from '../../components/JobAmountCard';
 import { useTokens } from '../../theme/ThemeProvider';
 import { fontFor, space, type } from '../../theme/tokens';
-import { formatClock } from '../../lib/timeFormat';
+import { routeStops, stopCountLabel } from '../../lib/route';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { useStartJob, useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 
@@ -35,6 +35,8 @@ export default function JobDetail() {
         <AppHeader title={String(id ?? '—')} onBack={() => router.back()}/>
         {isError ? (
           <ErrorBox message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>
+        ) : job === null ? (
+          <NotFound/>
         ) : (
           <View style={{ paddingTop: 60, alignItems: 'center' }}>
             <ActivityIndicator color={T.text2}/>
@@ -44,35 +46,9 @@ export default function JobDetail() {
     );
   }
 
-  const stopsForUi: Stop[] = job.stops.map(s => ({
-    kind: s.kind,
-    arriveLabel: s.scheduledAt ? 'Arrive' : '—',
-    arrive: s.scheduledAt ? formatClock(s.scheduledAt) : '—',
-    place: s.location + (s.detail ? `, ${s.detail}` : ''),
-    depart: undefined,
-    lat: s.lat,
-    lng: s.lng,
+  const stopsForUi: Stop[] = routeStops(job.stops).map(r => ({
+    kind: r.label, arrive: r.time, place: r.place, lat: r.lat, lng: r.lng,
   }));
-
-  // Fallback to a 2-stop pickup+dropoff if no job_stops rows exist.
-  if (stopsForUi.length === 0) {
-    stopsForUi.push(
-      {
-        kind: 'Pickup',
-        arriveLabel: 'Pickup',
-        arrive: formatClock(job.pickupAt),
-        place: job.pickupLocation + (job.pickupDetail ? `, ${job.pickupDetail}` : ''),
-        depart: undefined,
-      },
-      {
-        kind: 'Dropoff',
-        arriveLabel: 'Arrive',
-        arrive: '—',
-        place: job.dropoffLocation + (job.dropoffDetail ? `, ${job.dropoffDetail}` : ''),
-        depart: undefined,
-      },
-    );
-  }
 
   const isPending = job.rawStatus === 'pending';
   const isConfirmed = job.rawStatus === 'confirmed';
@@ -103,7 +79,7 @@ export default function JobDetail() {
         <Card style={{ padding: space[5], gap: space[4] }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space[3] }}>
             <Text style={[type.title, { color: T.text }]}>Route</Text>
-            <Text style={[type.label, { color: T.text2 }]}>{stopsForUi.length} stops</Text>
+            <Text style={[type.label, { color: T.text2 }]}>{stopCountLabel(stopsForUi.length)}</Text>
           </View>
           <View>
             {stopsForUi.map((s, i) => (
@@ -163,19 +139,19 @@ export default function JobDetail() {
               }
             }}
           >
-            {startJob.isPending ? 'Starting…' : 'On My Way'}
+            {startJob.isPending ? 'Starting…' : 'On my way'}
           </Button>
         )}
 
         {job.rawStatus === 'in_progress' && (
           <Button full size="lg" onPress={() => router.replace({ pathname: '/jobs/active', params: { id: job.jobNumber } })}>
-            Open Active Job
+            Open active job
           </Button>
         )}
 
         {(job.rawStatus === 'done' || job.rawStatus === 'cancelled' || job.rawStatus === 'rejected') && (
           <Button variant="secondary" full size="lg" onPress={() => router.back()}>
-            Back to Jobs
+            Back to jobs
           </Button>
         )}
 
@@ -184,7 +160,7 @@ export default function JobDetail() {
             <Text style={[type.label, {
               fontFamily: fontFor('600'), fontWeight: '600', color: T.text2, textDecorationLine: 'underline',
             }]}>
-              Report an Issue
+              Report an issue
             </Text>
           </Pressable>
         </View>
@@ -239,5 +215,20 @@ function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }
         <Button variant="secondary" onPress={onRetry}>Retry</Button>
       </View>
     </Band>
+  );
+}
+
+// The job is no longer this driver's: cancelled, reassigned or hidden. Not a
+// failure, so there is no Retry. Words are the design mock's.
+function NotFound() {
+  const T = useTokens();
+  return (
+    <Card style={{ marginHorizontal: space[4], padding: space[5], gap: space[3] }}>
+      <Text style={[type.heading, { color: T.text }]}>This job is no longer on your list</Text>
+      <Text style={[type.body, { color: T.text2 }]}>Dispatch may have cancelled or reassigned it.</Text>
+      <View style={{ marginTop: space[2], alignSelf: 'flex-start' }}>
+        <Button variant="secondary" onPress={() => router.replace('/(tabs)')}>Back to jobs</Button>
+      </View>
+    </Card>
   );
 }
