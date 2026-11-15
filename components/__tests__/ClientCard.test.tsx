@@ -148,12 +148,11 @@ describe('ClientCard — dialling', () => {
 });
 
 describe('ClientCard — vehicle line', () => {
-  it('shows type, model and plate as separate items, not one dot-joined line', async () => {
-    // Redesign change 3: a dot-joined line becomes separate items.
+  it('reads as one plain line: type, then model and plate (no dots)', async () => {
+    // Change 3 dropped the dot-joined line. lib/route.ts vehicleLine writes
+    // the mock's plain line: "MPV, Alphard WA 1234 B".
     await render(card({ vehicleType: 'mpv', vehicleModel: 'Alphard', vehiclePlate: 'WA 1234 B' }));
-    expect(screen.getByText('MPV')).toBeTruthy();
-    expect(screen.getByText('Alphard')).toBeTruthy();
-    expect(screen.getByText('WA 1234 B')).toBeTruthy();
+    expect(screen.getByText('MPV, Alphard WA 1234 B')).toBeTruthy();
     expect(screen.queryByText(/·/)).toBeNull();
   });
 

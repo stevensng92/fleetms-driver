@@ -3,7 +3,7 @@ import { View, StyleProp, ViewStyle } from 'react-native';
 import { Pill } from './Pill';
 import { formatSpecialCommission, type SpecialCommission } from '../lib/commissionRate';
 
-// "20% comm" / "RM 80 flat" — the badge for a job that doesn't pay the driver's
+// "20% of the fare" / "RM 80 flat" — the badge for a job that doesn't pay the driver's
 // normal cut. Shared by the Jobs list (JobCard) and Earnings so the same fact
 // never renders two different ways.
 //
@@ -29,8 +29,8 @@ import { formatSpecialCommission, type SpecialCommission } from '../lib/commissi
 // driver reads the number.
 //
 // `compact` drops the trailing word for callers that already sit under a label
-// saying so — CommissionRateCard's row reads "Commission rate … 20% comm"
-// otherwise, which says commission twice. Standalone callers (Jobs list,
+// saying so — CommissionRateCard's row reads "Commission rate … 20% of the fare"
+// otherwise, which repeats itself. Standalone callers (Jobs list,
 // Earnings rows) keep it, because there the pill is the only thing naming what
 // the number is.
 //

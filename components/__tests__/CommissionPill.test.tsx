@@ -26,27 +26,27 @@ describe('CommissionPill — absent', () => {
 });
 
 describe('CommissionPill — percentage', () => {
-  it('labels the rate with "comm" when standing alone', async () => {
+  it('labels the rate with "of the fare" when standing alone', async () => {
     await render(<CommissionPill commission={{ kind: 'rate', pct: 20 }}/>);
-    expect(screen.getByText('20% comm')).toBeTruthy();
+    expect(screen.getByText('20% of the fare')).toBeTruthy();
   });
 
-  it('drops the "comm" suffix in compact mode', async () => {
+  it('drops the "of the fare" suffix in compact mode', async () => {
     // Used inside CommissionRateCard, whose own label already says
     // "Commission rate" — the suffix would say commission twice.
     await render(<CommissionPill commission={{ kind: 'rate', pct: 20 }} compact/>);
     expect(screen.getByText('20%')).toBeTruthy();
-    expect(screen.queryByText('20% comm')).toBeNull();
+    expect(screen.queryByText('20% of the fare')).toBeNull();
   });
 
   it('strips trailing zeros in the label', async () => {
     await render(<CommissionPill commission={{ kind: 'rate', pct: 12.5 }}/>);
-    expect(screen.getByText('12.5% comm')).toBeTruthy();
+    expect(screen.getByText('12.5% of the fare')).toBeTruthy();
   });
 
   it('renders a 0% rate rather than treating it as absent', async () => {
     await render(<CommissionPill commission={{ kind: 'rate', pct: 0 }}/>);
-    expect(screen.getByText('0% comm')).toBeTruthy();
+    expect(screen.getByText('0% of the fare')).toBeTruthy();
   });
 });
 
@@ -63,7 +63,7 @@ describe('CommissionPill — fixed fee', () => {
     // read as the org rate. Rendering the fee AS a rate would be worse.
     await render(<CommissionPill commission={{ kind: 'fixed', amount: 20 }}/>);
     expect(screen.queryByText('20%')).toBeNull();
-    expect(screen.queryByText('20% comm')).toBeNull();
+    expect(screen.queryByText('20% of the fare')).toBeNull();
     expect(screen.getByText('RM 20 flat')).toBeTruthy();
   });
 

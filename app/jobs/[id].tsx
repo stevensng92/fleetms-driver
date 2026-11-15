@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppFrame } from '../../components/AppFrame';
@@ -7,6 +7,7 @@ import { StatusPill } from '../../components/StatusPill';
 import { Band } from '../../components/Band';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { TimelineStop, Stop, pinFor } from '../../components/TimelineStop';
 import { ClientCard } from '../../components/ClientCard';
 import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
@@ -14,7 +15,7 @@ import { SurchargesCard } from '../../components/SurchargesCard';
 import { PayCard } from '../../components/JobAmountCard';
 import { useTokens } from '../../theme/ThemeProvider';
 import { fontFor, space, type } from '../../theme/tokens';
-import { formatClock } from '../../lib/timeFormat';
+import { routeStops, stopCountLabel } from '../../lib/route';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { useStartJob, useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 
@@ -28,6 +29,8 @@ export default function JobDetail() {
   const startJob = useStartJob();
   const confirmAsg = useConfirmAssignment();
   const rejectAsg = useRejectAssignment();
+  // Reject asks first; nothing is sent until the driver confirms.
+  const [askingReject, setAskingReject] = useState(false);
 
   if (isLoading || !job) {
     return (
@@ -35,6 +38,8 @@ export default function JobDetail() {
         <AppHeader title={String(id ?? '—')} onBack={() => router.back()}/>
         {isError ? (
           <ErrorBox message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>
+        ) : job === null ? (
+          <NotFound/>
         ) : (
           <View style={{ paddingTop: 60, alignItems: 'center' }}>
             <ActivityIndicator color={T.text2}/>
@@ -44,35 +49,9 @@ export default function JobDetail() {
     );
   }
 
-  const stopsForUi: Stop[] = job.stops.map(s => ({
-    kind: s.kind,
-    arriveLabel: s.scheduledAt ? 'Arrive' : '—',
-    arrive: s.scheduledAt ? formatClock(s.scheduledAt) : '—',
-    place: s.location + (s.detail ? `, ${s.detail}` : ''),
-    depart: undefined,
-    lat: s.lat,
-    lng: s.lng,
+  const stopsForUi: Stop[] = routeStops(job.stops).map(r => ({
+    kind: r.label, arrive: r.time, place: r.place, lat: r.lat, lng: r.lng,
   }));
-
-  // Fallback to a 2-stop pickup+dropoff if no job_stops rows exist.
-  if (stopsForUi.length === 0) {
-    stopsForUi.push(
-      {
-        kind: 'Pickup',
-        arriveLabel: 'Pickup',
-        arrive: formatClock(job.pickupAt),
-        place: job.pickupLocation + (job.pickupDetail ? `, ${job.pickupDetail}` : ''),
-        depart: undefined,
-      },
-      {
-        kind: 'Dropoff',
-        arriveLabel: 'Arrive',
-        arrive: '—',
-        place: job.dropoffLocation + (job.dropoffDetail ? `, ${job.dropoffDetail}` : ''),
-        depart: undefined,
-      },
-    );
-  }
 
   const isPending = job.rawStatus === 'pending';
   const isConfirmed = job.rawStatus === 'confirmed';
@@ -103,7 +82,7 @@ export default function JobDetail() {
         <Card style={{ padding: space[5], gap: space[4] }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space[3] }}>
             <Text style={[type.title, { color: T.text }]}>Route</Text>
-            <Text style={[type.label, { color: T.text2 }]}>{stopsForUi.length} stops</Text>
+            <Text style={[type.label, { color: T.text2 }]}>{stopCountLabel(stopsForUi.length)}</Text>
           </View>
           <View>
             {stopsForUi.map((s, i) => (
@@ -134,7 +113,7 @@ export default function JobDetail() {
             <View style={{ flexDirection: 'row', gap: space[3] }}>
               <Button
                 variant="secondary" full size="lg" style={{ flex: 1 }}
-                onPress={() => promptReject(job.assignmentId!, rejectAsg.mutateAsync, () => router.back())}
+                onPress={() => setAskingReject(true)}
               >
                 Reject
               </Button>
@@ -163,19 +142,19 @@ export default function JobDetail() {
               }
             }}
           >
-            {startJob.isPending ? 'Starting…' : 'On My Way'}
+            {startJob.isPending ? 'Starting…' : 'On my way'}
           </Button>
         )}
 
         {job.rawStatus === 'in_progress' && (
           <Button full size="lg" onPress={() => router.replace({ pathname: '/jobs/active', params: { id: job.jobNumber } })}>
-            Open Active Job
+            Open active job
           </Button>
         )}
 
         {(job.rawStatus === 'done' || job.rawStatus === 'cancelled' || job.rawStatus === 'rejected') && (
           <Button variant="secondary" full size="lg" onPress={() => router.back()}>
-            Back to Jobs
+            Back to jobs
           </Button>
         )}
 
@@ -184,49 +163,29 @@ export default function JobDetail() {
             <Text style={[type.label, {
               fontFamily: fontFor('600'), fontWeight: '600', color: T.text2, textDecorationLine: 'underline',
             }]}>
-              Report an Issue
+              Report an issue
             </Text>
           </Pressable>
         </View>
       </View>
+      <ConfirmDialog
+        visible={askingReject}
+        title={`Reject ${job.jobNumber}?`}
+        body="Dispatch will give it to another driver."
+        cancelLabel="Keep job"
+        confirmLabel="Reject job"
+        tone="danger"
+        reason={{ label: 'Reason (optional)', placeholder: 'Dispatch will see this.', optional: true }}
+        onCancel={() => setAskingReject(false)}
+        onConfirm={(reason) => {
+          setAskingReject(false);
+          rejectAsg.mutateAsync({ assignmentId: job.assignmentId!, reason: reason || undefined })
+            .then(() => router.back())
+            .catch((e: any) => Alert.alert('Could not reject', e?.message ?? 'Unknown error'));
+        }}
+      />
     </AppFrame>
   );
-}
-
-// Simple Alert.prompt-style reject flow. Alert.prompt is iOS-only; on Android
-// we fall through to a no-reason reject. Replace with a proper sheet later.
-function promptReject(
-  assignmentId: string,
-  mutate: (args: { assignmentId: string; reason?: string }) => Promise<unknown>,
-  onDone: () => void,
-) {
-  const doReject = (reason?: string) => {
-    mutate({ assignmentId, reason })
-      .then(onDone)
-      .catch((e: any) => Alert.alert('Could not reject', e?.message ?? 'Unknown error'));
-  };
-
-  if ((Alert as any).prompt) {
-    (Alert as any).prompt(
-      'Reject this job?',
-      'Optional reason — dispatcher will see this.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Reject', style: 'destructive', onPress: (text: string) => doReject(text || undefined) },
-      ],
-      'plain-text',
-      '',
-    );
-  } else {
-    Alert.alert(
-      'Reject this job?',
-      'Are you sure? Dispatcher will need to reassign.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Reject', style: 'destructive', onPress: () => doReject() },
-      ],
-    );
-  }
 }
 
 function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) {
@@ -239,5 +198,20 @@ function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }
         <Button variant="secondary" onPress={onRetry}>Retry</Button>
       </View>
     </Band>
+  );
+}
+
+// The job is no longer this driver's: cancelled, reassigned or hidden. Not a
+// failure, so there is no Retry. Words are the design mock's.
+function NotFound() {
+  const T = useTokens();
+  return (
+    <Card style={{ marginHorizontal: space[4], padding: space[5], gap: space[3] }}>
+      <Text style={[type.heading, { color: T.text }]}>This job is no longer on your list</Text>
+      <Text style={[type.body, { color: T.text2 }]}>Dispatch may have cancelled or reassigned it.</Text>
+      <View style={{ marginTop: space[2], alignSelf: 'flex-start' }}>
+        <Button variant="secondary" onPress={() => router.replace('/(tabs)')}>Back to jobs</Button>
+      </View>
+    </Card>
   );
 }

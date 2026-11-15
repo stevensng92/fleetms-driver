@@ -8,16 +8,7 @@ import { Pill } from './Pill';
 import { useTokens } from '../theme/ThemeProvider';
 import { fontFor, space, type } from '../theme/tokens';
 import { isDialable, toDialString, type JobContact } from '../lib/jobContact';
-
-const MONO = 'ui-monospace, Menlo, Monaco, "Courier New", monospace';
-
-const VEHICLE_TYPE_LABEL: Record<string, string> = {
-  sedan:           'Sedan',
-  sedan_executive: 'Executive',
-  mpv:             'MPV',
-  van:             'Van',
-  coach:           'Coach',
-};
+import { vehicleLine } from '../lib/route';
 
 // Top-of-page client/passenger card shared by Job Detail + Active Job screens.
 //
@@ -32,9 +23,9 @@ const VEHICLE_TYPE_LABEL: Record<string, string> = {
 // other than the person named above it, say so rather than implying the
 // headline name will answer.
 //
-// Bottom row: the assigned vehicle as separate items (type, model, plate) after
-// a car icon, not one dot-joined line. When no vehicle is assigned, falls back
-// to the requested vehicle type alone.
+// Bottom row: a car icon and one plain line, "MPV, Alphard WA 1234 B" (type,
+// then model and plate; lib/route.ts vehicleLine). When no vehicle is assigned
+// it falls back to the requested vehicle type alone.
 export function ClientCard({
   clientName,
   passengerName,
@@ -73,14 +64,7 @@ export function ClientCard({
     );
   }
 
-  // Vehicle items: type, model, plate. Drop falsy pieces; the plate keeps the
-  // mono face. Index 2 is always the plate, so keep positions, not just values.
-  const typeLabel = vehicleType ? (VEHICLE_TYPE_LABEL[vehicleType] ?? vehicleType) : null;
-  const vehicleItems = [
-    typeLabel ? { text: typeLabel, mono: false } : null,
-    vehicleModel ? { text: vehicleModel, mono: false } : null,
-    vehiclePlate ? { text: vehiclePlate, mono: true } : null,
-  ].filter(Boolean) as { text: string; mono: boolean }[];
+  const car = vehicleLine({ type: vehicleType, model: vehicleModel, plate: vehiclePlate });
 
   const strong = { fontFamily: fontFor('600'), fontWeight: '600' } as const;
 
@@ -129,15 +113,9 @@ export function ClientCard({
         flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: space[3], rowGap: space[1],
       }}>
         <Icon name="car" size={16} color={T.text3}/>
-        {vehicleItems.length > 0 ? vehicleItems.map((v, i) => (
-          <Text
-            key={i}
-            style={[type.body, v.mono ? { fontFamily: MONO, fontWeight: '600' } : null, { color: T.text }]}
-            numberOfLines={1}
-          >
-            {v.text}
-          </Text>
-        )) : (
+        {car ? (
+          <Text style={[type.body, { color: T.text, flexShrink: 1 }]}>{car}</Text>
+        ) : (
           <Text style={[type.body, { color: T.text2 }]}>No vehicle assigned</Text>
         )}
       </View>

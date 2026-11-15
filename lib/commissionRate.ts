@@ -265,5 +265,5 @@ export function formatFixedFee(amount: number): string {
 export function formatSpecialCommission(c: SpecialCommission, compact?: boolean): string {
   return c.kind === 'fixed'
     ? `${formatFixedFee(c.amount)}${compact ? '' : ' flat'}`
-    : `${formatRatePct(c.pct)}${compact ? '' : ' comm'}`;
+    : `${formatRatePct(c.pct)}${compact ? '' : ' of the fare'}`;
 }
