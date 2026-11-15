@@ -46,10 +46,6 @@ screens change. Reload the page to reset everything.
 
 ## Tests
 
-`demo/__tests__/fakeSupabase.test.ts`. Run it from a worktree under
-`.claude/worktrees/` with the ignore patterns overridden, because the Jest
-config ignores that folder:
-
-```bash
-npx jest demo --testPathIgnorePatterns "/node_modules/" --modulePathIgnorePatterns "/none/"
-```
+`demo/__tests__/fakeSupabase.test.ts`. Run it with `npx jest demo`, from the main
+checkout or from inside a worktree. The Jest config only skips worktree copies
+under the project's own root, so no flag overrides are needed.
