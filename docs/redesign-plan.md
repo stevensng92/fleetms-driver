@@ -122,7 +122,7 @@ Rebuilt in `components/`, each with a test for its states:
 | Piece | Today | After |
 |---|---|---|
 | `Button` | violet, 6px corners, green "done" variant | ink primary, white secondary with shadow, danger, quiet; pill shape; 44px touch; press shrinks to .97. The green variant goes (the accent never fills a button) |
-| `StatusPill` | coloured dot, In Progress pulses | the admin pill: soft tint, icon plus word. Only In Progress moves: a slow blue glow, 2.4 seconds a cycle, added to the mock 15 Nov at Steven's request. Build it as a soft halo whose opacity loops (react-native-reanimated), and hold it still when the phone's Reduce Motion is on. Job words: Pending, Confirmed, In Progress, Done, Cancelled. Payment words: Paid, Unpaid, Waived, Refunded |
+| `StatusPill` | coloured dot, In Progress pulses | the admin pill: soft tint, icon plus word. Only In Progress moves: a slow blue glow, 2.4 seconds a cycle, added to the mock 15 Nov at Steven's request. Build it as a soft halo whose opacity loops (react-native-reanimated), and hold it still when the phone's Reduce Motion is on. On the dark job card (`FeatureCard`), pills use the dark-theme tints in both themes, since that card stays black in light mode. Job words: Pending, Confirmed, In Progress, Done, Cancelled. Payment words: Paid, Unpaid, Waived, Refunded |
 | `Pill` | none | a plain tone pill for things that aren't statuses ("New", "Default") |
 | `Card` | 12px corners, coloured left stripe, can pulse | 24px corners, shadow-1, no stripe, no pulse |
 | `FeatureCard` | `heroBg`, flips to white in dark | the one dark card, dark in both themes. Used for the job being driven and the Expenses month total |
