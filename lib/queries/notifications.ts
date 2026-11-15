@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../supabase';
+import { useClockStyle } from '../clockPref';
 import { notificationText, notificationLink, type NotificationKind } from '../notificationText';
 
 // In-app inbox backed by public.push_log (the same table that drives push
@@ -26,8 +27,11 @@ export type NotificationItem = {
 };
 
 export function useNotifications() {
+  // The text carries times, so the Time format setting is part of the key: a
+  // change runs the query again. Invalidating ['notifications'] still hits it.
+  const clock = useClockStyle();
   return useQuery({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', clock],
     queryFn: async (): Promise<NotificationItem[]> => {
       const { data, error } = await supabase
         .from('push_log')
@@ -36,7 +40,7 @@ export function useNotifications() {
         .limit(50);
       if (error) throw error;
       return (data ?? []).map((r: any) => {
-        const { title, jobNumber, body } = notificationText(r.kind, r.payload);
+        const { title, jobNumber, body } = notificationText(r.kind, r.payload, clock);
         const deeplink = notificationLink(r.payload?.deeplink ?? null);
         return {
           id: r.id,

@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
 import { resolveSpecialCommission } from '../commissionRate';
 import { fetchCommissionBaseline } from './driverProfile';
-import { formatClock, formatDate, myDateKey, myStartOfDay } from '../timeFormat';
+import { formatClock, formatDate, myDateKey, myStartOfDay, type ClockStyle } from '../timeFormat';
+import { useClockStyle } from '../clockPref';
 import type { Job } from '../../components/JobCard';
 import type { StatusKind } from '../../components/StatusPill';
 
@@ -28,8 +29,8 @@ function mapStatus(s: string): StatusKind {
   }
 }
 
-// "14:30" — plain 24-hour digits (redesign change 4). See lib/timeFormat.ts.
-const timeOf = formatClock;
+// "14:30" — plain 24-hour digits (redesign change 4), or "2:30 pm" on the
+// 12-hour Time format setting (change 33). See lib/timeFormat.ts.
 
 // "Thu, 2 Jul" — only rendered on overdue cards, so a driver can see at a
 // glance the pickup was on a past day, not "due today". MY-pinned like every
@@ -73,7 +74,7 @@ const OPEN_STATUSES = ['pending', 'confirmed', 'in_progress'] as const;
 // RLS scopes results via private.is_driver_self(driver_id) so the anon JWT
 // only sees its own. PostgREST embedding handles the FK join automatically.
 // Exported for lib/queries/__tests__/jobs.test.ts; the screen goes through useTodaysJobs.
-export async function fetchJobs(): Promise<FetchedJobs> {
+export async function fetchJobs(clock: ClockStyle = '24h'): Promise<FetchedJobs> {
   // Every boundary derived independently from the same MY day, rather than by
   // walking forward from startToday with setDate(). setDate() operates in the
   // DEVICE's local terms, so on a phone that observes DST it would add 23 or 25
@@ -166,7 +167,7 @@ export async function fetchJobs(): Promise<FetchedJobs> {
     // Show the ACTUAL assigned vehicle plate ("WXY 1234"), not the requested
     // type. Driver cares which car they're in, not what the dispatcher asked for.
     vehicle: r.vehicle_plate ?? '—',
-    time: timeOf(r.job.pickup_datetime),
+    time: formatClock(r.job.pickup_datetime, clock),
     pickupDate: dateOf(r.job.pickup_datetime),
     from: r.job.pickup_location,
     to: r.job.dropoff_location,
@@ -221,8 +222,11 @@ export async function fetchJobs(): Promise<FetchedJobs> {
 }
 
 export function useTodaysJobs() {
+  // Card times are built inside fetchJobs, so the Time format setting is part
+  // of the key: a change runs the query again. Invalidating ['jobs'] still hits it.
+  const clock = useClockStyle();
   return useQuery({
-    queryKey: ['jobs', 'today'],
-    queryFn: fetchJobs,
+    queryKey: ['jobs', 'today', clock],
+    queryFn: () => fetchJobs(clock),
   });
 }

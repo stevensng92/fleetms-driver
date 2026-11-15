@@ -12,6 +12,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useFonts, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { ThemeProvider, useTokens, useThemeControls } from '../theme/ThemeProvider';
 import { queryClient } from '../lib/queryClient';
+import { loadClockStyle } from '../lib/clockPref';
 import { ensureDevSession, DevSessionResult } from '../lib/devSession';
 import { ensurePushNotifications } from '../lib/push';
 import { reportAppVersion } from '../lib/version';
@@ -122,6 +123,9 @@ function RootLayoutImpl() {
     ensureDevSession().then(r => { if (alive) setSession(r); });
     return () => { alive = false; };
   }, []);
+
+  // The saved Time format (24-hour or 12-hour), read once like the theme.
+  useEffect(() => { loadClockStyle(); }, []);
 
   // Inter loads before the first screen draws, or text jumps from the phone's
   // font to Inter a moment later. The splash stays up until then. A font that

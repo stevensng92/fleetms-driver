@@ -58,3 +58,15 @@ describe('sentAt', () => {
     expect(sentAt(WHEN)).toBe('12 Dec, 09:22');
   });
 });
+
+describe('the Time format setting', () => {
+  it('writes the pickup time in the style it is given', () => {
+    const p = { job_number: 'JOB-2', pickup_location: 'Sentral', pickup_datetime: WHEN };
+    expect(notificationText('pickup_reminder', p, '12h').body).toBe('Sentral, 12 Dec, 9:22 am');
+    expect(notificationText('pickup_reminder', p, '24h').body).toBe('Sentral, 12 Dec, 09:22');
+  });
+  it('writes the sent time in the style it is given', () => {
+    expect(sentAt(WHEN, '12h')).toBe('12 Dec, 9:22 am');
+    expect(sentAt(WHEN)).toBe('12 Dec, 09:22');
+  });
+});
