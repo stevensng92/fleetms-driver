@@ -73,8 +73,11 @@ Currently covered: pure helpers (`lib/timeFormat.ts`, `lib/commissionRate.ts`,
 `lib/semver.ts`, `lib/earningsPeriod.ts`, `lib/jobContact.ts`, `lib/jobStatus.ts`, `lib/notification.ts`) and shared
 components, plus the Earnings screen, `fetchClientPhone` in
 `lib/queries/jobDetail.ts`, `fetchNotifications` and the push tap handler
-(`handlePushTap` in `lib/push.ts`). NOT covered: the other screens, the remaining React
-Query data hooks, realtime, auth.
+(`handlePushTap` in `lib/push.ts`), sign-out (`signOut` in `lib/auth.ts`), clearing
+and resetting the push address (`clearPushNotifications`, `resetPushRegistration`
+in `lib/push.ts`) and the `useSignedIn` hook (`lib/useSignedIn.ts`). NOT covered:
+the other screens, the remaining React Query data hooks, realtime, the rest of auth
+(PIN sign-in).
 
 A job status is read ONLY through `lib/jobStatus.ts` (words, pill, open or
 finished, the allowed action, which screen opens). Never compare status
