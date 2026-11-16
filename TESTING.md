@@ -179,7 +179,9 @@ against genuine period values rather than a mock's idea of them.
 ## Not covered yet
 
 The screens other than Earnings, the React Query data hooks (`lib/queries/`,
-`lib/mutations/`), realtime subscriptions, and auth other than sign-out
-(`lib/__tests__/auth.signOut.test.ts`). These need Supabase mocking
+`lib/mutations/`) other than the job actions
+(`lib/mutations/__tests__/jobActions.test.tsx`), and auth other than sign-out
+(`lib/__tests__/auth.signOut.test.ts`). Live updates are covered by
+`lib/realtime/__tests__/jobsRealtime.test.tsx`. These need Supabase mocking
 and a query-client wrapper. The commission-rate, earnings-period and time-format
 helpers were done first because they carry real logic and need no mocking at all.
