@@ -15,6 +15,8 @@ let mockDriver: { id: string } | null = { id: 'drv-1' };
 // Optional hold on the driver lookup, so a test can sign out before it answers.
 let mockLookupGate: Promise<void> | null = null;
 let mockExistingChannels: { topic: string }[] = [];
+// When set, the driver lookup fails the way it does with no signal.
+let mockLookupError: { message: string } | null = null;
 
 jest.mock('../../supabase', () => {
   const channel = (name: string) => {
@@ -31,7 +33,7 @@ jest.mock('../../supabase', () => {
   };
   return {
     supabase: {
-      from: () => ({ select: () => ({ maybeSingle: async () => { if (mockLookupGate) await mockLookupGate; return { data: mockDriver, error: null }; } }) }),
+      from: () => ({ select: () => ({ maybeSingle: async () => { if (mockLookupGate) await mockLookupGate; return mockLookupError ? { data: null, error: mockLookupError } : { data: mockDriver, error: null }; } }) }),
       channel,
       getChannels: () => mockExistingChannels,
       removeChannel: (...a: unknown[]) => mockRemoveChannel(...a),
@@ -61,6 +63,7 @@ beforeEach(() => {
   mockRemoveChannel.mockClear();
   appStateRemove.mockClear();
   mockDriver = { id: 'drv-1' };
+  mockLookupError = null;
   mockLookupGate = null;
   mockExistingChannels = [];
   appStateCb = null;
@@ -170,6 +173,22 @@ describe('useLiveUpdates', () => {
     await flush();
     expect(mockRemoveChannel).toHaveBeenCalledTimes(1);
     expect(mockRemoveChannel).toHaveBeenCalledWith(leftover);
+    expect(mockChannelNames).toEqual(['driver-jobs-drv-1']);
+  });
+
+  // Value: protects=a driver whose lookup failed at sign-in (no signal) still gets live updates once the app comes back to the front; fails_when=the listener never retries the lookup, so the sign-in stays without a channel; why_new=no test failed the lookup; seam=none; no_claim=real network recovery timing
+  it('retries a failed driver lookup when the app comes back to the front', async () => {
+    mockLookupError = { message: 'offline' };
+    const { wrapper } = setup(true);
+    await renderHook(() => useLiveUpdates(true), { wrapper });
+    await flush();
+    expect(mockChannelNames).toEqual([]);
+    mockLookupError = null;
+    await act(async () => { appStateCb!('active'); });
+    await flush();
+    expect(mockChannelNames).toEqual(['driver-jobs-drv-1']);
+    await act(async () => { appStateCb!('active'); });
+    await flush();
     expect(mockChannelNames).toEqual(['driver-jobs-drv-1']);
   });
 });

@@ -30,19 +30,30 @@ export function useLiveUpdates(signedIn: boolean) {
   useEffect(() => {
     if (!signedIn) return;
     let cancelled = false;
+    let connecting = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
+    // Coming back to the front catches up, and retries a connect that failed
+    // (no signal at sign-in) so the rest of the sign-in still gets live updates.
     const appSub = AppState.addEventListener('change', state => {
-      if (state === 'active') void refreshJobs(qc);
+      if (state !== 'active') return;
+      void refreshJobs(qc);
+      if (!channel) void connect();
     });
 
     // Look the driver up on every sign-in rather than reading the cached
     // driver profile: that query key is not per driver, so after a driver
     // switch it could still hold the previous driver's id.
-    (async () => {
-      const { data } = await supabase.from('drivers').select('id').maybeSingle();
-      const driverId = (data as { id?: string } | null)?.id;
-      if (cancelled || !driverId) return;
+    async function connect() {
+      if (connecting || channel) return;
+      connecting = true;
+      let driverId: string | undefined;
+      try {
+        const { data } = await supabase.from('drivers').select('id').maybeSingle();
+        driverId = (data as { id?: string } | null)?.id;
+      } catch { /* offline: retried when the app comes back to the front */ }
+      connecting = false;
+      if (cancelled || !driverId || channel) return;
 
       // Supabase Realtime caches channels by topic. If a prior mount's cleanup
       // is racing with this effect (RN Fabric + concurrent rendering, seen on
@@ -72,7 +83,8 @@ export function useLiveUpdates(signedIn: boolean) {
           () => { void qc.invalidateQueries({ queryKey: ['notifications'] }); },
         )
         .subscribe();
-    })();
+    }
+    void connect();
 
     return () => {
       cancelled = true;
