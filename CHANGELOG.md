@@ -6,6 +6,17 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
 
 ### Fixed
 
+- **Tapping a push only opens screens the app allows.** A push banner tap used
+  to open whatever link the push carried, skipping the check the Notifications
+  screen uses. Both now go through the same check, and only exact link shapes
+  open. A push with a missing or refused link opens the Notifications screen
+  instead of doing nothing.
+- **A tapped push counts as read.** Its row on the Notifications screen turns
+  read and the unread badge drops.
+- **Push taps work even when saving the push address failed** on that launch.
+- **A new notification type shows plain details**, the pickup place and time,
+  instead of raw data. Each new type and each refused link is reported to
+  Sentry once.
 - **A job shows the same status on every screen.** A job the dispatcher
   cancelled read "Cancelled" on its card but "Voided" on its job screen. It
   now reads "Cancelled" everywhere, and a job the driver turned down reads

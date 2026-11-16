@@ -164,7 +164,7 @@ for a driver:
 
 Pure rules behind these live in their own tested files: `lib/jobGroups.ts`,
 `lib/route.ts`, `lib/money.ts`, `lib/earningsPeriod.ts`, `lib/timeOff.ts`,
-`lib/profile.ts`, `lib/clockPref.ts`, `lib/phone.ts`, `lib/notificationText.ts`,
+`lib/profile.ts`, `lib/clockPref.ts`, `lib/phone.ts`, `lib/notification.ts`,
 `lib/amount.ts`, `lib/expenses.ts`, `lib/statusTone.ts`, `lib/jobStatus.ts`.
 
 **Job status** is read in one place, `lib/jobStatus.ts`. Every screen shows the
@@ -172,6 +172,13 @@ dispatcher's word (Pending, Confirmed, In Progress, Done, Rejected, Cancelled)
 and takes its buttons from the same rule. A status the app doesn't know yet
 shows the dispatcher's word, stays in the open list, offers only "Back to
 jobs", and is reported to Sentry once. Terms are in `GLOSSARY.md`.
+
+**Notifications** are read in one place too, `lib/notification.ts`: the words
+on the Notifications screen and the link a row or a push tap opens. Only a few
+exact link shapes open (`/jobs/<job number>`, `/(tabs)`, `/notifications`,
+`/profile/time-off`). A tapped push with a missing or refused link opens the
+Notifications screen, and the tap marks its row read. Refused links and unknown
+notification types are reported to Sentry once.
 
 ## Run
 
@@ -267,7 +274,8 @@ lib/
                            normal pay, + "20%" / "RM 80" formatting
   earningsPeriod.ts        Earnings period model + the instant range each covers
   timeFormat.ts            clock formatting (24h digits + am/pm marker)
-  push.ts                  push-token registration
+  push.ts                  push-token registration + the push tap handler
+  notification.ts          notification words and allowed links (screen + push)
   queryClient.ts           React Query client
   queries/, mutations/     per-screen data-access layer (React Query hooks).
                            queries/driverProfile.ts also exports

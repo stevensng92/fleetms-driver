@@ -21,7 +21,7 @@ const item = (over: Partial<NotificationItem> = {}): NotificationItem => ({
   enqueuedAt: '2026-12-12T01:22:00Z',
   sentAt: null,
   readAt: null,
-  deeplink: '/jobs/JOB-047',
+  link: '/jobs/JOB-047',
   title: 'New job',
   jobNumber: 'JOB-047',
   body: 'Acme, KLIA, 12 Dec, 09:22',
@@ -70,8 +70,8 @@ describe('Notifications', () => {
 
   it('is a button only when the link leads somewhere', async () => {
     mockList([
-      item({ id: 'a', deeplink: '/jobs/JOB-047', jobNumber: 'JOB-047' }),
-      item({ id: 'b', deeplink: null, jobNumber: 'JOB-048', title: 'Job cancelled', body: 'KLIA' }),
+      item({ id: 'a', link: '/jobs/JOB-047', jobNumber: 'JOB-047' }),
+      item({ id: 'b', link: null, jobNumber: 'JOB-048', title: 'Job cancelled', body: 'KLIA' }),
     ]);
     await render(<Notifications/>);
     // Close button plus the one linked row.
