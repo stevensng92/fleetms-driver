@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import SetPin from '../../app/set-pin';
-import { completeDriverPinSetup } from '../../lib/auth';
+import { completeDriverPinSetup, signOut } from '../../lib/auth';
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn() },
@@ -31,6 +31,17 @@ describe('Set PIN', () => {
     expect(screen.getByText(/no longer valid/)).toBeTruthy();
     expect(screen.queryByText(EXPIRED)).toBeNull();
     expect(screen.getByText('Sign out')).toBeTruthy();
+  });
+
+  // Value: protects=Sign out on the expired-PIN card signs the driver out and returns to sign-in; fails_when=the button stops calling signOut (so the push address is never cleared) or stops navigating; why_new=only the button's presence was tested; seam=none; no_claim=signOut's own push clear (lib/__tests__/auth.signOut.test.ts covers it)
+  it('Sign out on the expired card signs out and returns to sign-in', async () => {
+    const { router } = jest.requireMock('expo-router');
+    (completeDriverPinSetup as jest.Mock).mockResolvedValue({ ok: false, reason: 'expired', message: EXPIRED });
+    await render(<SetPin/>);
+    await fillAndSave();
+    await fireEvent.press(await screen.findByText('Sign out'));
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledWith('/sign-in');
   });
 
   it('shows another error in a band', async () => {

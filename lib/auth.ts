@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { driverSyntheticEmail } from './phone';
+import { clearPushNotifications } from './push';
 
 // =============================================================================
 // Driver PIN auth — client helpers
@@ -80,7 +81,24 @@ export async function signInWithPin(phone: string, pin: string): Promise<SignInR
   return { ok: false, reason: 'unknown', message: error.message };
 }
 
+// How long sign-out waits for the push address clear before giving up on it.
+const CLEAR_PUSH_LIMIT_MS = 2000;
+
+/**
+ * Sign out, taking this phone's push address off the driver first so a
+ * signed-out phone stops getting their job alerts. The clear must run while
+ * still signed in (the server finds the driver by the session), and it never
+ * holds up sign-out: a failure is skipped, and a hang is abandoned after 2s.
+ */
 export async function signOut(): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      clearPushNotifications(),
+      new Promise<void>(resolve => { timer = setTimeout(resolve, CLEAR_PUSH_LIMIT_MS); }),
+    ]);
+  } catch { /* best-effort: sign out regardless */ }
+  clearTimeout(timer);
   await supabase.auth.signOut();
 }
 

@@ -21,7 +21,7 @@ jest.mock('expo-notifications', () => ({
 jest.mock('expo-device', () => ({ isDevice: true }));
 jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { version: '0.11.0' } } }));
 
-import { handlePushTap, ensurePushNotifications } from '../push';
+import { handlePushTap, ensurePushNotifications, clearPushNotifications, resetPushRegistration } from '../push';
 import { queryClient } from '../queryClient';
 import { resetNotificationReported } from '../notification';
 
@@ -126,5 +126,46 @@ describe('listening for taps', () => {
     expect(result).toEqual({ kind: 'denied' });
     expect(mockAddListener).not.toHaveBeenCalled();
     expect(mockGetToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('signing out of push', () => {
+  // Value: protects=sign-out stops tap handling on this phone and asks the server to drop its push address; fails_when=the listener is not removed or the clear RPC is not called; why_new=auth.signOut.test.ts mocks clearPushNotifications whole, so its body is untested; seam=none; no_claim=the server actually clearing the row (RPC mocked)
+  it('stops listening for taps and asks the server to clear the push address', async () => {
+    const remove = jest.fn();
+    mockAddListener.mockReturnValue({ remove });
+    mockGetToken.mockResolvedValue({ data: 'ExponentPushToken[test-4]' });
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    await ensurePushNotifications(router() as any);
+    const before = remove.mock.calls.length;
+    mockRpc.mockClear();
+    await clearPushNotifications();
+    expect(remove.mock.calls.length).toBe(before + 1);
+    expect(mockRpc).toHaveBeenCalledWith('clear_driver_push_token');
+  });
+
+  // Value: protects=the next driver to sign in on the same phone gets the push address saved to them; fails_when=clear stops forgetting the cached address, so the same-token dedup skips registration; why_new=no test runs setup after a clear; seam=none; no_claim=the real push token staying the same across sign-ins
+  it('saves the same push address again after sign-out, for the next driver', async () => {
+    mockAddListener.mockReturnValue({ remove: jest.fn() });
+    mockGetToken.mockResolvedValue({ data: 'ExponentPushToken[test-5]' });
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    await ensurePushNotifications(router() as any);
+    await clearPushNotifications();
+    mockRpc.mockClear();
+    await ensurePushNotifications(router() as any);
+    expect(mockRpc).toHaveBeenCalledWith('register_driver_push_token', expect.objectContaining({ p_token: 'ExponentPushToken[test-5]' }));
+  });
+
+  // Value: protects=after a sign-out that skipped the Sign out button (session expired, kicked off by another phone), the next sign-in still saves the push address; fails_when=resetPushRegistration stops forgetting the remembered address, so the same-address check skips the save; why_new=only the button path (clearPushNotifications) was tested; seam=resetPushRegistration (non-test callers: 1, app/_layout.tsx); no_claim=the root layout calling it on SIGNED_OUT (layout untested)
+  it('saves the push address again after a sign-out that skipped the Sign out button', async () => {
+    mockAddListener.mockReturnValue({ remove: jest.fn() });
+    mockGetToken.mockResolvedValue({ data: 'ExponentPushToken[test-6]' });
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    await ensurePushNotifications(router() as any);
+    resetPushRegistration();
+    mockRpc.mockClear();
+    await ensurePushNotifications(router() as any);
+    expect(mockRpc).toHaveBeenCalledWith('register_driver_push_token', expect.objectContaining({ p_token: 'ExponentPushToken[test-6]' }));
+    expect(mockRpc).not.toHaveBeenCalledWith('clear_driver_push_token');
   });
 });

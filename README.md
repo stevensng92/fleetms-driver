@@ -274,7 +274,10 @@ lib/
                            normal pay, + "20%" / "RM 80" formatting
   earningsPeriod.ts        Earnings period model + the instant range each covers
   timeFormat.ts            clock formatting (24h digits + am/pm marker)
-  push.ts                  push-token registration + the push tap handler
+  push.ts                  push-token registration, clearing it on sign-out,
+                           + the push tap handler
+  useSignedIn.ts           signed-in flag from Supabase auth events; the root
+                           layout re-runs push setup on every sign-in
   notification.ts          notification words and allowed links (screen + push)
   queryClient.ts           React Query client
   queries/, mutations/     per-screen data-access layer (React Query hooks).
@@ -307,7 +310,11 @@ per-driver scoping, so there's no separate authorization layer in the app.
 Auth is phone + PIN against `supabase.auth.signInWithPassword` using a
 synthetic email derived from the phone — see
 `../fleetms/docs/driver-pin-auth.md` for the full design (schema, RPCs,
-lockout policy).
+lockout policy). Sign-out (`signOut` in `lib/auth.ts`) first asks the server to
+drop this phone's push address (`clear_driver_push_token`), waiting at most 2
+seconds and never blocking sign-out. Push setup in `app/_layout.tsx` re-runs on
+every sign-in (`lib/useSignedIn.ts`), and any sign-out, including an expired
+session, makes the next sign-in save the push address again.
 
 ## Design provenance
 

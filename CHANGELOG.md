@@ -6,6 +6,16 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
 
 ### Fixed
 
+- **A signed-out phone stops getting that driver's job alerts.** Signing out
+  now tells the server to drop the phone's push address before the session
+  ends. A slow or dead network never holds sign-out up. After 2 seconds it
+  goes ahead anyway.
+- **Signing in saves the phone's push address straight away.** Before, a
+  phone only saved it when the app started while already signed in, so a
+  driver who signed in (or signed out and back in) got no job alerts until the
+  app was fully closed and reopened. This also covers a driver signed out
+  without the Sign out button, such as an expired session or signing in on
+  another phone.
 - **Tapping a push only opens screens the app allows.** A push banner tap used
   to open whatever link the push carried, skipping the check the Notifications
   screen uses. Both now go through the same check, and only exact link shapes

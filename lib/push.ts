@@ -142,10 +142,21 @@ export async function handlePushTap(data: unknown, router: Pick<Router, 'push'>)
   } catch { /* best-effort: the job is already open */ }
 }
 
+/**
+ * Forget the push address this phone last saved, so the next sign-in saves it
+ * again. The root layout calls it on every sign-out it sees, including ones
+ * that skip the Sign out button (session expired, or signed out because the
+ * driver signed in on another phone): otherwise the same-address check would
+ * skip the save and the next driver on this phone would get no job alerts.
+ */
+export function resetPushRegistration() {
+  registeredToken = null;
+}
+
 // Call on sign-out to drop the token server-side so the driver stops
 // receiving alerts on this device.
 export async function clearPushNotifications() {
-  registeredToken = null;
+  resetPushRegistration();
   if (responseSub) { responseSub.remove(); responseSub = null; }
   try { await supabase.rpc('clear_driver_push_token'); } catch { /* best-effort */ }
 }
