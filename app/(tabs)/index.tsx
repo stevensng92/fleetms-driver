@@ -19,7 +19,6 @@ import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 import { useUnreadCount } from '../../lib/queries/notifications';
 import { useDriverProfile } from '../../lib/queries/driverProfile';
-import { useJobsRealtime } from '../../lib/realtime/jobsRealtime';
 import { useAppVersionGate } from '../../lib/queries/appVersionConfig';
 import {
   countRose, getFinishedSeen, greeting, groupJobs, jobCount, jobScreen, setFinishedSeen, todayHeading,
@@ -31,7 +30,6 @@ const CURVE = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
 
 export default function JobsToday() {
   const T = useTokens();
-  useJobsRealtime();
   const { data, isLoading, isError, error, refetch, isRefetching } = useTodaysJobs();
   const { data: profile } = useDriverProfile();
   const confirmAsg = useConfirmAssignment();

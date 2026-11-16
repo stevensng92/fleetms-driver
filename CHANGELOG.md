@@ -6,6 +6,17 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
 
 ### Fixed
 
+- **An open job updates the moment dispatch changes it.** If the dispatcher
+  cancels a job, moves its pickup time or changes its address, the Jobs list,
+  the job screen and the Trip screen all update without the driver leaving the
+  screen. Before, only the Jobs list updated, and only for some changes.
+- **Live updates work however the app is opened.** They start as soon as a
+  driver is signed in, including when a push opens the app straight onto a
+  job, and the app catches up on anything missed when it comes back to the
+  front.
+- **The Trip screen shows the new status after On my way.** A job action waits
+  for the job to reload, at most 2 seconds, so a slow signal never leaves the
+  button spinning.
 - **A signed-out phone stops getting that driver's job alerts.** Signing out
   now tells the server to drop the phone's push address before the session
   ends. A slow or dead network never holds sign-out up. After 2 seconds it

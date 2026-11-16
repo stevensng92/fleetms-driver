@@ -35,6 +35,14 @@ A job status the dispatcher uses that this version of the app does not know yet.
 The screen a driver uses while a job is In progress, with the route and Mark as done.
 _Avoid_: active job screen, active screen
 
+**Job action**:
+Something the driver does to a job from the app: Accept, Reject, Start or Complete.
+_Avoid_: mutation
+
+**Live update**:
+A change the dispatcher makes to one of the driver's jobs or assignments reaching the app while it is open, so every screen showing that job updates without the driver refreshing. A cancel, a new pickup time or address, a new job and a reassignment are all live updates.
+_Avoid_: realtime event, push (a push is a phone notification)
+
 ### Notifications
 
 **Notification**:

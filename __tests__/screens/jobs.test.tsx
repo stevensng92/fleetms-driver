@@ -19,7 +19,6 @@ jest.mock('../../lib/mutations/jobActions', () => ({
 }));
 jest.mock('../../lib/queries/notifications', () => ({ useUnreadCount: () => 0 }));
 jest.mock('../../lib/queries/driverProfile', () => ({ useDriverProfile: () => ({ data: { name: 'Aiman Razak' } }) }));
-jest.mock('../../lib/realtime/jobsRealtime', () => ({ useJobsRealtime: () => undefined }));
 jest.mock('../../lib/queries/appVersionConfig', () => ({ useAppVersionGate: () => ({ status: 'ok' }) }));
 jest.mock('react-native-reanimated', () => {
   const actual = jest.requireActual('react-native-reanimated');

@@ -284,7 +284,10 @@ lib/
                            queries/driverProfile.ts also exports
                            fetchCommissionBaseline() — the driver's normal pay
                            (ladder rungs 3-5), shared by the three pay surfaces
-  realtime/                Supabase Realtime subscriptions (Jobs tab)
+                           mutations/jobActions.ts holds the four job actions
+                           (Accept, Reject, Start, Complete) + refreshJobs
+  realtime/                live updates (useLiveUpdates), started from the
+                           root layout whenever a driver is signed in
 ```
 
 ## Theming
@@ -305,7 +308,16 @@ Every screen reads/writes through a React Query hook in `lib/queries/` or
 timeOff, notifications, driverProfile, vehicles, appVersionConfig). Each
 hook calls Supabase directly — RLS via `private.is_driver_self()` does the
 per-driver scoping, so there's no separate authorization layer in the app.
-`lib/realtime/jobsRealtime.ts` subscribes the Jobs tab to live updates.
+The four job actions (Accept, Reject, Start, Complete) live in
+`lib/mutations/jobActions.ts`, with `refreshJobs`: the one list of queries that
+show a job (`jobs`, `job-by-number`, `driver-earnings`,
+`driver-earnings-history-start`). After an action succeeds it waits for that
+refresh, but at most 2 seconds. Live updates (`useLiveUpdates` in
+`lib/realtime/jobsRealtime.ts`) are started in `app/_layout.tsx` whenever a
+driver is signed in, not on the Jobs tab. They look the driver up on each
+sign-in, listen to `assignments`, `jobs` and `push_log`, run `refreshJobs` when
+the app comes back to the front, and reconnect only after the server closes the
+channel. Driver lookup problems go to Sentry once per app run.
 
 Auth is phone + PIN against `supabase.auth.signInWithPassword` using a
 synthetic email derived from the phone — see
