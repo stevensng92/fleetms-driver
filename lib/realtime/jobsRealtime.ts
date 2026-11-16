@@ -1,86 +1,83 @@
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../supabase';
-import { useDriverProfile } from '../queries/driverProfile';
+import { refreshJobs } from '../mutations/jobActions';
 
-// Live updates for the Jobs tab + notifications inbox.
+// Live updates: while a driver is signed in, a change the dispatcher makes to
+// one of their assignments or jobs refreshes every screen that shows a job
+// (refreshJobs, the same list the job actions use). Mounted once at the app's
+// root, so it also runs when a push opens the app straight onto a job screen.
 //
-// We subscribe to two tables:
-//   * assignments — filtered by driver_id. Most status changes
-//     (confirm/start/complete/reassign) touch the assignment row, so this is
-//     the primary signal for the Jobs list. New job assignments also create
-//     a new assignment row.
-//   * push_log — filtered by driver_id. Drives live unread-badge updates so
-//     the bell ticks the moment a new push lands.
+// We subscribe to three tables on one channel:
+//   * assignments — filtered by driver_id: a new job, a reassignment, a
+//     confirm/start/complete made elsewhere.
+//   * jobs — a cancel, a new pickup time or address. jobs has no driver_id
+//     column, so no filter: RLS decides which rows the realtime server
+//     delivers (Supabase Realtime Authorization), and a driver can read only
+//     the jobs assigned to them (drivers are not org members for
+//     is_member_of). Stop-only edits do not touch the jobs row and are not
+//     published, so they do not arrive live yet (dispatcher follow-up).
+//   * push_log — filtered by driver_id: the unread badge ticks the moment a
+//     new push lands.
 //
-// RLS gates which rows the realtime server actually delivers to each
-// subscriber (Supabase Realtime Authorization). The driver_id filter is
-// belt-and-braces on top — saves a round-trip when other drivers' rows hit.
-//
-// One channel per mount, cleaned up on unmount.
-
-export function useJobsRealtime() {
+// Coming back to the front runs the same refresh: realtime only delivers while
+// the app is open and connected, so a change made while the phone slept would
+// otherwise stay hidden (refetchOnWindowFocus is off in lib/queryClient.ts).
+export function useLiveUpdates(signedIn: boolean) {
   const qc = useQueryClient();
-  const { data: profile } = useDriverProfile();
-  const driverId = profile?.id;
 
   useEffect(() => {
-    if (!driverId) return;
+    if (!signedIn) return;
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    // Supabase Realtime caches channels by topic. If a prior mount's cleanup
-    // is racing with this mount's effect (which happens in RN Fabric +
-    // concurrent rendering — verified on Android v0.3.2+1 via logcat
-    // "cannot add `postgres_changes` callbacks after subscribe()"), the
-    // .channel(name) call below returns the still-subscribed channel and the
-    // next .on(...) throws. The throw propagates to the error boundary and
-    // blanks the JobsToday screen.
-    //
-    // Defensive teardown: remove any existing channel with the same topic
-    // BEFORE subscribing. Idempotent — no-op when there's nothing to clean up.
-    const expectedTopic = `realtime:driver-jobs-${driverId}`;
-    for (const existing of supabase.getChannels()) {
-      if (existing.topic === expectedTopic) {
-        supabase.removeChannel(existing);
+    const appSub = AppState.addEventListener('change', state => {
+      if (state === 'active') void refreshJobs(qc);
+    });
+
+    // Look the driver up on every sign-in rather than reading the cached
+    // driver profile: that query key is not per driver, so after a driver
+    // switch it could still hold the previous driver's id.
+    (async () => {
+      const { data } = await supabase.from('drivers').select('id').maybeSingle();
+      const driverId = (data as { id?: string } | null)?.id;
+      if (cancelled || !driverId) return;
+
+      // Supabase Realtime caches channels by topic. If a prior mount's cleanup
+      // is racing with this effect (RN Fabric + concurrent rendering, seen on
+      // Android v0.3.2+1: "cannot add `postgres_changes` callbacks after
+      // subscribe()"), .channel(name) returns the still-subscribed channel and
+      // the next .on(...) throws. Remove any channel with the same topic first.
+      const expectedTopic = `realtime:driver-jobs-${driverId}`;
+      for (const existing of supabase.getChannels()) {
+        if (existing.topic === expectedTopic) supabase.removeChannel(existing);
       }
-    }
 
-    const channel = supabase
-      .channel(`driver-jobs-${driverId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'assignments',
-          filter: `driver_id=eq.${driverId}`,
-        },
-        () => {
-          // Coarse invalidation — refetch the lot. Cheaper than reasoning
-          // about which keys this single event touches, and the query is
-          // already small.
-          qc.invalidateQueries({ queryKey: ['jobs'] });
-          // Earnings too: a dispatcher setting commission_amount, or an
-          // assignment reaching completed_at, changes what this screen owes the
-          // driver. Without it a mounted Earnings tab shows stale pay.
-          qc.invalidateQueries({ queryKey: ['driver-earnings'] });
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'push_log',
-          filter: `driver_id=eq.${driverId}`,
-        },
-        () => {
-          qc.invalidateQueries({ queryKey: ['notifications'] });
-        },
-      )
-      .subscribe();
+      channel = supabase
+        .channel(`driver-jobs-${driverId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'assignments', filter: `driver_id=eq.${driverId}` },
+          () => { void refreshJobs(qc); },
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'jobs' },
+          () => { void refreshJobs(qc); },
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'push_log', filter: `driver_id=eq.${driverId}` },
+          () => { void qc.invalidateQueries({ queryKey: ['notifications'] }); },
+        )
+        .subscribe();
+    })();
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      appSub.remove();
+      if (channel) supabase.removeChannel(channel);
     };
-  }, [driverId, qc]);
+  }, [signedIn, qc]);
 }

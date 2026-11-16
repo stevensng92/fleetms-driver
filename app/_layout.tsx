@@ -16,6 +16,7 @@ import { loadClockStyle } from '../lib/clockPref';
 import { ensureDevSession, DevSessionResult } from '../lib/devSession';
 import { ensurePushNotifications, resetPushRegistration } from '../lib/push';
 import { useSignedIn } from '../lib/useSignedIn';
+import { useLiveUpdates } from '../lib/realtime/jobsRealtime';
 import { reportAppVersion } from '../lib/version';
 import { useAppVersionGate } from '../lib/queries/appVersionConfig';
 import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
@@ -183,6 +184,10 @@ function ThemedShell({ session }: { session: DevSessionResult | null }) {
   // back in must save it again without an app restart. Idempotent within one
   // sign-in: the helper skips the save when the address hasn't changed.
   const signedIn = useSignedIn();
+  // Live updates for every screen that shows a job, whenever a driver is
+  // signed in: started here, not on the Jobs tab, so a push that opens the app
+  // straight onto a job screen still gets them.
+  useLiveUpdates(signedIn);
   useEffect(() => {
     // Any sign-out, not only the Sign out button: forget the saved address so
     // the next sign-in on this phone saves it again.
