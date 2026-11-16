@@ -25,6 +25,18 @@ export async function refreshJobs(qc: QueryClient): Promise<void> {
   await Promise.all(JOB_QUERY_KEYS.map(queryKey => qc.invalidateQueries({ queryKey })));
 }
 
+// How long a job action waits for the screens to reload before it finishes.
+const REFRESH_WAIT_MS = 2000;
+
+// Resolve when `p` settles or after `ms`, whichever comes first.
+function waitAtMost(p: Promise<unknown>, ms: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    p.then(() => undefined, () => undefined),
+    new Promise<void>(resolve => { timer = setTimeout(resolve, ms); }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 // One job action: call the server, then refresh every screen that shows a job.
 function useJobAction<TArg>(call: (arg: TArg) => PromiseLike<{ data: unknown; error: unknown }>) {
   const qc = useQueryClient();
@@ -34,10 +46,10 @@ function useJobAction<TArg>(call: (arg: TArg) => PromiseLike<{ data: unknown; er
       if (error) throw error;
       return data;
     },
-    // Fire and forget: the action is done once the server saves it. Returning
-    // the refresh would keep the button spinning until every screen reloads,
-    // which on a weak signal looks like a stuck "Marking…".
-    onSuccess: () => { void refreshJobs(qc); },
+    // Wait for the screens to reload, so the next screen (the Trip screen after
+    // On my way) shows the new status, but never longer than REFRESH_WAIT_MS:
+    // on a weak signal a hung reload must not leave a saved action spinning.
+    onSuccess: () => waitAtMost(refreshJobs(qc), REFRESH_WAIT_MS),
   });
 }
 

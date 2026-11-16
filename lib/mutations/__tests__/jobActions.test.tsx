@@ -74,21 +74,43 @@ describe('job actions', () => {
     expect(mockRpc).toHaveBeenCalledWith(rpc, params);
   });
 
-  // Value: protects=a job action finishes (its spinner stops) as soon as the server saves it, even when a screen's reload hangs on a weak signal; fails_when=onSuccess waits for the refresh again; why_new=no test held a reload open; seam=none; no_claim=real network timing
-  it('finishes as soon as the server saves, without waiting for screens to reload', async () => {
+  // Value: protects=after a job action the open job screen shows the new status (e.g. the Trip screen after On my way), yet a hung reload never keeps the button spinning past 2 seconds; fails_when=the action stops waiting for the reload, or waits without a limit; why_new=no test timed the action against a slow or hung reload; seam=none; no_claim=real network timing
+  it('waits for the job screen to reload before finishing', async () => {
     const qc = seededClient();
     const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
-    // A mounted job screen whose reload never answers (weak signal).
-    let fetches = 0;
+    let answer: (v: string) => void = () => {};
     const { result } = await renderHook(() => {
-      useQuery({ queryKey: ['job-by-number', 'JOB-001'], queryFn: () => { fetches += 1; return new Promise(() => {}); }, initialData: 'x', staleTime: Infinity });
-      return useCompleteJob();
+      useQuery({ queryKey: ['job-by-number', 'JOB-001'], queryFn: () => new Promise<string>(r => { answer = r; }), initialData: 'x', staleTime: Infinity });
+      return useStartJob();
     }, { wrapper });
     let done = false;
     await act(async () => { void result.current.mutateAsync('job-uuid-1').then(() => { done = true; }); });
+    await act(async () => { await Promise.resolve(); });
+    expect(done).toBe(false);
+    await act(async () => { answer('in progress'); });
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(fetches).toBe(1);
     expect(done).toBe(true);
+    expect(qc.getQueryData(['job-by-number', 'JOB-001'])).toBe('in progress');
+  });
+
+  it('stops waiting for a hung reload after 2 seconds', async () => {
+    jest.useFakeTimers();
+    try {
+      const qc = seededClient();
+      const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+      const { result } = await renderHook(() => {
+        useQuery({ queryKey: ['job-by-number', 'JOB-001'], queryFn: () => new Promise(() => {}), initialData: 'x', staleTime: Infinity });
+        return useCompleteJob();
+      }, { wrapper });
+      let done = false;
+      await act(async () => { void result.current.mutateAsync('job-uuid-1').then(() => { done = true; }); });
+      await act(async () => { await jest.advanceTimersByTimeAsync(1900); });
+      expect(done).toBe(false);
+      await act(async () => { await jest.advanceTimersByTimeAsync(200); });
+      expect(done).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('refreshes nothing when the server refuses the action', async () => {

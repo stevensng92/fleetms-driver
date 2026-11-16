@@ -45,7 +45,7 @@ jest.mock('../../supabase', () => {
   };
 });
 
-import { useLiveUpdates } from '../jobsRealtime';
+import { useLiveUpdates, resetLiveUpdateReports } from '../jobsRealtime';
 
 const JOB_KEYS = [['jobs', 'today', '24h'], ['job-by-number', 'JOB-001'], ['driver-earnings', 'this-month']];
 
@@ -70,6 +70,7 @@ beforeEach(() => {
   mockLookupError = null;
   mockStatusCb = null;
   mockCaptureMessage.mockClear();
+  resetLiveUpdateReports();
   mockLookupGate = null;
   mockExistingChannels = [];
   appStateCb = null;
@@ -198,17 +199,27 @@ describe('useLiveUpdates', () => {
     expect(mockChannelNames).toEqual(['driver-jobs-drv-1']);
   });
 
-  // Value: protects=a live connection that drops after it is set up (closed or errored by the server) reconnects on the next return to the front; fails_when=the dead channel is kept until sign-out; why_new=no test closed a subscribed channel; seam=none; no_claim=supabase-js's own rejoin behaviour
-  it('reconnects on the next return to the front after the live connection drops', async () => {
+  // Value: protects=a live connection the server closes reconnects on the next return to the front, while an error or timeout is left to the library's own rejoin; fails_when=a closed channel is kept until sign-out, or an errored one is thrown away (breaking the library's rejoin); why_new=no test closed or errored a subscribed channel; seam=none; no_claim=supabase-js's own rejoin timing
+  it('reconnects on the next return to the front after the server closes the connection', async () => {
     const { wrapper } = setup(true);
     await renderHook(() => useLiveUpdates(true), { wrapper });
     await flush();
     expect(mockChannelNames).toEqual(['driver-jobs-drv-1']);
-    await act(async () => { mockStatusCb!('CHANNEL_ERROR'); });
+    await act(async () => { mockStatusCb!('CLOSED'); });
     expect(mockRemoveChannel).toHaveBeenCalledTimes(1);
     await act(async () => { appStateCb!('active'); });
     await flush();
     expect(mockChannelNames).toEqual(['driver-jobs-drv-1', 'driver-jobs-drv-1']);
+  });
+
+  it.each(['CHANNEL_ERROR', 'TIMED_OUT'])('keeps the connection on %s so the library can rejoin it', async status => {
+    const { wrapper } = setup(true);
+    await renderHook(() => useLiveUpdates(true), { wrapper });
+    await flush();
+    await act(async () => { mockStatusCb!(status); appStateCb!('active'); });
+    await flush();
+    expect(mockRemoveChannel).not.toHaveBeenCalled();
+    expect(mockChannelNames).toEqual(['driver-jobs-drv-1']);
   });
 
   it('keeps a healthy connection when it reports SUBSCRIBED', async () => {
@@ -229,5 +240,26 @@ describe('useLiveUpdates', () => {
     await flush();
     expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
     expect(String(mockCaptureMessage.mock.calls[0][0])).toContain('Live updates');
+  });
+
+  it('reports a missing driver row, which returns no error', async () => {
+    mockDriver = null;
+    const { wrapper } = setup(true);
+    await renderHook(() => useLiveUpdates(true), { wrapper });
+    await flush();
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(String(mockCaptureMessage.mock.calls[0][0])).toContain('no driver row');
+  });
+
+  it('reports the same lookup problem only once per app run (no offline noise)', async () => {
+    mockLookupError = { message: 'TypeError: Network request failed' };
+    const { wrapper } = setup(true);
+    await renderHook(() => useLiveUpdates(true), { wrapper });
+    await flush();
+    await act(async () => { appStateCb!('active'); });
+    await flush();
+    await act(async () => { appStateCb!('active'); });
+    await flush();
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
   });
 });

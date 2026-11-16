@@ -24,9 +24,20 @@ import { refreshJobs } from '../mutations/jobActions';
 // Coming back to the front runs the same refresh: realtime only delivers while
 // the app is open and connected, so a change made while the phone slept would
 // otherwise stay hidden (refetchOnWindowFocus is off in lib/queryClient.ts).
-function reportLookupError(message: string) {
+// Each lookup problem is reported once per app run: an offline phone retries
+// on every return to the front, and repeating the same warning would bury the
+// real signal (a missing or duplicated driver row).
+const reported = new Set<string>();
+function reportLookupProblem(message: string) {
+  if (reported.has(message)) return;
+  reported.add(message);
   // Lazy require so a test that never meets one needs no Sentry mock.
   try { require('@sentry/react-native').captureMessage(`Live updates: driver lookup failed: ${message}`, 'warning'); } catch {}
+}
+
+/** Forget what was reported this run. For tests, like resetNotificationReported. */
+export function resetLiveUpdateReports() {
+  reported.clear();
 }
 
 export function useLiveUpdates(signedIn: boolean) {
@@ -57,8 +68,9 @@ export function useLiveUpdates(signedIn: boolean) {
         const { data, error } = await supabase.from('drivers').select('id').maybeSingle();
         // Reported so a phone left without live updates shows up in Sentry;
         // still retried when the app comes back to the front.
-        if (error) reportLookupError(error.message);
         driverId = (data as { id?: string } | null)?.id;
+        if (error) reportLookupProblem(error.message);
+        else if (!driverId) reportLookupProblem('no driver row');
       } catch { /* offline: retried when the app comes back to the front */ }
       connecting = false;
       if (cancelled || !driverId || channel) return;
@@ -91,12 +103,13 @@ export function useLiveUpdates(signedIn: boolean) {
           () => { void qc.invalidateQueries({ queryKey: ['notifications'] }); },
         );
       channel = ch;
-      // A connection that drops after it is set up (the server closed it, or
-      // it errored or timed out) is dropped here, so the next return to the
-      // front reconnects instead of keeping a dead channel until sign-out.
+      // A connection the server closes after it is set up is dropped here, so
+      // the next return to the front reconnects instead of keeping a dead
+      // channel until sign-out. CHANNEL_ERROR and TIMED_OUT are left alone:
+      // realtime-js rejoins those by itself, and every network blip fires one.
       ch.subscribe(status => {
         if (cancelled || channel !== ch) return;
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        if (status === 'CLOSED') {
           channel = null;
           supabase.removeChannel(ch);
         }
