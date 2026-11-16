@@ -14,7 +14,7 @@ import { ThemeProvider, useTokens, useThemeControls } from '../theme/ThemeProvid
 import { queryClient } from '../lib/queryClient';
 import { loadClockStyle } from '../lib/clockPref';
 import { ensureDevSession, DevSessionResult } from '../lib/devSession';
-import { ensurePushNotifications } from '../lib/push';
+import { ensurePushNotifications, resetPushRegistration } from '../lib/push';
 import { useSignedIn } from '../lib/useSignedIn';
 import { reportAppVersion } from '../lib/version';
 import { useAppVersionGate } from '../lib/queries/appVersionConfig';
@@ -184,7 +184,9 @@ function ThemedShell({ session }: { session: DevSessionResult | null }) {
   // sign-in: the helper skips the save when the address hasn't changed.
   const signedIn = useSignedIn();
   useEffect(() => {
-    if (!signedIn) return;
+    // Any sign-out, not only the Sign out button: forget the saved address so
+    // the next sign-in on this phone saves it again.
+    if (!signedIn) { resetPushRegistration(); return; }
     if (!isNavigationReady) return;
     let alive = true;
     ensurePushNotifications(router).then(r => {
