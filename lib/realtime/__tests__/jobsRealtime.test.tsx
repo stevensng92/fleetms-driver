@@ -17,6 +17,10 @@ let mockLookupGate: Promise<void> | null = null;
 let mockExistingChannels: { topic: string }[] = [];
 // When set, the driver lookup fails the way it does with no signal.
 let mockLookupError: { message: string } | null = null;
+// The status callback the listener passed to the last subscribe().
+let mockStatusCb: ((status: string) => void) | null = null;
+const mockCaptureMessage = jest.fn();
+jest.mock('@sentry/react-native', () => ({ captureMessage: (...a: unknown[]) => mockCaptureMessage(...a) }));
 
 jest.mock('../../supabase', () => {
   const channel = (name: string) => {
@@ -27,7 +31,7 @@ jest.mock('../../supabase', () => {
         mockFilters[opts.table] = opts.filter;
         return ch;
       },
-      subscribe: () => ch,
+      subscribe: (cb?: (status: string) => void) => { mockStatusCb = cb ?? null; return ch; },
     };
     return ch;
   };
@@ -64,6 +68,8 @@ beforeEach(() => {
   appStateRemove.mockClear();
   mockDriver = { id: 'drv-1' };
   mockLookupError = null;
+  mockStatusCb = null;
+  mockCaptureMessage.mockClear();
   mockLookupGate = null;
   mockExistingChannels = [];
   appStateCb = null;
@@ -190,5 +196,38 @@ describe('useLiveUpdates', () => {
     await act(async () => { appStateCb!('active'); });
     await flush();
     expect(mockChannelNames).toEqual(['driver-jobs-drv-1']);
+  });
+
+  // Value: protects=a live connection that drops after it is set up (closed or errored by the server) reconnects on the next return to the front; fails_when=the dead channel is kept until sign-out; why_new=no test closed a subscribed channel; seam=none; no_claim=supabase-js's own rejoin behaviour
+  it('reconnects on the next return to the front after the live connection drops', async () => {
+    const { wrapper } = setup(true);
+    await renderHook(() => useLiveUpdates(true), { wrapper });
+    await flush();
+    expect(mockChannelNames).toEqual(['driver-jobs-drv-1']);
+    await act(async () => { mockStatusCb!('CHANNEL_ERROR'); });
+    expect(mockRemoveChannel).toHaveBeenCalledTimes(1);
+    await act(async () => { appStateCb!('active'); });
+    await flush();
+    expect(mockChannelNames).toEqual(['driver-jobs-drv-1', 'driver-jobs-drv-1']);
+  });
+
+  it('keeps a healthy connection when it reports SUBSCRIBED', async () => {
+    const { wrapper } = setup(true);
+    await renderHook(() => useLiveUpdates(true), { wrapper });
+    await flush();
+    await act(async () => { mockStatusCb!('SUBSCRIBED'); appStateCb!('active'); });
+    await flush();
+    expect(mockRemoveChannel).not.toHaveBeenCalled();
+    expect(mockChannelNames).toEqual(['driver-jobs-drv-1']);
+  });
+
+  // Value: protects=a driver lookup that errors is reported, so a phone with no live updates is visible in Sentry; fails_when=the returned error is ignored again; why_new=no test checked the report; seam=none; no_claim=Sentry delivery
+  it('reports a driver lookup error to Sentry', async () => {
+    mockLookupError = { message: 'JSON object requested, multiple (or no) rows returned' };
+    const { wrapper } = setup(true);
+    await renderHook(() => useLiveUpdates(true), { wrapper });
+    await flush();
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(String(mockCaptureMessage.mock.calls[0][0])).toContain('Live updates');
   });
 });

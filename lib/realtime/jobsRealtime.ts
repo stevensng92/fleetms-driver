@@ -24,6 +24,11 @@ import { refreshJobs } from '../mutations/jobActions';
 // Coming back to the front runs the same refresh: realtime only delivers while
 // the app is open and connected, so a change made while the phone slept would
 // otherwise stay hidden (refetchOnWindowFocus is off in lib/queryClient.ts).
+function reportLookupError(message: string) {
+  // Lazy require so a test that never meets one needs no Sentry mock.
+  try { require('@sentry/react-native').captureMessage(`Live updates: driver lookup failed: ${message}`, 'warning'); } catch {}
+}
+
 export function useLiveUpdates(signedIn: boolean) {
   const qc = useQueryClient();
 
@@ -49,7 +54,10 @@ export function useLiveUpdates(signedIn: boolean) {
       connecting = true;
       let driverId: string | undefined;
       try {
-        const { data } = await supabase.from('drivers').select('id').maybeSingle();
+        const { data, error } = await supabase.from('drivers').select('id').maybeSingle();
+        // Reported so a phone left without live updates shows up in Sentry;
+        // still retried when the app comes back to the front.
+        if (error) reportLookupError(error.message);
         driverId = (data as { id?: string } | null)?.id;
       } catch { /* offline: retried when the app comes back to the front */ }
       connecting = false;
@@ -65,7 +73,7 @@ export function useLiveUpdates(signedIn: boolean) {
         if (existing.topic === expectedTopic) supabase.removeChannel(existing);
       }
 
-      channel = supabase
+      const ch = supabase
         .channel(`driver-jobs-${driverId}`)
         .on(
           'postgres_changes',
@@ -81,8 +89,18 @@ export function useLiveUpdates(signedIn: boolean) {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'push_log', filter: `driver_id=eq.${driverId}` },
           () => { void qc.invalidateQueries({ queryKey: ['notifications'] }); },
-        )
-        .subscribe();
+        );
+      channel = ch;
+      // A connection that drops after it is set up (the server closed it, or
+      // it errored or timed out) is dropped here, so the next return to the
+      // front reconnects instead of keeping a dead channel until sign-out.
+      ch.subscribe(status => {
+        if (cancelled || channel !== ch) return;
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          channel = null;
+          supabase.removeChannel(ch);
+        }
+      });
     }
     void connect();
 

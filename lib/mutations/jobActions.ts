@@ -34,7 +34,10 @@ function useJobAction<TArg>(call: (arg: TArg) => PromiseLike<{ data: unknown; er
       if (error) throw error;
       return data;
     },
-    onSuccess: () => refreshJobs(qc),
+    // Fire and forget: the action is done once the server saves it. Returning
+    // the refresh would keep the button spinning until every screen reloads,
+    // which on a weak signal looks like a stuck "Marking…".
+    onSuccess: () => { void refreshJobs(qc); },
   });
 }
 

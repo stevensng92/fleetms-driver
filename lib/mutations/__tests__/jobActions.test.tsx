@@ -3,7 +3,7 @@
 // all use it, so no screen can be missed by one path and not the other.
 import React from 'react';
 import { renderHook, act } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 
 const mockRpc = jest.fn();
 jest.mock('../../supabase', () => ({ supabase: { rpc: (...a: unknown[]) => mockRpc(...a) } }));
@@ -72,6 +72,23 @@ describe('job actions', () => {
     await act(async () => { await result.current.mutateAsync(arg); });
     expect(mockRpc).toHaveBeenCalledTimes(1);
     expect(mockRpc).toHaveBeenCalledWith(rpc, params);
+  });
+
+  // Value: protects=a job action finishes (its spinner stops) as soon as the server saves it, even when a screen's reload hangs on a weak signal; fails_when=onSuccess waits for the refresh again; why_new=no test held a reload open; seam=none; no_claim=real network timing
+  it('finishes as soon as the server saves, without waiting for screens to reload', async () => {
+    const qc = seededClient();
+    const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+    // A mounted job screen whose reload never answers (weak signal).
+    let fetches = 0;
+    const { result } = await renderHook(() => {
+      useQuery({ queryKey: ['job-by-number', 'JOB-001'], queryFn: () => { fetches += 1; return new Promise(() => {}); }, initialData: 'x', staleTime: Infinity });
+      return useCompleteJob();
+    }, { wrapper });
+    let done = false;
+    await act(async () => { void result.current.mutateAsync('job-uuid-1').then(() => { done = true; }); });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(fetches).toBe(1);
+    expect(done).toBe(true);
   });
 
   it('refreshes nothing when the server refuses the action', async () => {
