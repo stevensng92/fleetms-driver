@@ -1,12 +1,13 @@
 // The Notifications screen's rows: each one carries its words and an already
 // checked link, so the row on screen trusts it and checks nothing again.
 
-let mockRows: unknown[] = [];
+let mockRows: unknown[] | null = [];
+let mockError: unknown = null;
 jest.mock('../../supabase', () => ({
   supabase: {
     from: () => ({
       select: () => ({
-        order: () => ({ limit: async () => ({ data: mockRows, error: null }) }),
+        order: () => ({ limit: async () => ({ data: mockRows, error: mockError }) }),
       }),
     }),
   },
@@ -30,5 +31,14 @@ describe('fetchNotifications', () => {
     mockRows = [row('n2', 'job_updated', { deeplink: '/admin/secret' })];
     const [item] = await fetchNotifications('24h');
     expect(item.link).toBeNull();
+  });
+
+  // Value: protects=a failed load reaches the screen as an error, not as "no notifications"; fails_when=the error is swallowed or data null becomes a crash; why_new=extracted function, no test of its error or empty-data exits; seam=none; no_claim=React Query's retry UI
+  it('throws when the load fails, and gives an empty list for no data', async () => {
+    mockError = new Error('offline');
+    await expect(fetchNotifications('24h')).rejects.toThrow('offline');
+    mockError = null;
+    mockRows = null;
+    expect(await fetchNotifications('24h')).toEqual([]);
   });
 });

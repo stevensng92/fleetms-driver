@@ -103,4 +103,28 @@ describe('listening for taps', () => {
     onTap({ notification: { request: { content: { data: { deeplink: '/jobs/JOB-9' } } } } });
     expect(r.push).toHaveBeenCalledWith('/jobs/JOB-9');
   });
+
+  // Value: protects=a tap opens the job once, not once per setup call; fails_when=the old listener is not removed before a new one is added; why_new=existing tests call setup once and never see a second listener; seam=none; no_claim=the real library delivering taps
+  it('drops the previous listener when set up again, so one tap is handled once', async () => {
+    const remove = jest.fn();
+    mockAddListener.mockReturnValue({ remove });
+    mockGetToken.mockResolvedValue({ data: 'ExponentPushToken[test-3]' });
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    await ensurePushNotifications(router() as any);
+    const before = remove.mock.calls.length;
+    await ensurePushNotifications(router() as any);
+    expect(remove.mock.calls.length).toBe(before + 1);
+    expect(mockAddListener).toHaveBeenCalledTimes(2);
+  });
+
+  // Value: protects=a driver who refused permission gets no tap listener and no token request; fails_when=the listener is wired before the permission check; why_new=listener wiring moved in this diff and no test covers the denied exit; seam=none; no_claim=the system permission dialog
+  it('wires no listener when permission is refused', async () => {
+    const N = require('expo-notifications');
+    N.getPermissionsAsync.mockResolvedValueOnce({ status: 'denied' });
+    N.requestPermissionsAsync.mockResolvedValueOnce({ status: 'denied' });
+    const result = await ensurePushNotifications(router() as any);
+    expect(result).toEqual({ kind: 'denied' });
+    expect(mockAddListener).not.toHaveBeenCalled();
+    expect(mockGetToken).not.toHaveBeenCalled();
+  });
 });
