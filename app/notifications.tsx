@@ -15,7 +15,7 @@ import {
   type NotificationItem,
 } from '../lib/queries/notifications';
 import { useClockStyle } from '../lib/clockPref';
-import { notificationLink, sentAt } from '../lib/notificationText';
+import { sentAt } from '../lib/notification';
 
 // Notifications inbox. Opens from the bell button on the Jobs tab.
 //
@@ -119,10 +119,9 @@ function NotificationRow({ item, isLast }: { item: NotificationItem; isLast: boo
   const unread = item.readAt === null;
   const clock = useClockStyle();
   const time = sentAt(item.enqueuedAt, clock);
-  // A row opens its job only when the link is one the app can open (the
-  // allowlist lives in lib/notificationText.ts). Otherwise it is plain text:
-  // not pressable, no chevron.
-  const link = notificationLink(item.deeplink);
+  // A row opens its job only when it has an allowed link, already checked by
+  // lib/notification.ts. Otherwise it is plain text: not pressable, no chevron.
+  const { link } = item;
 
   const content = (
     <>

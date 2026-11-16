@@ -3,10 +3,10 @@
 // Single entry-point: `ensurePushNotifications(router)`.
 //
 //   1. Asks for permission (idempotent — system remembers the answer)
-//   2. Fetches the Expo push token
-//   3. Calls register_driver_push_token(token) RPC on Supabase
-//   4. Wires a foreground listener (badge updates while app is open)
-//   5. Wires a tap-response listener (deep-link routing)
+//   2. Wires a tap-response listener (handlePushTap), once permission is
+//      granted, whatever happens with the token below
+//   3. Fetches the Expo push token
+//   4. Calls register_driver_push_token(token) RPC on Supabase
 //
 // Call it from the root layout after the dev-session resolves, so we don't
 // register a token for an unauthenticated session. Safe to call multiple
@@ -18,6 +18,8 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import type { Router } from 'expo-router';
 import { supabase } from './supabase';
+import { queryClient } from './queryClient';
+import { readPushTap } from './notification';
 
 // Foreground notification UX: show banner + play sound. Quieter alternatives
 // were considered; drivers expect to be interrupted by job assignments even
@@ -73,6 +75,17 @@ export async function ensurePushNotifications(router: Router): Promise<PushSetup
     return { kind: 'denied' };
   }
 
+  // Tap-response listener, wired before the token work below so a failed
+  // token fetch or save never leaves pushes already on the phone dead to a
+  // tap. Wire once per ensurePushNotifications() call.
+  if (responseSub) {
+    responseSub.remove();
+    responseSub = null;
+  }
+  responseSub = Notifications.addNotificationResponseReceivedListener(response => {
+    void handlePushTap(response.notification.request.content.data, router);
+  });
+
   // Need an EAS project id to mint a push token for production builds. In
   // Expo Go on dev, this works via Expo's hosted service. SDK 54 reads from
   // app.json -> extra.eas.projectId or expo-config.
@@ -110,20 +123,23 @@ export async function ensurePushNotifications(router: Router): Promise<PushSetup
     registeredToken = token;
   }
 
-  // Tap-response listener. Wire once per ensurePushNotifications() call.
-  if (responseSub) {
-    responseSub.remove();
-    responseSub = null;
-  }
-  responseSub = Notifications.addNotificationResponseReceivedListener(response => {
-    const data: any = response.notification.request.content.data ?? {};
-    const deeplink: string | undefined = data.deeplink;
-    if (deeplink) {
-      router.push(deeplink as any);
-    }
-  });
-
   return { kind: 'ok', token };
+}
+
+/**
+ * A tapped push: open where it leads (an allowed link, else the Notifications
+ * screen), then mark its Notifications screen row read so the badge drops.
+ * The open comes first and a failed mark is swallowed: a network blip must
+ * never keep a driver from the job. Exported for tests.
+ */
+export async function handlePushTap(data: unknown, router: Pick<Router, 'push'>): Promise<void> {
+  const { link, rowId } = readPushTap(data);
+  router.push(link as any);
+  if (!rowId) return;
+  try {
+    const { error } = await supabase.rpc('mark_notifications_read', { p_ids: [rowId] });
+    if (!error) await queryClient.invalidateQueries({ queryKey: ['notifications'] });
+  } catch { /* best-effort: the job is already open */ }
 }
 
 // Call on sign-out to drop the token server-side so the driver stops
