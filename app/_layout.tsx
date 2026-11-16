@@ -15,6 +15,7 @@ import { queryClient } from '../lib/queryClient';
 import { loadClockStyle } from '../lib/clockPref';
 import { ensureDevSession, DevSessionResult } from '../lib/devSession';
 import { ensurePushNotifications } from '../lib/push';
+import { useSignedIn } from '../lib/useSignedIn';
 import { reportAppVersion } from '../lib/version';
 import { useAppVersionGate } from '../lib/queries/appVersionConfig';
 import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
@@ -176,11 +177,14 @@ function ThemedShell({ session }: { session: DevSessionResult | null }) {
   const rootNavigationState = useRootNavigationState();
   const isNavigationReady = !!rootNavigationState?.key;
 
-  // Register push notifications once the session is up AND the navigator is
-  // ready. Idempotent — the helper short-circuits if the token hasn't
-  // changed across cold starts.
+  // Register push notifications whenever a driver is signed in AND the
+  // navigator is ready. Keyed on every sign-in (useSignedIn), not the one-time
+  // boot check: sign-out clears the push address on the server, so signing
+  // back in must save it again without an app restart. Idempotent within one
+  // sign-in: the helper skips the save when the address hasn't changed.
+  const signedIn = useSignedIn();
   useEffect(() => {
-    if (session?.kind !== 'ok') return;
+    if (!signedIn) return;
     if (!isNavigationReady) return;
     let alive = true;
     ensurePushNotifications(router).then(r => {
@@ -188,7 +192,7 @@ function ThemedShell({ session }: { session: DevSessionResult | null }) {
       (globalThis as any).__FLEETMS_PUSH__ = r;
     });
     return () => { alive = false; };
-  }, [session?.kind, isNavigationReady, router]);
+  }, [signedIn, isNavigationReady, router]);
 
   // Report the installed build's version — separate from push registration
   // above, and gated ONLY on the session (not push permission or navigator
