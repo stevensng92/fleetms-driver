@@ -34,3 +34,23 @@ A job status the dispatcher uses that this version of the app does not know yet.
 **Trip screen**:
 The screen a driver uses while a job is In progress, with the route and Mark as done.
 _Avoid_: active job screen, active screen
+
+### Notifications
+
+**Notification**:
+One alert the dispatcher's system sends a driver about a job, such as a new job, a change, a cancellation or a pickup reminder. It reaches the driver twice: as a push on the phone and as a row on the Notifications screen.
+_Avoid_: message, inbox item
+
+**Push**:
+The banner the phone itself shows for a notification, even when the app is closed. Tapping it opens the app at the notification's link.
+_Avoid_: push notification (in prose), alert
+
+**Notifications screen**:
+The screen listing the driver's recent notifications, newest first, with unread ones counted on the badge.
+_Avoid_: inbox
+
+**Allowed link**:
+A screen a notification may open, from a short fixed list. A notification whose link is not allowed opens nothing from its row, and opens the Notifications screen from its push.
+
+**Unknown notification type**:
+A type of notification this version of the app does not know yet. It shows its job details in plain words, never its raw data.
