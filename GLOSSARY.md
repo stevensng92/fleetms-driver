@@ -43,6 +43,23 @@ _Avoid_: mutation
 A change the dispatcher makes to one of the driver's jobs or assignments reaching the app while it is open, so every screen showing that job updates without the driver refreshing. A cancel, a new pickup time or address, a new job and a reassignment are all live updates.
 _Avoid_: realtime event, push (a push is a phone notification)
 
+**Route**:
+The stops of one job, in the order the driver visits them.
+_Avoid_: timeline, itinerary
+
+**Stop**:
+One place on a route. The first is the Pickup and the last is the Drop-off. The ones between are Stop 1, Stop 2 and so on, always numbered without gaps, even after dispatch deletes one.
+_Avoid_: waypoint, leg
+
+### Expenses
+
+**Expense**:
+Money the driver spent for work (fuel, a toll or something else), logged in the app with its amount, date and receipt.
+_Avoid_: claim
+
+**Receipt**:
+The photo of the slip attached to an expense. It is part of the expense, not a record of its own.
+
 ### Notifications
 
 **Notification**:
