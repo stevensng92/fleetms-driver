@@ -117,6 +117,17 @@ function parseLogic(expr: string, mode: 'or' | 'and'): (row: Json) => boolean {
   return row => (mode === 'or' ? preds.some(p => p(row)) : preds.every(p => p(row)));
 }
 
+// ---- failures (tests only) --------------------------------------------------
+
+/** What a failing call answers with: PostgREST's error shape. `status` is optional and is only used as the HTTP status of the answer. */
+export interface FakeError { message: string; code?: string; details?: string; hint?: string; status?: number }
+/** What the failure rule is asked about: a table read, or a server command (rpc). */
+export interface FailTarget { kind: 'table' | 'rpc'; name: string }
+
+function failResult(error: FakeError): Result {
+  return { data: null, error, count: null, status: error.status ?? 500, statusText: 'Error' };
+}
+
 // ---- the query builder -----------------------------------------------------
 
 type Sort = { col: string; asc: boolean };
@@ -130,7 +141,11 @@ class FakeQuery implements PromiseLike<Result> {
   private wantCount = false;
   private mode: 'many' | 'single' | 'maybe' = 'many';
 
-  constructor(private readonly load: () => Json[] | null) {}
+  constructor(
+    private readonly load: () => Json[] | null,
+    /** Asked on every await. An error means this read fails; undefined means it goes ahead. */
+    private readonly failure: () => FakeError | undefined = () => undefined,
+  ) {}
 
   select(_columns?: string, opts?: { count?: string; head?: boolean }) {
     if (opts?.count) this.wantCount = true;
@@ -172,6 +187,8 @@ class FakeQuery implements PromiseLike<Result> {
   maybeSingle() { this.mode = 'maybe'; return this; }
 
   private run(): Result {
+    const failed = this.failure();
+    if (failed) return failResult(failed);
     const base = this.load();
     if (base === null) {
       return { data: null, count: null, status: 404, statusText: 'Not Found', error: { code: '42P01', message: 'relation does not exist', details: null, hint: null } };
@@ -381,12 +398,20 @@ export interface FakeOptions {
   now?: () => Date;
   /** Page query string; read on every call so ?version=... works without a reload of the module. */
   search?: () => string;
+  /**
+   * FOR TESTS ONLY (the web demo never passes it). Called on every table read
+   * and every rpc. Return an error to make that call resolve `{ data: null, error }`,
+   * or undefined to let it through. Keep a counter in the function to fail once
+   * and then succeed. An rpc that fails does not run.
+   */
+  fail?: (target: FailTarget) => FakeError | undefined;
 }
 
 export function createFakeSupabase(opts: FakeOptions = {}) {
   const db = opts.db ?? buildDb((opts.now ?? (() => new Date()))());
   const search = opts.search ?? defaultSearch;
   const rpcs = rpcTable(db);
+  const fail = opts.fail ?? (() => undefined);
   let signedIn = true;
   const channels: any[] = [];
 
@@ -395,9 +420,11 @@ export function createFakeSupabase(opts: FakeOptions = {}) {
     : null);
 
   return {
-    from: (table: string) => new FakeQuery(() => readTable(db, search, table)),
+    from: (table: string) => new FakeQuery(() => readTable(db, search, table), () => fail({ kind: 'table', name: table })),
 
     rpc: (name: string, args: Json = {}) => {
+      const failed = fail({ kind: 'rpc', name });
+      if (failed) return Promise.resolve(failResult(failed));
       const fn = rpcs[name];
       // Unknown rpcs (push token, version ping, PIN setup...) succeed quietly.
       return Promise.resolve({ data: fn ? clone(fn(args)) : null, error: null, count: null, status: 200, statusText: 'OK' });

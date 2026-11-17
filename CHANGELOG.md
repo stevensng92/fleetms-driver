@@ -76,6 +76,11 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
   screen now show the same red box, with Retry in the same place on the right.
 - The job screen and the Trip screen draw the route from one shared card, so
   the stop names (Pickup, Stop 1, Drop-off), times and count always match.
+- **The app's data tests now run on realistic data.** Seven tests that load
+  jobs, notifications, job details and receipts now read the same invented
+  data as the web demo, instead of a few hand-picked rows each. A mismatch
+  between what the database sends and what the app expects is now more likely
+  to show up in a test. Nothing changes in the app itself.
 
 ## [Hotfix] - 2026-09-24
 

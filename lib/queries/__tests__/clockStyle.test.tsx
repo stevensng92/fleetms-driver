@@ -4,47 +4,44 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Change 33, revised: job cards and notification rows format their own times on
 // screen, so a change to the Time format setting must NOT run either query again.
-// supabase is mocked so importing them builds no live client (AGENTS.md).
-const mockResult = jest.fn();
-jest.mock('../../supabase', () => {
-  const chain: any = {};
-  for (const m of ['from', 'select', 'eq', 'or']) chain[m] = () => chain;
-  chain.order = () => Object.assign(Promise.resolve(mockResult()), { limit: () => Promise.resolve(mockResult()) });
-  return { supabase: chain };
-});
-jest.mock('../driverProfile', () => ({ fetchCommissionBaseline: () => Promise.resolve(null) }));
+// Runs on the demo's fake database (test/fakeDatabase.ts); a pass-through spy on
+// the fake client counts how many times a query went to the database.
+jest.mock('../../supabase', () => require('../../../test/fakeDatabase').supabaseModule);
 
 import { useTodaysJobs } from '../jobs';
 import { useNotifications } from '../notifications';
 import { resetClockStyleForTests, setClockStyle } from '../../clockPref';
+import { supabase } from '../../supabase';
+import { installFakeDatabase } from '../../../test/fakeDatabase';
+
+installFakeDatabase();
 
 function wrapper() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
   const Wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
   return Wrapper;
 }
 
+let from: jest.SpyInstance;
 beforeEach(() => {
   resetClockStyleForTests();
-  mockResult.mockReset();
+  from = jest.spyOn(supabase, 'from');
 });
+afterEach(() => from.mockRestore());
 
 describe('useTodaysJobs', () => {
   // The cards format their own time, so the setting is a display choice only:
   // switching it keeps the cached list and downloads nothing.
   it('does not download the jobs again when the setting changes', async () => {
-    const pickup = new Date().toISOString();
-    mockResult.mockReturnValue({ data: [{
-      id: 'asg-1', vehicle: { plate_number: 'WXY 1234' },
-      jobs: { id: 'u1', job_number: 'J1', pickup_datetime: pickup, pickup_location: 'A', dropoff_location: 'B', client_name: 'C', pax: 1, status: 'pending', commission_rate_override: null, commission_fixed_amount: null },
-    }], error: null });
     const { result } = await renderHook(() => useTodaysJobs(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.length).toBeGreaterThan(0);
     const before = result.current.data;
-    const calls = mockResult.mock.calls.length;
+    expect(from).toHaveBeenCalled();
+    const calls = from.mock.calls.length;
     await act(async () => { setClockStyle('12h'); });
     expect(result.current.data).toBe(before);
-    expect(mockResult.mock.calls.length).toBe(calls);
+    expect(from.mock.calls.length).toBe(calls);
   });
 });
 
@@ -52,17 +49,14 @@ describe('useNotifications', () => {
   // Rows are worded on screen, so the setting is a display choice only:
   // switching it keeps the cached list and downloads nothing.
   it('does not download the notifications again when the setting changes', async () => {
-    const when = '2026-12-12T01:22:00Z';
-    mockResult.mockReturnValue({ data: [{
-      id: 'n1', kind: 'pickup_reminder', enqueued_at: when, sent_at: null, read_at: null,
-      payload: { job_number: 'JOB-1', pickup_location: 'KLIA', pickup_datetime: when },
-    }], error: null });
     const { result } = await renderHook(() => useNotifications(), { wrapper: wrapper() });
-    await waitFor(() => expect(result.current.data?.[0].pickupAt).toBe(when));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.length).toBeGreaterThan(0);
     const before = result.current.data;
-    const calls = mockResult.mock.calls.length;
+    expect(from).toHaveBeenCalled();
+    const calls = from.mock.calls.length;
     await act(async () => { setClockStyle('12h'); });
     expect(result.current.data).toBe(before);
-    expect(mockResult.mock.calls.length).toBe(calls);
+    expect(from.mock.calls.length).toBe(calls);
   });
 });

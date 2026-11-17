@@ -123,12 +123,61 @@ Where you can, sidestep the zone entirely by building dates from local
 components (`new Date(2026, 6, 30, 14, 30)` is 14:30 local in *any* zone) rather
 than from an ISO instant.
 
+## Testing on the fake database
+
+Most data-loading tests run on the demo's fake database (`demo/fakeSupabase.ts`,
+with the shared story in `demo/fixtures.ts`) instead of a hand-made chain of fake
+calls. The real query runs, the fake answers with realistic rows, and the test
+only says what is different.
+
+Switch a test file over with two lines at the top level (the paths are relative
+to the test file):
+
+```ts
+jest.mock('../../supabase', () => require('../../../test/fakeDatabase').supabaseModule);
+const fake = installFakeDatabase();   // import { installFakeDatabase } from '../../../test/fakeDatabase'
+```
+
+The mock must be written with `require` inside the factory. `jest.mock` is hoisted
+above the imports, so the factory cannot reach an imported name (it runs before
+the file's `import` and `const` lines have set them up).
+
+- **Fresh story per test.** `installFakeDatabase()` builds a new copy before each
+  test, so an edit in one test never shows in the next.
+- **Edit the story inside the test.** `fake.db` is the plain data:
+  `fake.db.jobs.find(j => j.job_number === 'JOB-139')!.status = 'done'`. Do the edit
+  before the code under test runs. Prefer this over adding rows to the shared story.
+- **Fixed today.** `installFakeDatabase({ now: new Date('2026-03-01T04:00:00Z') })`
+  moves the story's dates onto that day. It does not freeze the clock the code
+  under test reads, so use it for the story only (and do not freeze `Date`, see above).
+  The default is the real now.
+- **Make a call fail.** `fake.failWith(t => t.name === 'push_log' ? { message: 'offline' } : undefined)`.
+  `t` is `{ kind: 'table' | 'rpc', name }`. Keep a counter to fail once and then
+  succeed (the Retry path): `++reads === 1 ? error : undefined`. Put `status: 0` on
+  the error for "the request never left the phone". A failing rpc does not run.
+  The rule is cleared before each test.
+- **Count or inspect calls.** `const spy = jest.spyOn(supabase, 'from')` wraps the
+  fake and still lets it answer. Call `spy.mockRestore()` afterwards. The same spy
+  with `.mockRejectedValue(...)` covers a client that rejects or throws, which a
+  fake that always answers cannot do.
+
+**Limit: the fake ignores column names.** It never reads the select string, so a
+misspelt or missing column passes here and fails on the real database. The
+production column check before building the APK stays the guard.
+
+**Keep a hand-made stand-in when the test is about what the app sends**: which
+function, which arguments, how many times, in what order. That is why
+`jobActions`, `jobsRealtime`, `auth.signOut`, `push` and `useSignedIn` keep theirs.
+The story is shared and public: change it with care, because many tests read it,
+and keep every row invented.
+
 ## Layout
 
 ```
 test/
   globalSetup.js        TZ pin, runs before workers spawn
   setup.ts              per-file mocks (AsyncStorage, safe-area, expo-haptics, Sentry)
+  fakeDatabase.ts       switches a test file onto the demo's fake database
 lib/__tests__/          pure helper tests
 components/__tests__/   component tests
 __tests__/screens/      screen tests — NOT under app/, see below

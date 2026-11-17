@@ -436,3 +436,84 @@ describe('real query hooks over the fake client', () => {
     expect(await getSignedReceiptUrl('demo/x1.svg')).toMatch(/^data:/);
   });
 });
+
+// The `fail` option is for tests only: the web demo never passes it.
+describe('fail option', () => {
+  const BOOM = { message: 'Failed to fetch', code: '', details: '', hint: '' };
+
+  it('a failing table read resolves { data: null, error } and names the table it was asked about', async () => {
+    const seen: unknown[] = [];
+    const client = createFakeSupabase({
+      db: buildDb(NOW), now: () => NOW, search: () => '',
+      fail: t => { seen.push(t); return t.name === 'push_log' ? BOOM : undefined; },
+    });
+    const bad = await client.from('push_log').select('*');
+    expect(bad.data).toBeNull();
+    expect(bad.error).toBe(BOOM);
+    expect(seen).toEqual([{ kind: 'table', name: 'push_log' }]);
+    const ok = await client.from('jobs').select('*');
+    expect(ok.error).toBeNull();
+    expect((ok.data as any[]).length).toBeGreaterThan(0);
+  });
+
+  // Value: protects=a failing count read (head-only count select) resolves { data: null, error } like any read, so count-based screens see the failure; fails_when=the failure rule is skipped when the select asks for a count; why_new=the other fail tests use plain selects; seam=none; no_claim=the count value of a healthy read
+  it('a failing count select resolves { data: null, error }', async () => {
+    const client = createFakeSupabase({ db: buildDb(NOW), now: () => NOW, search: () => '', fail: () => BOOM });
+    const res = await client.from('jobs').select('*', { count: 'exact', head: true });
+    expect(res).toMatchObject({ data: null, count: null, error: BOOM });
+  });
+
+  // Value: protects=the failure rule is checked before the missing-table 404, so a test can fail a table that does not exist yet; fails_when=the 404 check runs first and hides the rule's error; why_new=no test fails an unknown table; seam=none; no_claim=real PostgREST 404 text
+  it('a failure on an unknown table wins over the 404', async () => {
+    const client = createFakeSupabase({ db: buildDb(NOW), now: () => NOW, search: () => '', fail: () => BOOM });
+    const res = await client.from('no_such_table').select('*');
+    expect(res.error).toBe(BOOM);
+    expect(res.status).toBe(500);
+  });
+
+  it('single and maybeSingle fail the same way', async () => {
+    const client = createFakeSupabase({ db: buildDb(NOW), now: () => NOW, search: () => '', fail: () => BOOM });
+    expect(await client.from('jobs').select('*').single()).toMatchObject({ data: null, error: BOOM });
+    expect(await client.from('jobs').select('*').maybeSingle()).toMatchObject({ data: null, error: BOOM });
+  });
+
+  it('a failing rpc resolves { data: null, error } and the command does not run', async () => {
+    const db = buildDb(NOW);
+    const before = db.jobs.find(j => j.job_number === 'JOB-138')!.status;
+    const client = createFakeSupabase({
+      db, now: () => NOW, search: () => '',
+      fail: t => (t.kind === 'rpc' && t.name === 'driver_confirm_assignment' ? BOOM : undefined),
+    });
+    const res = await client.rpc('driver_confirm_assignment', { target_assignment_id: 'asg-138' });
+    expect(res).toMatchObject({ data: null, error: BOOM });
+    expect(db.jobs.find(j => j.job_number === 'JOB-138')!.status).toBe(before);
+    expect((await client.rpc('driver_my_vehicles')).error).toBeNull();
+  });
+
+  it('a status on the error becomes the status of the answer; otherwise it is 500', async () => {
+    const client = createFakeSupabase({
+      db: buildDb(NOW), now: () => NOW, search: () => '',
+      fail: t => ({ ...BOOM, ...(t.kind === 'rpc' ? { status: 0 } : {}) }),
+    });
+    expect((await client.rpc('x')).status).toBe(0);
+    expect((await client.from('jobs').select('*')).status).toBe(500);
+  });
+
+  it('a rule with a counter can fail the first call and let the second through', async () => {
+    let calls = 0;
+    const client = createFakeSupabase({
+      db: buildDb(NOW), now: () => NOW, search: () => '',
+      fail: t => (t.name === 'jobs' && ++calls === 1 ? BOOM : undefined),
+    });
+    expect((await client.from('jobs').select('*')).error).toBe(BOOM);
+    const second = await client.from('jobs').select('*');
+    expect(second.error).toBeNull();
+    expect((second.data as any[]).length).toBeGreaterThan(0);
+  });
+
+  it('without the option nothing fails', async () => {
+    const { client } = fresh();
+    expect((await client.from('jobs').select('*')).error).toBeNull();
+    expect((await client.rpc('driver_my_vehicles')).error).toBeNull();
+  });
+});
