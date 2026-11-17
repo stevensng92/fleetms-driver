@@ -7,8 +7,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { AppHeader, SectionLabel } from '../../components/AppHeader';
 import { JobCard, type Job } from '../../components/JobCard';
+import { LoadError } from '../../components/LoadError';
 import { Band } from '../../components/Band';
-import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Icon } from '../../components/Icon';
@@ -343,11 +343,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
   const T = useTokens();
   const sessionInfo = (globalThis as any).__FLEETMS_DEV_SESSION__;
   return (
-    <Band tone="red" style={{ marginHorizontal: space[4] }}>
-      <Text style={[type.body, { fontFamily: fontFor('600'), fontWeight: '600', color: T.redText, marginBottom: 4 }]}>
-        Couldn't load jobs
-      </Text>
-      <Text style={[type.body, { color: T.redText }]}>{message}</Text>
+    <LoadError title="Couldn't load jobs" message={message} onRetry={onRetry}>
       {sessionInfo && sessionInfo.kind !== 'ok' && (
         <Text style={[type.caption, { color: T.text2, marginTop: space[2] }]}>
           Auth status: {sessionInfo.kind}
@@ -360,10 +356,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
             : ''}
         </Text>
       )}
-      <View style={{ marginTop: space[3], alignSelf: 'flex-start' }}>
-        <Button variant="secondary" onPress={onRetry}>Retry</Button>
-      </View>
-    </Band>
+    </LoadError>
   );
 }
 

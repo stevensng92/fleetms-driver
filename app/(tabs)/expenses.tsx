@@ -7,7 +7,7 @@ import { Button } from '../../components/Button';
 import { Icon, IconName } from '../../components/Icon';
 import { Card } from '../../components/Card';
 import { FeatureCard } from '../../components/FeatureCard';
-import { Band } from '../../components/Band';
+import { LoadError } from '../../components/LoadError';
 import { Pill } from '../../components/Pill';
 import { useTokens } from '../../theme/ThemeProvider';
 import { fontFor, radius, space, TABULAR, type } from '../../theme/tokens';
@@ -56,7 +56,7 @@ export default function Expenses() {
             <ActivityIndicator color={T.text2}/>
           </View>
         ) : isError ? (
-          <ErrorBox message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>
+          <LoadError title="Couldn't load expenses" message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>
         ) : (
           <>
             {/* Month total: the dark card when there is something to show */}
@@ -195,19 +195,5 @@ function ExpenseRowView({ e, last }: { e: ExpenseRow; last?: boolean }) {
         )}
       </View>
     </Pressable>
-  );
-}
-
-function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) {
-  const T = useTokens();
-  return (
-    <Band
-      tone="red"
-      style={{ marginHorizontal: space[4] }}
-      action={<Button variant="secondary" onPress={onRetry}>Retry</Button>}
-    >
-      <Text style={[type.title, { color: T.redText }]}>Couldn&apos;t load expenses</Text>
-      <Text style={[type.label, { color: T.redText, marginTop: space[1] }]}>{message}</Text>
-    </Band>
   );
 }

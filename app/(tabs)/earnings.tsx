@@ -13,7 +13,7 @@ import { StatusPill } from '../../components/StatusPill';
 import { CommissionPill } from '../../components/CommissionPill';
 import { Icon, IconName } from '../../components/Icon';
 import { Band } from '../../components/Band';
-import { Button } from '../../components/Button';
+import { LoadError } from '../../components/LoadError';
 import { Segmented } from '../../components/Segmented';
 import { useTokens } from '../../theme/ThemeProvider';
 import { EASE_OUT, fontFor, motionFor, radius, space, TABULAR, type } from '../../theme/tokens';
@@ -287,18 +287,11 @@ export default function Earnings() {
         <SectionLabel>Recent jobs</SectionLabel>
 
         {isError && (
-          <Band
-            tone="red"
-            style={{ marginHorizontal: space[4] }}
-            action={<Button variant="secondary" onPress={() => refetch()}>Retry</Button>}
-          >
-            <Text style={[type.title, { color: T.redText, marginBottom: space[1] }]}>
-              Couldn&apos;t load earnings
-            </Text>
-            <Text style={[type.label, { color: T.redText }]}>
-              {(error as Error)?.message ?? 'Unknown error'}
-            </Text>
-          </Band>
+          <LoadError
+            title="Couldn't load earnings"
+            message={(error as Error)?.message ?? 'Unknown error'}
+            onRetry={() => refetch()}
+          />
         )}
 
         {!isError && !isLoading && (data?.rows ?? []).length === 0 && (
