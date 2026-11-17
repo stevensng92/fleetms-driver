@@ -6,8 +6,8 @@ import JobsToday from '../../app/(tabs)/index';
 import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 import { resetFinishedSeen, setFinishedSeen } from '../../lib/jobGroups';
-import type { Job } from '../../components/JobCard';
-import { myDateKey, myStartOfDay } from '../../lib/timeFormat';
+import type { FetchedJob } from '../../lib/queries/jobs';
+import { myStartOfDay } from '../../lib/timeFormat';
 
 // Screen test for the Jobs tab. Queries and mutations are mocked, so no
 // Supabase client is built (see earnings.test.tsx for the same approach).
@@ -32,15 +32,15 @@ const R = Reanimated as unknown as { withSequence: jest.Mock };
 const at = (days: number, hh: number, mm: number) =>
   new Date(myStartOfDay(new Date(), days).getTime() + (hh * 60 + mm) * 60_000).toISOString();
 
-const job = (id: string, status: Job['status'], at: string, over: Partial<Job> = {}): Job => ({
-  id, assignmentId: `asg-${id}`, jobUuid: `uuid-${id}`, time: at.slice(11, 16), pickupAt: at,
+const job = (id: string, status: string, at: string, over: Partial<FetchedJob> = {}): FetchedJob => ({
+  id, assignmentId: `asg-${id}`, jobUuid: `uuid-${id}`, pickupAt: at,
   vehicle: 'WXY 1234', from: 'KLIA', to: 'Bukit Bintang', client: `Client ${id}`, pax: 2, status, ...over,
 });
 
-type Data = { overdue?: Job[]; today?: Job[]; tomorrow?: Job[]; upcoming?: { dateKey: string; label: string; jobs: Job[] }[] };
-function mockJobs(d: Data) {
+// The download is one flat list; the screen splits it by day itself.
+function mockJobs(jobs: FetchedJob[]) {
   (useTodaysJobs as jest.Mock).mockReturnValue({
-    data: { overdue: [], today: [], tomorrow: [], upcoming: [], ...d },
+    data: jobs,
     isLoading: false, isError: false, error: null, refetch: jest.fn(), isRefetching: false,
   });
 }
@@ -70,13 +70,13 @@ const CANCELLED = job('JOB-4', 'cancelled', at(0, 17, 0));
 
 describe('Today heading (change 10)', () => {
   it('counts the jobs still to do and shows no money', async () => {
-    mockJobs({ today: [PENDING, UNDER_WAY, DONE] });
+    mockJobs([PENDING, UNDER_WAY, DONE]);
     await render(<JobsToday/>);
     expect(screen.getByText('2 jobs to go')).toBeTruthy();
     expect(screen.queryByText(/RM/)).toBeNull();
   });
   it('says All done when only finished jobs are left', async () => {
-    mockJobs({ today: [DONE] });
+    mockJobs([DONE]);
     await render(<JobsToday/>);
     expect(screen.getByText('All done')).toBeTruthy();
   });
@@ -84,18 +84,18 @@ describe('Today heading (change 10)', () => {
 
 describe('Empty state (change 15)', () => {
   it('shows "No jobs scheduled today" only when nothing is coming at all', async () => {
-    mockJobs({});
+    mockJobs([]);
     await render(<JobsToday/>);
     expect(screen.getByText('No jobs scheduled today')).toBeTruthy();
   });
   it('does not show it when only an upcoming day has a job', async () => {
-    mockJobs({ upcoming: [{ dateKey: myDateKey(at(3, 10, 0)), label: '', jobs: [job('JOB-9', 'confirmed', at(3, 10, 0))] }] });
+    mockJobs([job('JOB-9', 'confirmed', at(3, 10, 0))]);
     await render(<JobsToday/>);
     expect(screen.queryByText('No jobs scheduled today')).toBeNull();
     expect(screen.getByText('Client JOB-9')).toBeTruthy();
   });
   it('does not show it for a day of only finished jobs', async () => {
-    mockJobs({ today: [DONE] });
+    mockJobs([DONE]);
     await render(<JobsToday/>);
     expect(screen.queryByText('No jobs scheduled today')).toBeNull();
   });
@@ -103,7 +103,7 @@ describe('Empty state (change 15)', () => {
 
 describe('Today order (change 32)', () => {
   it('leads with the job under way, then the jobs still to do', async () => {
-    mockJobs({ today: [PENDING, UNDER_WAY] });
+    mockJobs([PENDING, UNDER_WAY]);
     await render(<JobsToday/>);
     const clients = screen.getAllByText(/^Client JOB-/).map((n) => n.props.children);
     expect(clients).toEqual(['Client JOB-2', 'Client JOB-1']);
@@ -113,7 +113,7 @@ describe('Today order (change 32)', () => {
 describe('Finished today fold (changes 32, 36)', () => {
   fakeTimers();
   it('starts closed, with the count showing', async () => {
-    mockJobs({ today: [PENDING, DONE, CANCELLED] });
+    mockJobs([PENDING, DONE, CANCELLED]);
     await render(<JobsToday/>);
     expect(screen.getByText('Finished today')).toBeTruthy();
     expect(screen.getByText('2 jobs')).toBeTruthy();
@@ -121,7 +121,7 @@ describe('Finished today fold (changes 32, 36)', () => {
     expect(screen.queryByText('Client JOB-4')).toBeNull();
   });
   it('opens on tap and shows the jobs, a cancelled one as Cancelled', async () => {
-    mockJobs({ today: [PENDING, DONE, CANCELLED] });
+    mockJobs([PENDING, DONE, CANCELLED]);
     await render(<JobsToday/>);
     await fireEvent.press(screen.getByText('Finished today'));
     expect(screen.getByText('Client JOB-3')).toBeTruthy();
@@ -129,7 +129,7 @@ describe('Finished today fold (changes 32, 36)', () => {
     expect(screen.getByText('Cancelled')).toBeTruthy();
   });
   it('closes again on a second tap', async () => {
-    mockJobs({ today: [DONE] });
+    mockJobs([DONE]);
     await render(<JobsToday/>);
     await fireEvent.press(screen.getByText('Finished today'));
     expect(screen.getByText('Client JOB-3')).toBeTruthy();
@@ -138,20 +138,20 @@ describe('Finished today fold (changes 32, 36)', () => {
     expect(screen.queryByText('Client JOB-3')).toBeNull();
   });
   it('is not drawn when nothing finished today', async () => {
-    mockJobs({ today: [PENDING] });
+    mockJobs([PENDING]);
     await render(<JobsToday/>);
     expect(screen.queryByText('Finished today')).toBeNull();
   });
   it('does not bump the count on first draw', async () => {
-    mockJobs({ today: [DONE] });
+    mockJobs([DONE]);
     await render(<JobsToday/>);
     expect(R.withSequence).not.toHaveBeenCalled();
   });
   it('bumps once when a job is marked done while the screen is showing', async () => {
-    mockJobs({ today: [PENDING, DONE] });
+    mockJobs([PENDING, DONE]);
     const view = await render(<JobsToday/>);
     expect(R.withSequence).not.toHaveBeenCalled();
-    mockJobs({ today: [DONE, { ...PENDING, status: 'done' }] });
+    mockJobs([DONE, { ...PENDING, status: 'done' }]);
     await view.rerender(<JobsToday/>);
     expect(R.withSequence).toHaveBeenCalledTimes(1);
     expect(screen.getByText('2 jobs')).toBeTruthy();
@@ -160,13 +160,13 @@ describe('Finished today fold (changes 32, 36)', () => {
   });
   it('bumps when the driver comes back after marking a job done on the trip screen', async () => {
     setFinishedSeen(1); // seen with one finished job before leaving for the trip screen
-    mockJobs({ today: [DONE, { ...UNDER_WAY, status: 'done' }] });
+    mockJobs([DONE, { ...UNDER_WAY, status: 'done' }]);
     await render(<JobsToday/>);
     expect(R.withSequence).toHaveBeenCalledTimes(1);
   });
   it('does not bump when the count fell or held', async () => {
     setFinishedSeen(2);
-    mockJobs({ today: [DONE] });
+    mockJobs([DONE]);
     await render(<JobsToday/>);
     expect(R.withSequence).not.toHaveBeenCalled();
   });
@@ -175,14 +175,14 @@ describe('Finished today fold (changes 32, 36)', () => {
 describe('Statuses on the Jobs list (lib/jobStatus.ts)', () => {
   fakeTimers();
   it('a rejected job sits in the Finished today fold and reads Rejected', async () => {
-    mockJobs({ today: [PENDING, job('JOB-5', 'rejected', at(0, 18, 0))] });
+    mockJobs([PENDING, job('JOB-5', 'rejected', at(0, 18, 0))]);
     await render(<JobsToday/>);
     expect(screen.queryByText('Client JOB-5')).toBeNull();
     await fireEvent.press(screen.getByText('Finished today'));
     expect(screen.getByText('Rejected')).toBeTruthy();
   });
   it("an unknown status stays among the open jobs, shows the dispatcher's word and offers no Accept", async () => {
-    mockJobs({ today: [job('JOB-6', 'on_hold', at(0, 18, 0))] });
+    mockJobs([job('JOB-6', 'on_hold', at(0, 18, 0))]);
     await render(<JobsToday/>);
     expect(screen.getByText('Client JOB-6')).toBeTruthy();
     expect(screen.getByText('On hold')).toBeTruthy();
@@ -194,19 +194,19 @@ describe('Statuses on the Jobs list (lib/jobStatus.ts)', () => {
 
 describe('Opening a job (change 14)', () => {
   it('opens an in-progress job on the trip screen from Today', async () => {
-    mockJobs({ today: [UNDER_WAY] });
+    mockJobs([UNDER_WAY]);
     await render(<JobsToday/>);
     await fireEvent.press(screen.getByText('Client JOB-2'));
     expect(router.push).toHaveBeenCalledWith({ pathname: '/jobs/active', params: { id: 'JOB-2' } });
   });
   it('opens an in-progress job on the trip screen from Upcoming too', async () => {
-    mockJobs({ upcoming: [{ dateKey: myDateKey(at(3, 10, 0)), label: '', jobs: [job('JOB-9', 'in_progress', at(3, 10, 0))] }] });
+    mockJobs([job('JOB-9', 'in_progress', at(3, 10, 0))]);
     await render(<JobsToday/>);
     await fireEvent.press(screen.getByText('Client JOB-9'));
     expect(router.push).toHaveBeenCalledWith({ pathname: '/jobs/active', params: { id: 'JOB-9' } });
   });
   it('opens any other job on the job screen', async () => {
-    mockJobs({ today: [PENDING] });
+    mockJobs([PENDING]);
     await render(<JobsToday/>);
     await fireEvent.press(screen.getByText('Client JOB-1'));
     expect(router.push).toHaveBeenCalledWith('/jobs/JOB-1');
@@ -215,7 +215,7 @@ describe('Opening a job (change 14)', () => {
 
 describe('Reject from the list (change 11)', () => {
   it('opens a dialog and sends nothing until it is confirmed', async () => {
-    mockJobs({ today: [PENDING] });
+    mockJobs([PENDING]);
     await render(<JobsToday/>);
     await fireEvent.press(screen.getByText('Reject'));
     expect(screen.getByText('Reject JOB-1?')).toBeTruthy();
@@ -223,7 +223,7 @@ describe('Reject from the list (change 11)', () => {
     expect(reject).not.toHaveBeenCalled();
   });
   it('Keep job closes the dialog and sends nothing', async () => {
-    mockJobs({ today: [PENDING] });
+    mockJobs([PENDING]);
     await render(<JobsToday/>);
     await fireEvent.press(screen.getByText('Reject'));
     await fireEvent.press(screen.getByText('Keep job'));
@@ -231,7 +231,7 @@ describe('Reject from the list (change 11)', () => {
     expect(reject).not.toHaveBeenCalled();
   });
   it('sends the reason through when confirmed', async () => {
-    mockJobs({ today: [PENDING] });
+    mockJobs([PENDING]);
     await render(<JobsToday/>);
     await fireEvent.press(screen.getByText('Reject'));
     await fireEvent.changeText(screen.getByPlaceholderText('Dispatch will see this.'), 'Car in the workshop');
@@ -240,7 +240,7 @@ describe('Reject from the list (change 11)', () => {
     expect(reject).toHaveBeenCalledWith({ assignmentId: 'asg-JOB-1', reason: 'Car in the workshop' });
   });
   it('sends no reason when the box is left empty', async () => {
-    mockJobs({ today: [PENDING] });
+    mockJobs([PENDING]);
     await render(<JobsToday/>);
     await fireEvent.press(screen.getByText('Reject'));
     await fireEvent.press(screen.getByText('Reject job'));
@@ -252,7 +252,7 @@ describe('Reject from the list (change 11)', () => {
 describe('Accept from the list (change 35)', () => {
   fakeTimers();
   it('accepts once after the fade', async () => {
-    mockJobs({ today: [PENDING] });
+    mockJobs([PENDING]);
     await render(<JobsToday/>);
     await fireEvent.press(screen.getByText('Accept'));
     await advance(119);

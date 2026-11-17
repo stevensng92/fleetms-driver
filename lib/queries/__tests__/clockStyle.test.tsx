@@ -2,9 +2,10 @@ import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// Change 33: job cards and notification rows build their times inside query
-// functions, so a change to the Time format setting must make those queries run
-// again. supabase is mocked so importing them builds no live client (AGENTS.md).
+// Change 33, revised: job cards format their own times, so a change to the Time
+// format setting must NOT run the jobs query again. Notification rows still
+// build their text inside the query, so that one runs again.
+// supabase is mocked so importing them builds no live client (AGENTS.md).
 const mockResult = jest.fn();
 jest.mock('../../supabase', () => {
   const chain: any = {};
@@ -14,10 +15,10 @@ jest.mock('../../supabase', () => {
 });
 jest.mock('../driverProfile', () => ({ fetchCommissionBaseline: () => Promise.resolve(null) }));
 
-import { useTodaysJobs, fetchJobs } from '../jobs';
+import { useTodaysJobs } from '../jobs';
 import { useNotifications } from '../notifications';
 import { resetClockStyleForTests, setClockStyle } from '../../clockPref';
-import { formatClock, formatDateTime } from '../../timeFormat';
+import { formatDateTime } from '../../timeFormat';
 
 function wrapper() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -28,20 +29,6 @@ function wrapper() {
 beforeEach(() => {
   resetClockStyleForTests();
   mockResult.mockReset();
-});
-
-describe('fetchJobs', () => {
-  const pickup = new Date().toISOString();
-  const row = {
-    id: 'asg-1', vehicle: { plate_number: 'WXY 1234' },
-    jobs: { id: 'u1', job_number: 'J1', pickup_datetime: pickup, pickup_location: 'A', dropoff_location: 'B', client_name: 'C', pax: 1, status: 'pending', commission_rate_override: null, commission_fixed_amount: null },
-  };
-  it('writes the card time in the style it is given, 24-hour by default', async () => {
-    mockResult.mockReturnValue({ data: [row], error: null });
-    expect((await fetchJobs()).today[0].time).toBe(formatClock(pickup, '24h'));
-    expect((await fetchJobs('12h')).today[0].time).toBe(formatClock(pickup, '12h'));
-    expect(formatClock(pickup, '12h')).toMatch(/ (am|pm)$/);
-  });
 });
 
 describe('useTodaysJobs', () => {

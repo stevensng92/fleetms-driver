@@ -6,7 +6,7 @@ import Animated, {
   Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming,
 } from 'react-native-reanimated';
 import { AppHeader, SectionLabel } from '../../components/AppHeader';
-import { JobCard, type Job } from '../../components/JobCard';
+import { JobCard } from '../../components/JobCard';
 import { LoadError } from '../../components/LoadError';
 import { Band } from '../../components/Band';
 import { Card } from '../../components/Card';
@@ -16,7 +16,7 @@ import { useTokens } from '../../theme/ThemeProvider';
 import { EASE_OUT, fontFor, motionFor, radius, space, type } from '../../theme/tokens';
 import { formatClock, formatDate, formatDayLong } from '../../lib/timeFormat';
 import { useClockStyle } from '../../lib/clockPref';
-import { useTodaysJobs } from '../../lib/queries/jobs';
+import { useTodaysJobs, type FetchedJob } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 import { useUnreadCount } from '../../lib/queries/notifications';
 import { useDriverProfile } from '../../lib/queries/driverProfile';
@@ -43,17 +43,14 @@ export default function JobsToday() {
   // banner is just a soft nudge.
   const [bannerDismissed, setBannerDismissed] = useState(false);
   // The job the driver tapped Reject on. Nothing is sent until the dialog is confirmed.
-  const [rejecting, setRejecting] = useState<Job | null>(null);
+  const [rejecting, setRejecting] = useState<FetchedJob | null>(null);
 
-  const groups = groupJobs(
-    data ? [...data.overdue, ...data.today, ...data.tomorrow, ...data.upcoming.flatMap((g) => g.jobs)] : [],
-    new Date(),
-  );
+  const groups = groupJobs(data ?? [], new Date());
   const { overdue, today, todayFinished, tomorrow, upcoming } = groups;
   const upcomingTotal = upcoming.reduce((sum, g) => sum + g.jobs.length, 0);
 
   // MY day, matching the MY day boundaries the Today/Tomorrow groups below use
-  // (lib/queries/jobs.ts). Device-local would let this header disagree with
+  // (lib/jobGroups.ts). Device-local would let this header disagree with
   // which jobs are sitting under 'Today'.
   const headerSubtitle = formatDayLong();
 
@@ -62,14 +59,14 @@ export default function JobsToday() {
 
   // One job card. An in-progress job opens the trip screen from every group;
   // anything else opens the job screen.
-  const card = (j: Job, opts: { dim?: boolean; overdue?: boolean } = {}) => {
+  const card = (j: FetchedJob, opts: { dim?: boolean; overdue?: boolean } = {}) => {
     const open = jobScreen(j) === 'trip'
       ? { pathname: '/jobs/active' as const, params: { id: j.id } }
       : `/jobs/${j.id}`;
     return (
       <JobCard
         key={j.id}
-        job={{ ...j, time: formatClock(j.pickupAt, clock) }}
+        job={{ ...j, time: formatClock(j.pickupAt, clock), pickupDate: formatDate(j.pickupAt, { weekday: true }) }}
         dim={opts.dim}
         overdue={opts.overdue}
         onPress={() => router.push(open as Parameters<typeof router.push>[0])}
