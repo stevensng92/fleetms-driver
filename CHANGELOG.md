@@ -6,6 +6,15 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
 
 ### Fixed
 
+- **Switching between 12-hour and 24-hour time is instant.** The Jobs list
+  and Notifications now redraw in the new format straight away. Before, both
+  downloaded everything again, with a spinner, and with no signal the Jobs tab
+  could show "Couldn't load jobs" just for changing a setting.
+- **The Jobs list moves to the new day at midnight.** With the app open, or
+  after the phone sleeps past midnight, tomorrow's jobs move under Today and
+  unfinished ones under Overdue without a reload.
+- **A trip under way past midnight is not marked Missed.** A late-night trip
+  that started yesterday stays with today's jobs until the driver finishes it.
 - **A receipt that fails to load can be retried.** The receipt screen now
   shows Retry when it can't load, so a moment without signal no longer forces
   the driver to leave and come back.
