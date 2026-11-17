@@ -81,6 +81,9 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
   data as the web demo, instead of a few hand-picked rows each. A mismatch
   between what the database sends and what the app expects is now more likely
   to show up in a test. Nothing changes in the app itself.
+- **Those tests no longer fail at random around midnight.** A test that would
+  start within 30 seconds of midnight Malaysian time now waits until just
+  after it, so the test data and the code it checks always agree on the day.
 
 ## [Hotfix] - 2026-09-24
 
