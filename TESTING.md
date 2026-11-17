@@ -139,8 +139,8 @@ const fake = installFakeDatabase();   // import { installFakeDatabase } from '..
 ```
 
 The mock must be written with `require` inside the factory. `jest.mock` is hoisted
-above the imports, so the factory cannot reach an imported name (the same trap as
-the arrow-wrapper note in AGENTS.md).
+above the imports, so the factory cannot reach an imported name (it runs before
+the file's `import` and `const` lines have set them up).
 
 - **Fresh story per test.** `installFakeDatabase()` builds a new copy before each
   test, so an edit in one test never shows in the next.
@@ -177,7 +177,7 @@ and keep every row invented.
 test/
   globalSetup.js        TZ pin, runs before workers spawn
   setup.ts              per-file mocks (AsyncStorage, safe-area, expo-haptics, Sentry)
-  fakeDatabase.ts       one-line switch onto the demo's fake database
+  fakeDatabase.ts       switches a test file onto the demo's fake database
 lib/__tests__/          pure helper tests
 components/__tests__/   component tests
 __tests__/screens/      screen tests — NOT under app/, see below
