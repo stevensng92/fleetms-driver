@@ -40,6 +40,14 @@ describe('endSessionIfSignedOut', () => {
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 
+  // supabase-js keeps the session on purpose when the login server is briefly
+  // down (a retryable 502/503/504); the app must not sign the driver out then.
+  it.each([502, 503, 504])('keeps the session when the login server answers %i during renewal', async (status) => {
+    mockRefresh.mockResolvedValue({ data: { session: null }, error: { name: 'AuthRetryableFetchError', message: 'Service Unavailable', status } });
+    await endSessionIfSignedOut(pg('JWT expired', 'PGRST301'));
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
   // A bare 401 counts as signed out too, by the same renewal check.
   it('treats a bare 401 the same way', async () => {
     await endSessionIfSignedOut({ status: 401, message: 'Unauthorized' });
