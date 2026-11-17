@@ -165,7 +165,8 @@ for a driver:
 Pure rules behind these live in their own tested files: `lib/jobGroups.ts`,
 `lib/route.ts`, `lib/money.ts`, `lib/earningsPeriod.ts`, `lib/timeOff.ts`,
 `lib/profile.ts`, `lib/clockPref.ts`, `lib/phone.ts`, `lib/notification.ts`,
-`lib/amount.ts`, `lib/expenses.ts`, `lib/statusTone.ts`, `lib/jobStatus.ts`.
+`lib/amount.ts`, `lib/expenses.ts`, `lib/statusTone.ts`, `lib/jobStatus.ts`,
+`lib/errorWords.ts`.
 
 **Job status** is read in one place, `lib/jobStatus.ts`. Every screen shows the
 dispatcher's word (Pending, Confirmed, In Progress, Done, Rejected, Cancelled)
@@ -281,7 +282,10 @@ lib/
   useSignedIn.ts           signed-in flag from Supabase auth events; the root
                            layout re-runs push setup on every sign-in
   notification.ts          notification words and allowed links (screen + push)
-  queryClient.ts           React Query client
+  errorWords.ts            the one sentence a driver sees for any error (five kinds)
+  useReturnToSignInOnSignOut.ts  opens Sign in whenever the session ends
+  queryClient.ts           React Query client; ends a session the server rejects
+                           (after one renewal attempt)
   queries/, mutations/     per-screen data-access layer (React Query hooks).
                            queries/driverProfile.ts also exports
                            fetchCommissionBaseline() — the driver's normal pay
@@ -333,6 +337,19 @@ drop this phone's push address (`clear_driver_push_token`), waiting at most 2
 seconds and never blocking sign-out. Push setup in `app/_layout.tsx` re-runs on
 every sign-in (`lib/useSignedIn.ts`), and any sign-out, including an expired
 session, makes the next sign-in save the push address again.
+
+Every error a driver sees is one of five plain sentences from `lib/errorWords.ts`
+(no signal, signed out, not allowed, dispatch changed the job, anything else);
+no screen shows an error's own text, and the raw error goes to Sentry once per
+kind. A load box takes the error itself (`<LoadError error={error} />`). When a
+job action fails because dispatch changed the job, `refreshJobs` runs (bounded
+like success) before the pop-up says so, so the screens already show the new
+state. When a request fails because the server rejected the session,
+`endSessionIfSignedOut` in `lib/queryClient.ts` tries one renewal and, only if
+the server refuses it, signs out on this phone. `lib/useReturnToSignInOnSignOut.ts`
+(started in `app/_layout.tsx`) then opens Sign in on any sign-out, whether the
+Sign out button or an expired session. A renewal that fails for lack of signal
+or a briefly-down login server keeps the session.
 
 ## Design provenance
 

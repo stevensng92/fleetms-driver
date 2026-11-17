@@ -56,7 +56,7 @@ export default function Expenses() {
             <ActivityIndicator color={T.text2}/>
           </View>
         ) : isError ? (
-          <LoadError title="Couldn't load expenses" message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>
+          <LoadError title="Couldn't load expenses" error={error} onRetry={() => refetch()}/>
         ) : (
           <>
             {/* Month total: the dark card when there is something to show */}

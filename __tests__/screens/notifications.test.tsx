@@ -110,7 +110,8 @@ describe('Notifications: failed load (LoadError)', () => {
     (useNotifications as jest.Mock).mockReturnValue({ data: undefined, isLoading: false, error: new Error('Failed to fetch'), refetch });
     await render(<Notifications/>);
     expect(screen.getByText("Couldn't load notifications")).toBeTruthy();
-    expect(screen.getByText('Failed to fetch')).toBeTruthy();
+    expect(screen.getByText('No signal. Check your connection and try again.')).toBeTruthy();
+    expect(screen.queryByText('Failed to fetch')).toBeNull();
     expect(screen.queryByText(/No notifications/i)).toBeNull();
     await fireEvent.press(screen.getByText('Retry'));
     expect(refetch).toHaveBeenCalledTimes(1);

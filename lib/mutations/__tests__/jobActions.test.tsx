@@ -121,4 +121,44 @@ describe('job actions', () => {
     await act(async () => { await expect(result.current.mutateAsync('job-uuid-1')).rejects.toBeTruthy(); });
     for (const k of JOB_KEYS) expect(stale(qc, k)).toBe(false);
   });
+  // dispatch changed the job under the driver: the pop-up says "It's been updated on your screen", so it must be.
+  it('refreshes every job screen when dispatch has changed the job, and still rejects', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'Cannot start a pending job (must be confirmed)', code: 'P0001' } });
+    const qc = seededClient();
+    const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+    const { result } = await renderHook(() => useStartJob(), { wrapper });
+    await act(async () => { await expect(result.current.mutateAsync('job-uuid-1')).rejects.toMatchObject({ code: 'P0001' }); });
+    for (const k of JOB_KEYS) expect(stale(qc, k)).toBe(true);
+    for (const k of OTHER_KEYS) expect(stale(qc, k)).toBe(false);
+  });
+
+  it('does not refresh when the failure is only a lost connection', async () => {
+    mockRpc.mockRejectedValue(new TypeError('Network request failed'));
+    const qc = seededClient();
+    const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+    const { result } = await renderHook(() => useStartJob(), { wrapper });
+    await act(async () => { await expect(result.current.mutateAsync('job-uuid-1')).rejects.toBeInstanceOf(TypeError); });
+    for (const k of JOB_KEYS) expect(stale(qc, k)).toBe(false);
+  });
+
+  it('stops waiting for a hung reload after 2 seconds on a changed job too', async () => {
+    jest.useFakeTimers();
+    try {
+      mockRpc.mockResolvedValue({ data: null, error: { message: 'No current assignment for job', code: 'P0001' } });
+      const qc = seededClient();
+      const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+      const { result } = await renderHook(() => {
+        useQuery({ queryKey: ['job-by-number', 'JOB-001'], queryFn: () => new Promise(() => {}), initialData: 'x', staleTime: Infinity });
+        return useCompleteJob();
+      }, { wrapper });
+      let failed = false;
+      await act(async () => { void result.current.mutateAsync('job-uuid-1').catch(() => { failed = true; }); });
+      await act(async () => { await jest.advanceTimersByTimeAsync(1900); });
+      expect(failed).toBe(false);
+      await act(async () => { await jest.advanceTimersByTimeAsync(200); });
+      expect(failed).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

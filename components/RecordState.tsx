@@ -52,7 +52,7 @@ export function RecordState({ title, errorTitle, notFound, query, bg }: {
     body = (
       <LoadError
         title={errorTitle}
-        message={(query.error as Error | null)?.message ?? 'Unknown error'}
+        error={query.error}
         onRetry={() => { query.refetch(); }}
       />
     );

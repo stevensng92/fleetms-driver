@@ -19,6 +19,7 @@ import { useMyVehicles } from '../../lib/queries/vehicles';
 import { useLogExpense } from '../../lib/mutations/logExpense';
 import type { ExpenseCategory } from '../../lib/queries/expenses';
 import { formatDateLong, myDateKey } from '../../lib/timeFormat';
+import { errorWords } from '../../lib/errorWords';
 import { amountValue, checkExpense, checkReceiptFile, receiptFileOf, vehicleOptionLine, hasDraft } from '../../lib/expenses';
 
 const CATS: { value: ExpenseCategory; label: string; icon: IconName }[] = [
@@ -151,7 +152,7 @@ export default function LogExpense() {
       });
       setLeaving({ action: null });
     } catch (e: any) {
-      Alert.alert('Could not save', e?.message ?? 'Unknown error');
+      Alert.alert('Could not save', errorWords(e));
     }
   }
 

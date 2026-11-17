@@ -19,20 +19,21 @@ function mockExpenses(over: Record<string, unknown>) {
 beforeEach(() => jest.clearAllMocks());
 
 describe('Expenses tab: failed load', () => {
-  it('shows the error box with the message and Retry, and Retry reloads', async () => {
+  it('shows the error box with the plain sentence and Retry, and Retry reloads', async () => {
     const refetch = jest.fn();
     mockExpenses({ isError: true, error: new Error('Failed to fetch'), refetch });
     await render(<Expenses/>);
     expect(screen.getByText("Couldn't load expenses")).toBeTruthy();
-    expect(screen.getByText('Failed to fetch')).toBeTruthy();
+    expect(screen.getByText('No signal. Check your connection and try again.')).toBeTruthy();
+    expect(screen.queryByText('Failed to fetch')).toBeNull();
     expect(screen.queryByText('Logged this month')).toBeNull();
     await fireEvent.press(screen.getByText('Retry'));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('says "Unknown error" when the failure has no message', async () => {
+  it('says something went wrong when the failure has no message', async () => {
     mockExpenses({ isError: true, error: null });
     await render(<Expenses/>);
-    expect(screen.getByText('Unknown error')).toBeTruthy();
+    expect(screen.getByText('Something went wrong. Try again, or call dispatch if it keeps happening.')).toBeTruthy();
   });
 });

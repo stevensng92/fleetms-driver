@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { resetClockStyleForTests, setClockStyle } from '../../lib/clockPref';
@@ -126,7 +127,8 @@ describe('Active job: not found and failed (change 20)', () => {
     const refetch = jest.fn();
     mockJob(undefined, { isError: true, error: new Error('Network request failed'), refetch });
     await render(<ActiveJob/>);
-    expect(screen.getByText('Network request failed')).toBeTruthy();
+    expect(screen.getByText('No signal. Check your connection and try again.')).toBeTruthy();
+    expect(screen.queryByText('Network request failed')).toBeNull();
     expect(screen.queryByText('This job is no longer on your list')).toBeNull();
     await fireEvent.press(screen.getByText('Retry'));
     await waitFor(() => expect(refetch).toHaveBeenCalled());
@@ -174,5 +176,24 @@ describe('Trip screen when the job is no longer In progress', () => {
     expect(screen.getByText('In Progress')).toBeTruthy();
     expect(screen.getByText('Mark as done')).toBeTruthy();
     expect(screen.queryByText('Back to jobs')).toBeNull();
+  });
+});
+
+// A failed Mark as done shows the plain sentence, never the server's own text.
+describe('Active job: a failed Mark as done shows plain words', () => {
+  it("says dispatch changed the job, and never shows the server's text", async () => {
+    const RAW = 'Cannot complete a done job';
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      mutateAsync.mockRejectedValue({ message: RAW, code: 'P0001' });
+      await render(<ActiveJob/>);
+      await fireEvent.press(screen.getByText('Mark as done'));
+      await fireEvent.press(await screen.findByText('Mark done'));
+      await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Could not mark done', "Dispatch has changed this job. It's been updated on your screen."));
+      expect(alertSpy).not.toHaveBeenCalledWith('Could not mark done', RAW);
+      expect(router.replace).not.toHaveBeenCalled();
+    } finally {
+      alertSpy.mockRestore();
+    }
   });
 });

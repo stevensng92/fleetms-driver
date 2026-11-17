@@ -71,13 +71,15 @@ Run with `npm test`. Full guide, including the sharp edges that will bite you
 
 Currently covered: pure helpers (`lib/timeFormat.ts`, `lib/commissionRate.ts`,
 `lib/semver.ts`, `lib/earningsPeriod.ts`, `lib/jobContact.ts`, `lib/jobStatus.ts`, `lib/notification.ts`,
-`lib/jobGroups.ts`) and shared
+`lib/errorWords.ts`, `lib/jobGroups.ts`) and shared
 components (including `RouteCard`, `LoadError` and `RecordState`), plus every
 screen in the README's screen table (`__tests__/screens/`), `fetchClientPhone` in
 `lib/queries/jobDetail.ts`, `fetchJobs` (`lib/queries/jobs.ts`), `fetchNotifications` and the push tap handler
 (`handlePushTap` in `lib/push.ts`), sign-out (`signOut` in `lib/auth.ts`), clearing
 and resetting the push address (`clearPushNotifications`, `resetPushRegistration`
-in `lib/push.ts`), the `useSignedIn` hook (`lib/useSignedIn.ts`), the four job
+in `lib/push.ts`), the `useSignedIn` hook (`lib/useSignedIn.ts`), the return to
+sign-in on sign-out (`lib/useReturnToSignInOnSignOut.ts`, and `endSessionIfSignedOut`
+in `lib/queryClient.ts` for a session the server rejects), the four job
 actions and `refreshJobs` (`lib/mutations/jobActions.ts`) and live updates
 (`useLiveUpdates` in `lib/realtime/jobsRealtime.ts`). NOT covered: the session
 gate (`app/index.tsx`), the remaining React Query data hooks, the rest of auth
@@ -92,6 +94,16 @@ allowed link a row or push tap opens). Never open a notification's link
 without it; add a shape to its allowed list instead. The download keeps raw
 details (`readNotification`); the screen words them as it draws
 (`notificationWords`).
+
+An error is shown ONLY through `lib/errorWords.ts`: it sorts any thrown value
+into one of five kinds (no signal, signed out, not allowed, dispatch changed
+the job, anything else) and returns one plain sentence, reporting the raw error
+to Sentry once per kind. Never put an error's own text (`e.message`, a database
+error, a status code) on screen. A load box takes the error itself
+(`<LoadError error={error}/>`), and a pop-up after a failed button press uses
+`Alert.alert('Could not …', errorWords(e))`. New wording for a new kind of
+failure goes in that module, not in a screen. Sign-in and set-PIN word their
+own errors in `lib/auth.ts`.
 
 Times are formatted on screen, never inside a download. Queries return raw
 timestamps, and the screen or card formats them in the driver's Time format,

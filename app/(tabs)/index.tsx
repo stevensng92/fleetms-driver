@@ -15,6 +15,7 @@ import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { EASE_OUT, fontFor, motionFor, radius, space, type } from '../../theme/tokens';
 import { formatDate, formatDayLong, myDateKey, myStartOfDay } from '../../lib/timeFormat';
+import { errorWords } from '../../lib/errorWords';
 import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 import { useUnreadCount } from '../../lib/queries/notifications';
@@ -101,7 +102,7 @@ export default function JobsToday() {
         onAccept={async () => {
           if (!j.assignmentId) return false;
           try { await confirmAsg.mutateAsync(j.assignmentId); return true; }
-          catch (e: any) { Alert.alert('Could not accept', e?.message ?? 'Unknown error'); return false; }
+          catch (e: any) { Alert.alert('Could not accept', errorWords(e)); return false; }
         }}
         onReject={() => setRejecting(j)}
       />
@@ -113,7 +114,7 @@ export default function JobsToday() {
     setRejecting(null);
     if (!j?.assignmentId) return;
     try { await rejectAsg.mutateAsync({ assignmentId: j.assignmentId, reason: reason || undefined }); }
-    catch (e: any) { Alert.alert('Could not reject', e?.message ?? 'Unknown error'); }
+    catch (e: any) { Alert.alert('Could not reject', errorWords(e)); }
   };
 
   return (
@@ -141,7 +142,7 @@ export default function JobsToday() {
         )}
 
         {isLoading && <LoadingState/>}
-        {isError && <ErrorState message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>}
+        {isError && <ErrorState error={error} onRetry={() => refetch()}/>}
 
         {!isLoading && !isError && groups.empty && <EmptyState/>}
 
@@ -364,11 +365,11 @@ function LoadingState() {
   );
 }
 
-function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+function ErrorState({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const T = useTokens();
   const sessionInfo = (globalThis as any).__FLEETMS_DEV_SESSION__;
   return (
-    <LoadError title="Couldn't load jobs" message={message} onRetry={onRetry}>
+    <LoadError title="Couldn't load jobs" error={error} onRetry={onRetry}>
       {sessionInfo && sessionInfo.kind !== 'ok' && (
         <Text style={[type.caption, { color: T.text2, marginTop: space[2] }]}>
           Auth status: {sessionInfo.kind}

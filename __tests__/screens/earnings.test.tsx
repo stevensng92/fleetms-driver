@@ -281,7 +281,8 @@ describe('Earnings — row rendering', () => {
     await render(<Earnings/>);
 
     expect(screen.getByText("Couldn't load earnings")).toBeTruthy();
-    expect(screen.getByText('boom')).toBeTruthy();
+    expect(screen.getByText('Something went wrong. Try again, or call dispatch if it keeps happening.')).toBeTruthy();
+    expect(screen.queryByText('boom')).toBeNull();
     expect(screen.getByText('Retry')).toBeTruthy();
   });
 

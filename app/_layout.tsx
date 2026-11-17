@@ -16,6 +16,7 @@ import { loadClockStyle } from '../lib/clockPref';
 import { ensureDevSession, DevSessionResult } from '../lib/devSession';
 import { ensurePushNotifications, resetPushRegistration } from '../lib/push';
 import { useSignedIn } from '../lib/useSignedIn';
+import { useReturnToSignInOnSignOut } from '../lib/useReturnToSignInOnSignOut';
 import { useLiveUpdates } from '../lib/realtime/jobsRealtime';
 import { reportAppVersion } from '../lib/version';
 import { useAppVersionGate } from '../lib/queries/appVersionConfig';
@@ -177,6 +178,10 @@ function ThemedShell({ session }: { session: DevSessionResult | null }) {
   // navigator can actually handle a push, so the replayed tap can't outrun it.
   const rootNavigationState = useRootNavigationState();
   const isNavigationReady = !!rootNavigationState?.key;
+
+  // Any sign-out (button, or a session that expired and could not renew) goes
+  // back to the sign-in screen, so the driver is never stuck on a dead screen.
+  useReturnToSignInOnSignOut(router, isNavigationReady);
 
   // Register push notifications whenever a driver is signed in AND the
   // navigator is ready. Keyed on every sign-in (useSignedIn), not the one-time

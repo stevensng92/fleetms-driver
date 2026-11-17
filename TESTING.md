@@ -170,7 +170,8 @@ production column check before building the APK stays the guard.
 
 **Keep a hand-made stand-in when the test is about what the app sends**: which
 function, which arguments, how many times, in what order. That is why
-`jobActions`, `jobsRealtime`, `auth.signOut`, `push` and `useSignedIn` keep theirs.
+`jobActions`, `jobsRealtime`, `auth.signOut`, `push`, `useSignedIn`,
+`useReturnToSignInOnSignOut` and `endSessionIfSignedOut` (`queryClient`) keep theirs.
 The story is shared and public: change it with care, because many tests read it,
 and keep every row invented.
 

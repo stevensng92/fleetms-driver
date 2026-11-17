@@ -66,7 +66,7 @@ export default function Notifications() {
       {error && (
         <LoadError
           title="Couldn't load notifications"
-          message={(error as Error).message}
+          error={error}
           onRetry={() => refetch()}
         />
       )}

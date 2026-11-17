@@ -43,7 +43,8 @@ describe('Receipt screen', () => {
     fake.failWith(t => (t.name === 'expenses' && ++reads === 1 ? { message: 'Failed to fetch' } : undefined));
     await open();
     expect(await screen.findByText("Couldn't load expense")).toBeTruthy();
-    expect(screen.getByText('Failed to fetch')).toBeTruthy();
+    expect(screen.getByText('No signal. Check your connection and try again.')).toBeTruthy();
+    expect(screen.queryByText('Failed to fetch')).toBeNull();
     await fireEvent.press(screen.getByText('Retry'));
     expect(await screen.findByText('Fuel receipt')).toBeTruthy();
   });
