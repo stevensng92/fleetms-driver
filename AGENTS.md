@@ -104,16 +104,18 @@ was split out of `lib/queries/earnings.ts` for exactly this reason, and
 `lib/jobContact.ts` out of `lib/queries/jobDetail.ts`. The jobs day split
 moved the same way, from `lib/queries/jobs.ts` into `lib/jobGroups.ts`.
 
-**Query modules CAN be tested.** Put
-`jest.mock('../../supabase', () => ({ supabase: { rpc: … } }))` at the top of the
-file and importing the query never constructs a client, so the import-time
-problem above disappears. Reach for this whenever a query carries real logic —
-a degrade path, a retry, a mapping — rather than assuming queries are
-untestable. Export the inner function for the test and say so in a comment;
-going through the hook drags in a React Query provider for no gain.
-Worked example: `lib/queries/__tests__/jobDetail.clientPhone.test.ts`. Note the
-arrow-wrapper indirection around the mock fn — `jest.mock` hoists above `const`
-initialisation, so referencing the mock directly hits the TDZ.
+**Query modules CAN be tested, and the default is the demo's fake database.**
+Put `jest.mock('../../supabase', () => require('../../../test/fakeDatabase').supabaseModule)`
+and `const fake = installFakeDatabase()` at the top of the file. The query then runs
+on the shared story in `demo/fixtures.ts`, so you edit a row (`fake.db`) or make a
+call fail (`fake.failWith`) instead of building a chain of fake calls. Only a
+test about what the app SENDS (the job actions, live updates, sign-out, push, the
+signed-in check) keeps a hand-made stand-in. The fake ignores select strings, so
+it cannot catch a missing column; the production column check before a build is
+the guard. Worked example: `lib/queries/__tests__/jobDetail.clientPhone.test.ts`;
+full guide in [TESTING.md](TESTING.md). Export the inner function for the test
+and say so in a comment; going through the hook drags in a React Query provider
+for no gain.
 
 ## Docs upkeep
 

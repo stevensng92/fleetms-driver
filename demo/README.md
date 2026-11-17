@@ -49,3 +49,15 @@ screens change. Reload the page to reset everything.
 `demo/__tests__/fakeSupabase.test.ts`. Run it with `npx jest demo`, from the main
 checkout or from inside a worktree. The Jest config only skips worktree copies
 under the project's own root, so no flag overrides are needed.
+
+The fake and the story are also the database for the repo's data-loading tests
+(through `test/fakeDatabase.ts`, see TESTING.md). So a change to a row in
+`fixtures.ts` can fail a test far from here: change the story with care, run the
+whole suite, and keep every row invented, because the repo is public.
+
+`createFakeSupabase` takes an optional `fail` rule, a function that makes a table
+read or an rpc return an error. It exists for tests only. The web demo never
+passes it, so the preview never shows a failure.
+
+The fake ignores the select string, so it cannot catch a missing or misspelt
+column. The production column check before a driver APK build stays the guard.

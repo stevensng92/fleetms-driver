@@ -436,3 +436,69 @@ describe('real query hooks over the fake client', () => {
     expect(await getSignedReceiptUrl('demo/x1.svg')).toMatch(/^data:/);
   });
 });
+
+// The `fail` option is for tests only: the web demo never passes it.
+describe('fail option', () => {
+  const BOOM = { message: 'Failed to fetch', code: '', details: '', hint: '' };
+
+  it('a failing table read resolves { data: null, error } and names the table it was asked about', async () => {
+    const seen: unknown[] = [];
+    const client = createFakeSupabase({
+      db: buildDb(NOW), now: () => NOW, search: () => '',
+      fail: t => { seen.push(t); return t.name === 'push_log' ? BOOM : undefined; },
+    });
+    const bad = await client.from('push_log').select('*');
+    expect(bad.data).toBeNull();
+    expect(bad.error).toBe(BOOM);
+    expect(seen).toEqual([{ kind: 'table', name: 'push_log' }]);
+    const ok = await client.from('jobs').select('*');
+    expect(ok.error).toBeNull();
+    expect((ok.data as any[]).length).toBeGreaterThan(0);
+  });
+
+  it('single and maybeSingle fail the same way', async () => {
+    const client = createFakeSupabase({ db: buildDb(NOW), now: () => NOW, search: () => '', fail: () => BOOM });
+    expect(await client.from('jobs').select('*').single()).toMatchObject({ data: null, error: BOOM });
+    expect(await client.from('jobs').select('*').maybeSingle()).toMatchObject({ data: null, error: BOOM });
+  });
+
+  it('a failing rpc resolves { data: null, error } and the command does not run', async () => {
+    const db = buildDb(NOW);
+    const before = db.jobs.find(j => j.job_number === 'JOB-138')!.status;
+    const client = createFakeSupabase({
+      db, now: () => NOW, search: () => '',
+      fail: t => (t.kind === 'rpc' && t.name === 'driver_confirm_assignment' ? BOOM : undefined),
+    });
+    const res = await client.rpc('driver_confirm_assignment', { target_assignment_id: 'asg-138' });
+    expect(res).toMatchObject({ data: null, error: BOOM });
+    expect(db.jobs.find(j => j.job_number === 'JOB-138')!.status).toBe(before);
+    expect((await client.rpc('driver_my_vehicles')).error).toBeNull();
+  });
+
+  it('a status on the error becomes the status of the answer; otherwise it is 500', async () => {
+    const client = createFakeSupabase({
+      db: buildDb(NOW), now: () => NOW, search: () => '',
+      fail: t => ({ ...BOOM, ...(t.kind === 'rpc' ? { status: 0 } : {}) }),
+    });
+    expect((await client.rpc('x')).status).toBe(0);
+    expect((await client.from('jobs').select('*')).status).toBe(500);
+  });
+
+  it('a rule with a counter can fail the first call and let the second through', async () => {
+    let calls = 0;
+    const client = createFakeSupabase({
+      db: buildDb(NOW), now: () => NOW, search: () => '',
+      fail: t => (t.name === 'jobs' && ++calls === 1 ? BOOM : undefined),
+    });
+    expect((await client.from('jobs').select('*')).error).toBe(BOOM);
+    const second = await client.from('jobs').select('*');
+    expect(second.error).toBeNull();
+    expect((second.data as any[]).length).toBeGreaterThan(0);
+  });
+
+  it('without the option nothing fails', async () => {
+    const { client } = fresh();
+    expect((await client.from('jobs').select('*')).error).toBeNull();
+    expect((await client.rpc('driver_my_vehicles')).error).toBeNull();
+  });
+});
