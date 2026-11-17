@@ -358,10 +358,12 @@ describe('real query hooks over the fake client', () => {
   });
 
   it('jobs land in overdue / today / tomorrow / upcoming', async () => {
+    // The download is one flat list; the Jobs tab splits it by Malaysian day on screen.
     const { useTodaysJobs } = require('../../lib/queries/jobs');
-    const j: any = await run(() => useTodaysJobs());
+    const { groupJobs } = require('../../lib/jobGroups');
+    const j: any = groupJobs(await run(() => useTodaysJobs()));
     expect(j.overdue.map((x: any) => x.id)).toEqual(['JOB-139']);
-    expect(j.today.map((x: any) => x.id)).toEqual(['JOB-124', 'JOB-137', 'JOB-138', 'JOB-140', 'JOB-144']);
+    expect([...j.today, ...j.todayFinished].map((x: any) => x.id)).toEqual(['JOB-137', 'JOB-138', 'JOB-140', 'JOB-124', 'JOB-144']);
     expect(j.tomorrow.map((x: any) => x.id)).toEqual(['JOB-132', 'JOB-141']);
     expect(j.upcoming.flatMap((g: any) => g.jobs.map((x: any) => x.id))).toEqual(['JOB-142', 'JOB-143']);
     const j137 = j.today.find((x: any) => x.id === 'JOB-137');
@@ -411,7 +413,9 @@ describe('real query hooks over the fake client', () => {
     const { useNotifications } = require('../../lib/queries/notifications');
     const n: any = await run(() => useNotifications());
     expect(n.length).toBe(6);
-    expect(n[0]).toMatchObject({ title: 'New job', jobNumber: 'JOB-143' });
+    // The download holds raw details; the words are built when the row draws.
+    expect(n[0]).toMatchObject({ kind: 'job_assigned', jobNumber: 'JOB-143' });
+    expect(require('../../lib/notification').notificationWords(n[0]).title).toBe('New job');
     expect(n.filter((i: any) => i.readAt === null)).toHaveLength(2);
   });
 

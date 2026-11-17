@@ -75,7 +75,11 @@ passes-alone-fails-together signature as above. When a screen renders
 date-derived labels, derive the *expectations* from the real clock through the
 same pure helper the screen uses, and pin the date arithmetic itself in that
 helper's own test against a fixed instant. `__tests__/screens/earnings.test.tsx`
-and `lib/__tests__/earningsPeriod.test.ts` are the worked example.
+and `lib/__tests__/earningsPeriod.test.ts` are the worked example. To test a
+timer, fake only the timer and keep `Date` real
+(`jest.useFakeTimers({ doNotFake: ['Date', 'performance'] })`); the Jobs tab's
+midnight timer in `__tests__/screens/jobs.test.tsx` is the worked example, and
+its day split is pinned against an injected "now" in `lib/__tests__/jobGroups.test.ts`.
 
 **Safe-area is mocked globally, and the `.default` unwrap is load-bearing.**
 `AppFrame` calls `useSafeAreaInsets()` at the top of every screen, so screen
@@ -145,7 +149,7 @@ screen tests in `__tests__/screens/` at the repo root.
 - **Test what the code does, not that it exists.** `expect(x).toBeDefined()` is
   not a test. Assert real behaviour and real values.
 - Say *why* in a comment when the assertion encodes a decision someone might
-  otherwise "clean up" — e.g. the deliberate `14:30 pm` redundancy in
+  otherwise "clean up" — e.g. the no-am/pm-marker 24-hour rule in
   `timeFormat.test.ts`, or the value-vs-null-check rule in
   `commissionRate.test.ts`. A test that fails without explaining itself invites
   a wrong fix.

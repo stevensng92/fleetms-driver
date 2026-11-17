@@ -246,7 +246,7 @@ Extends the existing `lib/earningsPeriod.ts` (already tested) and adds
 | 26 | An inactive driver never shows a green pill; initials skip "bin" and "binti" | `availabilityPill`, `initials` ports |
 | 27 | Sign out asks first | nothing happens until confirmed |
 
-**Change 33, added to the mock 15 Nov: Time format.** Profile > Appearance gets a Time format choice under Theme: 24-hour ("14:30", the default) or 12-hour ("2:30 pm", "12:15 am"). It is saved on the phone and every clock follows it: job cards, the job and trip screens, notification text and sent times. Test first: port the mock's `clockTime` cases (`rules.test.ts`) into `lib/__tests__/timeFormat.test.ts`, then add the style to `formatClock`. Job cards and notification rows build their times inside query functions, so a change must also refetch those queries. Today's app does not get this before the redesign.
+**Change 33, added to the mock 15 Nov: Time format.** Profile > Appearance gets a Time format choice under Theme: 24-hour ("14:30", the default) or 12-hour ("2:30 pm", "12:15 am"). It is saved on the phone and every clock follows it: job cards, the job and trip screens, notification text and sent times. Test first: port the mock's `clockTime` cases (`rules.test.ts`) into `lib/__tests__/timeFormat.test.ts`, then add the style to `formatClock`. Job cards and notification rows build their times inside query functions, so a change must also refetch those queries. Today's app does not get this before the redesign. (Changed 17 Nov 2026, `.scratch/format-times-on-screen/spec.md`: the downloads now carry raw times, cards and notification rows format them on screen, and switching the Time format only redraws.)
 
 New pure files: `lib/timeOff.ts`, `lib/profile.ts`.
 

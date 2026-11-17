@@ -113,10 +113,12 @@ passenger number alone rather than failing the screen. Dispatcher-side
 counterpart: `../fleetms/app/lib/job-contact.ts`, documented in
 `../fleetms/docs/clients.md`.
 
-Clock times render as 24-hour digits with the am/pm marker kept behind them
-(`09:00 am`, `14:30 pm`) via `lib/timeFormat.ts`. The marker is redundant
-after noon by strict notation; it is retained deliberately, so don't
-"simplify" it away.
+Clock times render via `lib/timeFormat.ts`, always in Malaysian time, in the
+driver's Time format: plain 24-hour digits by default (`09:00`, `14:30`, no
+am/pm marker since redesign change 4), or 12-hour (`2:30 pm`). Times are
+formatted on screen as they draw; the jobs and notifications downloads carry
+raw timestamps only, so switching the Time format redraws without downloading
+anything.
 
 | Screen           | Route                        | Wired? |
 |-------------------|-------------------------------|--------|
@@ -152,7 +154,8 @@ for a driver:
 - **Earnings**: cents everywhere, Paid / Unpaid / Waived / Refunded on rows,
   swipe right for earlier, a short page-turn slide.
 - **Profile**: Time format setting (24-hour default, or 12-hour; saved on the
-  phone, every clock follows it), one-tap time-off requests, Sign out asks first.
+  phone, every clock follows it, and switching it redraws without a download),
+  one-tap time-off requests, Sign out asks first.
 - **Sign in, notifications, expenses**: field-level messages instead of pop-ups
   or a disabled button; notification rows that lead nowhere aren't tappable; the
   expense form refuses "12abc", checks the receipt type and size, names vehicles
@@ -171,7 +174,9 @@ shows the dispatcher's word, stays in the open list, offers only "Back to
 jobs", and is reported to Sentry once. Terms are in `GLOSSARY.md`.
 
 **Notifications** are read in one place too, `lib/notification.ts`: the words
-on the Notifications screen and the link a row or a push tap opens. Only a few
+on the Notifications screen and the link a row or a push tap opens. The
+download keeps each row's raw details (`readNotification`); the screen words
+them as it draws (`notificationWords`), in the driver's Time format. Only a few
 exact link shapes open (`/jobs/<job number>`, `/(tabs)`, `/notifications`,
 `/profile/time-off`). A tapped push with a missing or refused link opens the
 Notifications screen, and the tap marks its row read. Refused links and unknown
@@ -269,7 +274,7 @@ lib/
                            job pays, whether that differs from the driver's own
                            normal pay, + "20%" / "RM 80" formatting
   earningsPeriod.ts        Earnings period model + the instant range each covers
-  timeFormat.ts            clock formatting (24h digits + am/pm marker)
+  timeFormat.ts            Malaysian-time date and clock formatting (24h or 12h)
   push.ts                  push-token registration, clearing it on sign-out,
                            + the push tap handler
   useSignedIn.ts           signed-in flag from Supabase auth events; the root
@@ -304,7 +309,11 @@ Every screen reads/writes through a React Query hook in `lib/queries/` or
 timeOff, notifications, driverProfile, vehicles, appVersionConfig). Each
 hook calls Supabase directly — RLS via `private.is_driver_self()` does the
 per-driver scoping, so there's no separate authorization layer in the app.
-The four job actions (Accept, Reject, Start, Complete) live in
+The jobs download (`fetchJobs` in `lib/queries/jobs.ts`) is one flat list of
+raw jobs in pickup order. The Jobs tab splits it by Malaysian day
+(`lib/jobGroups.ts`) against a "now" that moves at Malaysian midnight and
+catches up when the app returns to the front, and each `JobCard` formats its
+own pickup time. The four job actions (Accept, Reject, Start, Complete) live in
 `lib/mutations/jobActions.ts`, with `refreshJobs`: the one list of queries that
 show a job (`jobs`, `job-by-number`, `driver-earnings`,
 `driver-earnings-history-start`). After an action succeeds it waits for that

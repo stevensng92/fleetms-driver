@@ -70,10 +70,11 @@ Run with `npm test`. Full guide, including the sharp edges that will bite you
 - Never commit code that makes existing tests fail.
 
 Currently covered: pure helpers (`lib/timeFormat.ts`, `lib/commissionRate.ts`,
-`lib/semver.ts`, `lib/earningsPeriod.ts`, `lib/jobContact.ts`, `lib/jobStatus.ts`, `lib/notification.ts`) and shared
+`lib/semver.ts`, `lib/earningsPeriod.ts`, `lib/jobContact.ts`, `lib/jobStatus.ts`, `lib/notification.ts`,
+`lib/jobGroups.ts`) and shared
 components (including `RouteCard`, `LoadError` and `RecordState`), plus every
 screen in the README's screen table (`__tests__/screens/`), `fetchClientPhone` in
-`lib/queries/jobDetail.ts`, `fetchNotifications` and the push tap handler
+`lib/queries/jobDetail.ts`, `fetchJobs` (`lib/queries/jobs.ts`), `fetchNotifications` and the push tap handler
 (`handlePushTap` in `lib/push.ts`), sign-out (`signOut` in `lib/auth.ts`), clearing
 and resetting the push address (`clearPushNotifications`, `resetPushRegistration`
 in `lib/push.ts`), the `useSignedIn` hook (`lib/useSignedIn.ts`), the four job
@@ -88,13 +89,20 @@ strings in a screen; add a row there instead.
 
 A notification is read ONLY through `lib/notification.ts` (its words, and the
 allowed link a row or push tap opens). Never open a notification's link
-without it; add a shape to its allowed list instead.
+without it; add a shape to its allowed list instead. The download keeps raw
+details (`readNotification`); the screen words them as it draws
+(`notificationWords`).
+
+Times are formatted on screen, never inside a download. Queries return raw
+timestamps, and the screen or card formats them in the driver's Time format,
+so the Time format is never part of a query key and switching it only redraws.
 
 Note the shape that makes the pure helpers coverable: anything importing
 `lib/supabase.ts` builds a live client at import time, so pure decisions belong
 in their own module beside the query rather than inside it. `lib/earningsPeriod.ts`
 was split out of `lib/queries/earnings.ts` for exactly this reason, and
-`lib/jobContact.ts` out of `lib/queries/jobDetail.ts`.
+`lib/jobContact.ts` out of `lib/queries/jobDetail.ts`. The jobs day split
+moved the same way, from `lib/queries/jobs.ts` into `lib/jobGroups.ts`.
 
 **Query modules CAN be tested.** Put
 `jest.mock('../../supabase', () => ({ supabase: { rpc: … } }))` at the top of the

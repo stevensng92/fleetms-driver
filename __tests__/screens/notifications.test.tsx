@@ -15,6 +15,7 @@ jest.mock('../../lib/queries/notifications', () => ({
   useMarkNotificationsRead: jest.fn(),
 }));
 
+// Raw details as the download returns them: the row words them on screen.
 const item = (over: Partial<NotificationItem> = {}): NotificationItem => ({
   id: 'n1',
   kind: 'job_assigned',
@@ -22,9 +23,10 @@ const item = (over: Partial<NotificationItem> = {}): NotificationItem => ({
   sentAt: null,
   readAt: null,
   link: '/jobs/JOB-047',
-  title: 'New job',
   jobNumber: 'JOB-047',
-  body: 'Acme, KLIA, 12 Dec, 09:22',
+  clientName: 'Acme',
+  pickupLocation: 'KLIA',
+  pickupAt: '2026-12-12T01:22:00Z',
   ...over,
 });
 
@@ -71,7 +73,7 @@ describe('Notifications', () => {
   it('is a button only when the link leads somewhere', async () => {
     mockList([
       item({ id: 'a', link: '/jobs/JOB-047', jobNumber: 'JOB-047' }),
-      item({ id: 'b', link: null, jobNumber: 'JOB-048', title: 'Job cancelled', body: 'KLIA' }),
+      item({ id: 'b', kind: 'job_cancelled', link: null, jobNumber: 'JOB-048' }),
     ]);
     await render(<Notifications/>);
     // Close button plus the one linked row.
@@ -91,6 +93,13 @@ describe('Notifications with the Time format setting', () => {
     await act(async () => { setClockStyle('12h'); });
     expect(screen.getByText('12 Dec, 9:22 am')).toBeTruthy();
     expect(screen.queryByText('12 Dec, 09:22')).toBeNull();
+  });
+  it('words the pickup time in the row body in the chosen style, from the same downloaded details', async () => {
+    mockList([item()]);
+    await render(<Notifications/>);
+    expect(screen.getByText('Acme, KLIA, 12 Dec, 09:22')).toBeTruthy();
+    await act(async () => { setClockStyle('12h'); });
+    expect(screen.getByText('Acme, KLIA, 12 Dec, 9:22 am')).toBeTruthy();
   });
 });
 

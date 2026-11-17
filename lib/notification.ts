@@ -2,7 +2,9 @@ import { formatDateTime, type ClockStyle } from './timeFormat';
 
 // The one reader of a notification. The Notifications screen, its data query
 // and a push tap all ask this module; nothing else words a notification or
-// checks its link.
+// checks its link. The download keeps a row's raw details (readNotification);
+// the screen words them at draw time (notificationWords), so the Time format
+// setting changes the words without a download.
 //
 // Pure apart from the Sentry report: no database client at import time
 // (lib/queries/notifications.ts builds one), so it is tested without mocks.
@@ -23,14 +25,20 @@ const TITLE: Record<string, string> = {
   pickup_reminder: 'Pickup soon',
 };
 
-export type NotificationView = {
-  title: string;
+/** What a row's words are built from, read once when the list is downloaded. No time text. */
+export type NotificationDetails = {
+  kind: NotificationKind;
   /** The real job number, shown as its own small item beside the title. */
   jobNumber: string | null;
-  body: string;
+  clientName: string | null;
+  pickupLocation: string | null;
+  /** The raw pickup time (ISO). Formatted only when the row is drawn. */
+  pickupAt: string | null;
   /** An allowed link, or null: the row leads nowhere and is not a button. */
   link: string | null;
 };
+
+export type NotificationWords = { title: string; body: string };
 
 export type PushTap = {
   /** Always somewhere the app can open: the Notifications screen when the push's own link is missing or refused. */
@@ -70,28 +78,36 @@ function allowedLink(deeplink: unknown): string | null {
   return null;
 }
 
-/** Title, job number, body and allowed link for a Notifications screen row. Parts are joined with commas, never dots. */
-export function readNotification(kind: NotificationKind, payload: any, clock: ClockStyle = '24h'): NotificationView {
+/** A row's raw details, with its link checked. Reports a type this app does not know yet. */
+export function readNotification(kind: NotificationKind, payload: any): NotificationDetails {
   const p = payload ?? {};
-  const jobNumber: string | null = p.job_number ? String(p.job_number) : null;
-  const when: string | null = p.pickup_datetime ? formatDateTime(p.pickup_datetime, { weekday: false }, clock) : null;
-  const parts = (...xs: (string | null | undefined)[]) => xs.filter(Boolean).join(', ');
-  const title = TITLE[kind] ?? kind.replace(/_/g, ' ');
-  const link = allowedLink(p.deeplink);
+  if (!Object.prototype.hasOwnProperty.call(TITLE, kind)) reportOnce(`Unknown notification type: ${kind}`);
+  return {
+    kind,
+    jobNumber: p.job_number ? String(p.job_number) : null,
+    clientName: p.client_name ?? null,
+    pickupLocation: p.pickup_location ?? null,
+    pickupAt: p.pickup_datetime ?? null,
+    link: allowedLink(p.deeplink),
+  };
+}
 
-  switch (kind) {
+/** A row's title and body in the driver's Time format. Parts are joined with commas, never dots. */
+export function notificationWords(d: NotificationDetails, clock: ClockStyle = '24h'): NotificationWords {
+  const when: string | null = d.pickupAt ? formatDateTime(d.pickupAt, { weekday: false }, clock) : null;
+  const parts = (...xs: (string | null | undefined)[]) => xs.filter(Boolean).join(', ');
+  const title = TITLE[d.kind] ?? d.kind.replace(/_/g, ' ');
+
+  switch (d.kind) {
     case 'job_assigned':
-      return { title, jobNumber, body: parts(p.client_name, p.pickup_location, when), link };
-    case 'pickup_reminder':
-    case 'job_updated':
-      return { title, jobNumber, body: parts(p.pickup_location, when), link };
+      return { title, body: parts(d.clientName, d.pickupLocation, when) };
     case 'job_cancelled':
     case 'reassigned':
-      return { title, jobNumber, body: p.pickup_location ?? '', link };
+      return { title, body: d.pickupLocation ?? '' };
     default:
-      // A type this app does not know yet: plain job details, never raw data.
-      reportOnce(`Unknown notification type: ${kind}`);
-      return { title, jobNumber, body: parts(p.pickup_location, when), link };
+      // pickup_reminder, job_updated, and a type this app does not know yet:
+      // plain job details, never raw data.
+      return { title, body: parts(d.pickupLocation, when) };
   }
 }
 

@@ -13,6 +13,8 @@ import { useTokens } from '../theme/ThemeProvider';
 import { EASE_OUT, fontFor, motionFor, radius, space, type, TABULAR } from '../theme/tokens';
 import type { SpecialCommission } from '../lib/commissionRate';
 import { jobStatus } from '../lib/jobStatus';
+import { useClockStyle } from '../lib/clockPref';
+import { formatClock, formatDate } from '../lib/timeFormat';
 
 export type Job = {
   /** Human-readable identifier from jobs.job_number, shown on cards. */
@@ -21,9 +23,6 @@ export type Job = {
   jobUuid?: string;
   /** Current assignment uuid; required for confirm/reject mutations. */
   assignmentId?: string;
-  time: string;
-  /** "Thu, 2 Jul" — the pickup's calendar date. Only shown when `overdue`. */
-  pickupDate?: string;
   vehicle: string;
   from: string;
   to: string;
@@ -31,8 +30,9 @@ export type Job = {
   pax: number;
   /** The job status as the dispatcher sends it ("in_progress"). Read it through lib/jobStatus.ts. */
   status: string;
-  /** The real pickup time (ISO). Orders today's jobs on the Jobs tab. */
-  pickupAt?: string;
+  /** The real pickup time (ISO). The card formats it in the driver's Time
+   *  format; the Jobs tab decides the job's day and today's order from it. */
+  pickupAt: string;
   /** What this job pays when it isn't the driver's normal cut — a rate
    *  (20 → "20% comm") or a flat fee (80 → "RM 80 flat"). null = pays the
    *  standard rate, so no badge renders. Resolved in lib/commissionRate.ts —
@@ -113,6 +113,11 @@ export function JobCard({
   const T = useTokens();
   const reduced = useReducedMotion();
   const status = jobStatus(job.status);
+  // "14:30", or "2:30 pm" on the 12-hour Time format, in Malaysian time.
+  const time = formatClock(job.pickupAt, useClockStyle());
+  // "Thu, 2 Jul": only on an overdue card, so the driver sees the pickup was on
+  // a past day, not "due today".
+  const missedOn = overdue ? formatDate(job.pickupAt, { weekday: true }) : null;
   // The job being driven is the one dark card on the screen.
   const live = status.live;
 
@@ -148,7 +153,7 @@ export function JobCard({
   const main = (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${job.id}, ${job.client}, pickup ${job.time}${overdue && job.pickupDate ? `, missed on ${job.pickupDate}` : ''}`}
+      accessibilityLabel={`${job.id}, ${job.client}, pickup ${time}${missedOn ? `, missed on ${missedOn}` : ''}`}
       onPress={onPress}
       style={({ pressed }) => ({
         gap: space[3],
@@ -159,12 +164,12 @@ export function JobCard({
     >
       {/* Top row: pickup time, the missed date when overdue, status pill */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minWidth: 0 }}>
-        <Text style={[type.heading, TABULAR, { color: ink }]}>{job.time}</Text>
+        <Text style={[type.heading, TABULAR, { color: ink }]}>{time}</Text>
         {overdue && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1], flexShrink: 1 }}>
             <Icon name="triangleAlert" size={14} stroke={2.4} color={T.redText}/>
             <Text style={[type.label, { color: T.redText, fontFamily: fontFor('600'), fontWeight: '600' }]} numberOfLines={1}>
-              {job.pickupDate ? `Missed, ${job.pickupDate}` : 'Missed'}
+              {`Missed, ${missedOn}`}
             </Text>
           </View>
         )}

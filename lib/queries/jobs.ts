@@ -2,41 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase';
 import { resolveSpecialCommission } from '../commissionRate';
 import { fetchCommissionBaseline } from './driverProfile';
-import { formatClock, formatDate, myDateKey, myStartOfDay, type ClockStyle } from '../timeFormat';
-import { useClockStyle } from '../clockPref';
+import { myStartOfDay } from '../timeFormat';
 import type { Job } from '../../components/JobCard';
 import { FINISHED_STATUSES } from '../jobStatus';
 
 // The job status is kept exactly as the dispatcher sends it. lib/jobStatus.ts
 // is the one place that reads it (words, actions, open or finished) and
 // reports a status this app does not know yet to Sentry.
-
-// "14:30" — plain 24-hour digits (redesign change 4), or "2:30 pm" on the
-// 12-hour Time format setting (change 33). See lib/timeFormat.ts.
-
-// "Thu, 2 Jul" — only rendered on overdue cards, so a driver can see at a
-// glance the pickup was on a past day, not "due today". MY-pinned like every
-// other date in the app, so it can't disagree with the time on the same card.
-const dateOf = (iso: string) => formatDate(iso, { weekday: true });
-
-export type UpcomingGroup = {
-  /** YYYY-MM-DD in Malaysian time — stable key for the section header */
-  dateKey: string;
-  /** Human label, e.g. "Thu 22 May" */
-  label: string;
-  jobs: Job[];
-};
-
-export type FetchedJobs = {
-  /** Past, still-open jobs (not done/cancelled/rejected) carried over from
-   *  previous days so they don't vanish at midnight before the driver closes
-   *  them out. Bounded to the last OVERDUE_LOOKBACK_DAYS. */
-  overdue: Job[];
-  today: Job[];
-  tomorrow: Job[];
-  /** Day-by-day groupings from day-after-tomorrow up to UPCOMING_DAYS out. */
-  upcoming: UpcomingGroup[];
-};
 
 /** How many days past tomorrow we surface on the Jobs tab.
  *  14 days = "next two weeks" — past that, drivers should rely on the dispatcher. */
@@ -48,11 +20,14 @@ const UPCOMING_DAYS = 14;
 const OVERDUE_LOOKBACK_DAYS = 30;
 
 
-// Pulls the current driver's upcoming jobs (today + tomorrow + next 14 days).
+// Pulls the current driver's jobs as one flat list ordered by pickup time:
+// open jobs from up to 30 days back, then today + tomorrow + the next 14 days.
+// Raw pickup times only, no time text: the Jobs screen splits the list by day
+// (lib/jobGroups.ts) and each card formats its own time.
 // RLS scopes results via private.is_driver_self(driver_id) so the anon JWT
 // only sees its own. PostgREST embedding handles the FK join automatically.
 // Exported for lib/queries/__tests__/jobs.test.ts; the screen goes through useTodaysJobs.
-export async function fetchJobs(clock: ClockStyle = '24h'): Promise<FetchedJobs> {
+export async function fetchJobs(): Promise<Job[]> {
   // Every boundary derived independently from the same MY day, rather than by
   // walking forward from startToday with setDate(). setDate() operates in the
   // DEVICE's local terms, so on a phone that observes DST it would add 23 or 25
@@ -60,8 +35,6 @@ export async function fetchJobs(clock: ClockStyle = '24h'): Promise<FetchedJobs>
   // Malaysia has no DST; the device might.
   const now = new Date();
   const startToday         = myStartOfDay(now);
-  const startTomorrow      = myStartOfDay(now, 1);
-  const startDayAfterTmrw  = myStartOfDay(now, 2);
   const endWindow          = myStartOfDay(now, 2 + UPCOMING_DAYS);
   const overdueFloor       = myStartOfDay(now, -OVERDUE_LOOKBACK_DAYS);
 
@@ -145,14 +118,13 @@ export async function fetchJobs(clock: ClockStyle = '24h'): Promise<FetchedJobs>
     // Show the ACTUAL assigned vehicle plate ("WXY 1234"), not the requested
     // type. Driver cares which car they're in, not what the dispatcher asked for.
     vehicle: r.vehicle_plate ?? '—',
-    time: formatClock(r.job.pickup_datetime, clock),
-    pickupDate: dateOf(r.job.pickup_datetime),
     from: r.job.pickup_location,
     to: r.job.dropoff_location,
     client: r.job.client_name,
     pax: r.job.pax ?? 0,
     status: r.job.status,
-    // The real pickup time, so today's jobs can be put in order.
+    // The real pickup time. The screen decides the job's day from it and the
+    // card formats it in the driver's Time format.
     pickupAt: r.job.pickup_datetime,
     // null unless this job pays something other than the driver's normal cut —
     // a rate override pinned to the driver's own rate is not "special", but a
@@ -164,46 +136,17 @@ export async function fetchJobs(clock: ClockStyle = '24h'): Promise<FetchedJobs>
     ),
   });
 
-  const overdue: Job[] = [];
-  const today: Job[] = [];
-  const tomorrow: Job[] = [];
-  // Map of YYYY-MM-DD → group (preserves insertion order, which is already
-  // chronological because the query orders by pickup_datetime ascending).
-  const upcomingMap = new Map<string, UpcomingGroup>();
-
-  for (const r of rows) {
-    const d = new Date(r.job.pickup_datetime);
-    const t = d.getTime();
-    if (t < startToday.getTime()) {
-      // Pickup already passed and the job is not finished (guaranteed by the
-      // query's status filter: anything but done, rejected or cancelled,
-      // so a status the app doesn't know yet is carried over too).
-      overdue.push(toUi(r));
-    } else if (t < startTomorrow.getTime()) {
-      today.push(toUi(r));
-    } else if (t < startDayAfterTmrw.getTime()) {
-      tomorrow.push(toUi(r));
-    } else {
-      const dateKey = myDateKey(d);
-      let group = upcomingMap.get(dateKey);
-      if (!group) {
-        const label = formatDate(d, { weekday: true });
-        group = { dateKey, label, jobs: [] };
-        upcomingMap.set(dateKey, group);
-      }
-      group.jobs.push(toUi(r));
-    }
-  }
-
-  return { overdue, today, tomorrow, upcoming: Array.from(upcomingMap.values()) };
+  // The order() above sorts inside each embedded job, not the assignment rows,
+  // so the list is put in pickup order here. Array.sort is stable.
+  return rows.map(toUi).sort((a, b) => new Date(a.pickupAt).getTime() - new Date(b.pickupAt).getTime());
 }
 
 export function useTodaysJobs() {
-  // Card times are built inside fetchJobs, so the Time format setting is part
-  // of the key: a change runs the query again. Invalidating ['jobs'] still hits it.
-  const clock = useClockStyle();
+  // The Time format setting is not part of the key: the screen formats card
+  // times itself, so switching it never downloads the list again.
+  // Invalidating ['jobs'] still hits this key.
   return useQuery({
-    queryKey: ['jobs', 'today', clock],
-    queryFn: () => fetchJobs(clock),
+    queryKey: ['jobs', 'today'],
+    queryFn: () => fetchJobs(),
   });
 }

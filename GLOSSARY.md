@@ -24,6 +24,10 @@ _Avoid_: Voided
 **Open job**:
 A job that still needs the driver: Pending, Confirmed or In progress. Only an open job can be overdue.
 
+**Overdue job**:
+An open job whose pickup day has passed. It stays on the Jobs list, up to 30 days back, until the driver finishes it. Its card says "Missed" with the pickup date.
+_Avoid_: late job, past job
+
 **Finished job**:
 A job that needs nothing more from the driver: Done, Rejected or Cancelled. It offers no actions.
 _Avoid_: Closed, voided
@@ -79,3 +83,9 @@ A screen a notification may open, from a short fixed list. A notification whose 
 
 **Unknown notification type**:
 A type of notification this version of the app does not know yet. It shows its job details in plain words, never its raw data.
+
+### Settings
+
+**Time format**:
+The driver's choice on Profile of 12-hour ("2:30 pm") or 24-hour ("14:30") time. Every time in the app is shown in Malaysian time, in that format.
+_Avoid_: clock style, clock setting
