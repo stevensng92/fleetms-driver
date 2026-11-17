@@ -456,6 +456,21 @@ describe('fail option', () => {
     expect((ok.data as any[]).length).toBeGreaterThan(0);
   });
 
+  // Value: protects=a failing count read (head-only count select) resolves { data: null, error } like any read, so count-based screens see the failure; fails_when=the failure rule is skipped when the select asks for a count; why_new=the other fail tests use plain selects; seam=none; no_claim=the count value of a healthy read
+  it('a failing count select resolves { data: null, error }', async () => {
+    const client = createFakeSupabase({ db: buildDb(NOW), now: () => NOW, search: () => '', fail: () => BOOM });
+    const res = await client.from('jobs').select('*', { count: 'exact', head: true });
+    expect(res).toMatchObject({ data: null, count: null, error: BOOM });
+  });
+
+  // Value: protects=the failure rule is checked before the missing-table 404, so a test can fail a table that does not exist yet; fails_when=the 404 check runs first and hides the rule's error; why_new=no test fails an unknown table; seam=none; no_claim=real PostgREST 404 text
+  it('a failure on an unknown table wins over the 404', async () => {
+    const client = createFakeSupabase({ db: buildDb(NOW), now: () => NOW, search: () => '', fail: () => BOOM });
+    const res = await client.from('no_such_table').select('*');
+    expect(res.error).toBe(BOOM);
+    expect(res.status).toBe(500);
+  });
+
   it('single and maybeSingle fail the same way', async () => {
     const client = createFakeSupabase({ db: buildDb(NOW), now: () => NOW, search: () => '', fail: () => BOOM });
     expect(await client.from('jobs').select('*').single()).toMatchObject({ data: null, error: BOOM });

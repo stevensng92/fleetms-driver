@@ -65,6 +65,21 @@ describe('fetchJobs', () => {
       jobRow('JOB-143').pickup_datetime = myStartOfDay(new Date(), 17).toISOString();
       expect(await numbers()).not.toContain('JOB-143');
     });
+
+    // Value: protects=the exact window edges: an open job at today-30d 00:00 stays, one a millisecond earlier goes; the last millisecond before today+16d 00:00 stays, the boundary itself goes; fails_when=gte/lt flip or a bound shifts by a day; why_new=the neighbouring tests only probe one day past each edge; seam=none; no_claim=the DB's own comparison (the fake applies the same filters)
+    it('pins the window edges to the millisecond', async () => {
+      const at = (iso: string) => { jobRow('JOB-139').pickup_datetime = iso; };
+      const floor = myStartOfDay(new Date(), -30).getTime();
+      const end = myStartOfDay(new Date(), 16).getTime();
+      at(new Date(floor).toISOString());
+      expect(await numbers()).toContain('JOB-139');
+      at(new Date(floor - 1).toISOString());
+      expect(await numbers()).not.toContain('JOB-139');
+      at(new Date(end - 1).toISOString());
+      expect(await numbers()).toContain('JOB-139');
+      at(new Date(end).toISOString());
+      expect(await numbers()).not.toContain('JOB-139');
+    });
   });
 
   it('throws the database error when the download fails, so the screen can offer Retry', async () => {

@@ -41,6 +41,17 @@ describe('installFakeDatabase (real today)', () => {
     expect((await supabase.rpc('driver_my_vehicles')).error).toBeNull();
   });
 
+  // Value: protects=the client forwards auth, storage and realtime channels to the current fake, so code using them works in a migrated test; fails_when=a forwarder is dropped or points at the wrong member; why_new=the other tests only touch from and rpc; seam=none; no_claim=real Supabase auth or realtime behaviour
+  it('forwards auth, storage and channels to the current fake', async () => {
+    const { data } = await supabase.auth.getSession();
+    expect(data.session).not.toBeNull();
+    expect(typeof supabase.storage.from('receipts').createSignedUrl).toBe('function');
+    const ch = supabase.channel('x').subscribe();
+    expect(supabase.getChannels()).toContain(ch);
+    await supabase.removeChannel(ch);
+    expect(supabase.getChannels()).not.toContain(ch);
+  });
+
   it('can be spied on, because the client is a plain object', async () => {
     const spy = jest.spyOn(supabase, 'from');
     await supabase.from('jobs').select('*');
