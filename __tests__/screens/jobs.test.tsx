@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 import { router } from 'expo-router';
 import * as Reanimated from 'react-native-reanimated';
 import JobsToday from '../../app/(tabs)/index';
@@ -265,6 +266,30 @@ describe('Accept from the list (change 35)', () => {
 
 // The day split is drawn against a "now" the screen holds, which moves at the
 // next Malaysian midnight. Date stays real (TESTING.md); only the timer is fake.
+// Value: protects=opening the app after the phone slept past midnight shows today's days, even though the midnight timer has not fired yet; fails_when=the day is only moved by the timer, which phones pause in deep sleep; why_new=the midnight tests only advance the timer; seam=none; no_claim=real Android or iOS timer suspension (simulated by moving the clock without running timers)
+describe('Coming back after midnight', () => {
+  afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks(); });
+  it('moves the days when the app comes back to the front, before the timer fires', async () => {
+    // 23:00 Malaysian time tonight, as a frozen clock that only moves when told.
+    jest.useFakeTimers({ now: myStartOfDay(new Date(), 1).getTime() - 60 * 60 * 1000 });
+    const listeners: ((s: string) => void)[] = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((_t: string, cb: any) => {
+      listeners.push(cb);
+      return { remove: jest.fn() };
+    }) as any);
+    mockJobs([job('JOB-9', 'confirmed', at(1, 9, 0))]);
+    await render(<JobsToday/>);
+    expect(screen.getByText('Tomorrow')).toBeTruthy();
+
+    // The phone slept through midnight: the clock moved, the timer did not run.
+    jest.setSystemTime(myStartOfDay(new Date(), 1).getTime() + 7 * 60 * 60 * 1000);
+    await act(async () => { listeners.forEach((cb) => cb('active')); });
+    expect(screen.queryByText('Tomorrow')).toBeNull();
+    expect(screen.getByText('1 job to go')).toBeTruthy();
+    expect(screen.getByText(formatDayLong(new Date()))).toBeTruthy();
+  });
+});
+
 describe('Midnight redraw', () => {
   fakeTimers();
   it('moves a job from Tomorrow to Today at Malaysian midnight without a download', async () => {

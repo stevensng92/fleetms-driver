@@ -42,6 +42,7 @@ const byPickup = (a: GroupableJob, b: GroupableJob) => new Date(a.pickupAt).getT
  * own clock zone, so a phone set to another zone shows the same days.
  */
 export function groupJobs<J extends GroupableJob>(jobs: J[], now: Date = new Date()): JobGroups<J> {
+  const startYesterday = myStartOfDay(now, -1).getTime();
   const startToday = myStartOfDay(now).getTime();
   const startTomorrow = myStartOfDay(now, 1).getTime();
   const startDayAfter = myStartOfDay(now, 2).getTime();
@@ -55,8 +56,12 @@ export function groupJobs<J extends GroupableJob>(jobs: J[], now: Date = new Dat
     if (t < startToday) {
       // The download only carries past jobs that are still open. A job that
       // finished and then slipped into the past while the screen stayed open
-      // is not missed, so it leaves the list.
-      if (jobStatus(j.status).phase === 'open') overdue.push(j);
+      // is not missed, so it leaves the list. A trip under way that was
+      // picked up yesterday is a late-night trip running past midnight, not a
+      // missed one: it stays with today's jobs. An older one is stuck: Overdue.
+      const st = jobStatus(j.status);
+      if (st.live && t >= startYesterday) todayAll.push(j);
+      else if (st.phase === 'open') overdue.push(j);
     } else if (t < startTomorrow) {
       todayAll.push(j);
     } else if (t < startDayAfter) {

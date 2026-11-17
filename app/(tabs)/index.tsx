@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert, Linking } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, RefreshControl, ScrollView, Alert, Linking, AppState } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
@@ -14,7 +14,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { EASE_OUT, fontFor, motionFor, radius, space, type } from '../../theme/tokens';
-import { formatDate, formatDayLong, myStartOfDay } from '../../lib/timeFormat';
+import { formatDate, formatDayLong, myDateKey, myStartOfDay } from '../../lib/timeFormat';
 import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 import { useUnreadCount } from '../../lib/queries/notifications';
@@ -32,10 +32,14 @@ const CURVE = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
  * The "now" the Jobs list is split against. It moves at the next Malaysian
  * midnight (one timer, set again each midnight, cleared on unmount), so with
  * the app left open tomorrow's jobs move under Today, and an unfinished job
- * moves under Overdue, without a download.
+ * moves under Overdue, without a download. Phones pause timers while they
+ * sleep, so it also catches up whenever the app comes back to the front or
+ * the jobs reload (`reloadedAt`), the moments a stale day would show.
  */
-function useNowByMidnight(): Date {
+function useNowByMidnight(reloadedAt?: number): Date {
   const [now, setNow] = useState(() => new Date());
+  // Move to the real date if the Malaysian day has changed; otherwise keep now.
+  const catchUp = () => setNow(n => (myDateKey(new Date()) !== myDateKey(n) ? new Date() : n));
   useEffect(() => {
     const midnight = myStartOfDay(now, 1).getTime();
     const timer = setTimeout(() => {
@@ -45,12 +49,17 @@ function useNowByMidnight(): Date {
     }, Math.max(0, midnight - Date.now()));
     return () => clearTimeout(timer);
   }, [now]);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') catchUp(); });
+    return () => sub.remove();
+  }, []);
+  useEffect(() => { if (reloadedAt) catchUp(); }, [reloadedAt]);
   return now;
 }
 
 export default function JobsToday() {
   const T = useTokens();
-  const { data, isLoading, isError, error, refetch, isRefetching } = useTodaysJobs();
+  const { data, isLoading, isError, error, refetch, isRefetching, dataUpdatedAt } = useTodaysJobs();
   const { data: profile } = useDriverProfile();
   const confirmAsg = useConfirmAssignment();
   const rejectAsg = useRejectAssignment();
@@ -63,7 +72,7 @@ export default function JobsToday() {
   // The job the driver tapped Reject on. Nothing is sent until the dialog is confirmed.
   const [rejecting, setRejecting] = useState<Job | null>(null);
 
-  const now = useNowByMidnight();
+  const now = useNowByMidnight(dataUpdatedAt);
   const groups = groupJobs(data ?? [], now);
   const { overdue, today, todayFinished, tomorrow, upcoming } = groups;
   const upcomingTotal = upcoming.reduce((sum, g) => sum + g.jobs.length, 0);

@@ -225,3 +225,14 @@ describe('last seen Finished today count', () => {
     expect(getFinishedSeen()).toBeNull();
   });
 });
+
+// Value: protects=a trip under way is never shown as missed when midnight passes; fails_when=an in_progress job picked up before today lands in Overdue; why_new=the overdue tests only use pending and confirmed jobs; seam=none; no_claim=none beyond protects
+describe('groupJobs: a trip under way across midnight', () => {
+  it('keeps an In progress job picked up yesterday with today, never Overdue', () => {
+    // 23:30 Malaysian time on Fri 11 Dec, seen at 00:30 on Sat 12 Dec.
+    const live = job('LIVE', 'in_progress', '2026-12-11T15:30:00Z');
+    const g = group([live], new Date('2026-12-11T16:30:00Z'));
+    expect(ids(g.overdue)).toEqual([]);
+    expect(ids(g.today)).toEqual(['LIVE']);
+  });
+});
