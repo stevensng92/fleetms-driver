@@ -5,8 +5,8 @@ import type { ClockStyle } from './timeFormat';
 // The Time format setting (change 33): 24-hour ("14:30", the default) or
 // 12-hour ("2:30 pm"). Kept on the phone like the theme preference
 // (theme/ThemeProvider.tsx). It is a small store rather than a React context
-// because query functions build time text outside React and need to read the
-// current style when they run.
+// so it can be read and set outside the component tree. Times are formatted
+// on screen, never inside a download, so changing it only redraws.
 
 export const CLOCK_KEY = '@fleetms-driver/clock-style';
 
