@@ -7,7 +7,7 @@ import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 import { resetFinishedSeen, setFinishedSeen } from '../../lib/jobGroups';
 import type { Job } from '../../components/JobCard';
-import { myStartOfDay } from '../../lib/timeFormat';
+import { formatDate, formatDayLong, myStartOfDay } from '../../lib/timeFormat';
 
 // Screen test for the Jobs tab. Queries and mutations are mocked, so no
 // Supabase client is built (see earnings.test.tsx for the same approach).
@@ -283,6 +283,58 @@ describe('Midnight redraw', () => {
     expect(screen.getByText('Client JOB-7')).toBeTruthy();
     const { refetch } = (useTodaysJobs as jest.Mock).mock.results[0].value;
     expect(refetch).not.toHaveBeenCalled();
+  });
+
+  // Value: protects=the Jobs list keeps moving at every Malaysian midnight, not just the first, and the header date moves with it; fails_when=the midnight timer is not set again after it fires, or the header keeps the date from first draw; why_new=the test above stops after one midnight and never reads the header; seam=none; no_claim=real wall-clock midnight (timers faked, Date real)
+  it('sets the timer again each midnight and moves the header date with it', async () => {
+    mockJobs([job('JOB-8', 'confirmed', at(2, 10, 0))]);
+    await render(<JobsToday/>);
+    expect(screen.getByText(formatDayLong(new Date()))).toBeTruthy();
+    expect(screen.getByText('Upcoming')).toBeTruthy();
+
+    await advance(myStartOfDay(new Date(), 1).getTime() - Date.now() + 1000);
+    expect(screen.getByText(formatDayLong(myStartOfDay(new Date(), 1)))).toBeTruthy();
+    expect(screen.getByText('Tomorrow')).toBeTruthy();
+    expect(screen.queryByText('Upcoming')).toBeNull();
+
+    // Date is real, so the second timer is set against the real clock: wait two days to be past it.
+    await advance(2 * 24 * 60 * 60 * 1000);
+    expect(screen.getByText(formatDayLong(myStartOfDay(new Date(), 2)))).toBeTruthy();
+    expect(screen.queryByText('Tomorrow')).toBeNull();
+    expect(screen.getByText('1 job to go')).toBeTruthy();
+  });
+
+  // Value: protects=leaving the Jobs tab cancels the pending midnight timer; fails_when=the effect cleanup is removed so a timer outlives the screen; why_new=no test unmounts the screen with the timer pending; seam=none; no_claim=a timer firing on an unmounted screen (checks clearTimeout is called with the timer id)
+  it('clears the midnight timer when the screen goes away', async () => {
+    const setSpy = jest.spyOn(global, 'setTimeout');
+    const clearSpy = jest.spyOn(global, 'clearTimeout');
+    mockJobs([job('JOB-8', 'confirmed', at(1, 10, 0))]);
+    const view = await render(<JobsToday/>);
+    // The midnight timer is the only one set for more than an hour.
+    const idx = setSpy.mock.calls.findIndex(([, ms]) => typeof ms === 'number' && ms > 3_600_000);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const timer = setSpy.mock.results[idx].value;
+    await act(async () => { view.unmount(); });
+    expect(clearSpy).toHaveBeenCalledWith(timer);
+    setSpy.mockRestore();
+    clearSpy.mockRestore();
+  });
+});
+
+// Value: protects=each later day on the Jobs list is headed by its Malaysian weekday and date, taken from its first job's pickup; fails_when=the heading is dropped, shows the date key, or uses the phone's zone; why_new=no screen test reads an Upcoming day heading since the label moved from the download to the screen; seam=none; no_claim=exact weekday text (expectation comes from the same formatDate helper; its own test pins the zone)
+describe('Upcoming day headings', () => {
+  it('heads each later day with its weekday and date, in date order', async () => {
+    const d3 = at(3, 10, 0);
+    const d5 = at(5, 9, 0);
+    mockJobs([job('JOB-12', 'confirmed', d5), job('JOB-11', 'confirmed', d3)]);
+    await render(<JobsToday/>);
+    const h3 = formatDate(d3, { weekday: true });
+    const h5 = formatDate(d5, { weekday: true });
+    expect(screen.getByText(h3)).toBeTruthy();
+    expect(screen.getByText(h5)).toBeTruthy();
+    const drawn = screen.queryAllByText(/./).map((n) => String(n.props.children));
+    expect(drawn.indexOf(h3)).toBeGreaterThanOrEqual(0);
+    expect(drawn.indexOf(h3)).toBeLessThan(drawn.indexOf(h5));
   });
 });
 

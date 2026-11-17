@@ -49,6 +49,18 @@ describe('fetchJobs', () => {
     }
   });
 
+  // Value: protects=fetchJobs returns jobs oldest pickup first even though the database orders only inside each embedded job; fails_when=the final sort is removed and rows come back in assignment order; why_new=the flat-list test feeds rows already in pickup order; seam=none; no_claim=the live PostgREST row order (query mocked)
+  it('puts jobs in pickup order when the rows arrive out of order, keeping equal times in download order', async () => {
+    mockResult.mockReturnValue({ data: [
+      row('LATE', 'confirmed', '2026-12-20T02:00:00Z'),
+      row('TIE-A', 'confirmed', '2026-12-12T02:00:00Z'),
+      row('EARLY', 'confirmed', '2026-12-01T02:00:00Z'),
+      row('TIE-B', 'confirmed', '2026-12-12T02:00:00Z'),
+    ], error: null });
+    const jobs = await fetchJobs();
+    expect(jobs.map((j) => j.id)).toEqual(['EARLY', 'TIE-A', 'TIE-B', 'LATE']);
+  });
+
   it('carries past jobs forward unless they are finished, so an unknown status is never dropped', async () => {
     mockResult.mockReturnValue({ data: [], error: null });
     await fetchJobs();
