@@ -24,6 +24,7 @@
 
 import { createFakeSupabase, type FailTarget, type FakeError } from '../demo/fakeSupabase';
 import { buildDb, type Db } from '../demo/fixtures';
+import { myStartOfDay } from '../lib/timeFormat';
 
 type Fake = ReturnType<typeof createFakeSupabase>;
 type FailRule = (target: FailTarget) => FakeError | undefined;
@@ -48,6 +49,29 @@ export const supabaseModule = {
   supabaseConfigured: true,
 };
 
+/**
+ * The story's "today" is read before each test, and the code under test reads
+ * the clock again. A test that starts this close to Malaysian midnight waits
+ * until just after it, so the two always agree on the day. Tests here run in
+ * milliseconds, far inside the margin.
+ */
+export const MIDNIGHT_MARGIN_MS = 30_000;
+
+/** How long to wait so a test starting at `now` does not cross Malaysian midnight. 0 outside the margin. */
+export function msToWaitPastMidnight(now: Date): number {
+  const untilMidnight = myStartOfDay(now, 1).getTime() - now.getTime();
+  return untilMidnight <= MIDNIGHT_MARGIN_MS ? untilMidnight + 1 : 0;
+}
+
+/** Sleeps until just past Malaysian midnight when `now` is inside the margin; resolves at once otherwise. */
+export async function waitPastMidnight(
+  now: Date = new Date(),
+  sleep: (ms: number) => Promise<unknown> = ms => new Promise(resolve => setTimeout(resolve, ms)),
+): Promise<void> {
+  const wait = msToWaitPastMidnight(now);
+  if (wait > 0) await sleep(wait);
+}
+
 export interface FakeDatabase {
   /** The plain story data of the current test. Edit rows here before the code under test runs. */
   readonly db: Db;
@@ -64,12 +88,13 @@ export interface FakeDatabase {
 export function installFakeDatabase(opts: { now?: Date } = {}): FakeDatabase {
   let db: Db;
   let rule: FailRule | undefined;
-  beforeEach(() => {
+  beforeEach(async () => {
+    if (!opts.now) await waitPastMidnight();
     const now = opts.now ?? new Date();
     db = buildDb(now);
     rule = undefined;
     current = createFakeSupabase({ db, now: () => now, search: () => '', fail: t => rule?.(t) });
-  });
+  }, MIDNIGHT_MARGIN_MS + 10_000);
   return {
     get db() { return db; },
     failWith(r) { rule = r; },

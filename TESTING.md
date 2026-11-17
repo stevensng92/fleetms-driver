@@ -150,7 +150,10 @@ the file's `import` and `const` lines have set them up).
 - **Fixed today.** `installFakeDatabase({ now: new Date('2026-03-01T04:00:00Z') })`
   moves the story's dates onto that day. It does not freeze the clock the code
   under test reads, so use it for the story only (and do not freeze `Date`, see above).
-  The default is the real now.
+  The default is the real now. With the default, a test that would start within
+  30 seconds of Malaysian midnight waits until just after it, so the story and
+  the code under test never disagree on the day. Don't fake `setTimeout` in a
+  file that uses the helper, or that wait would never end.
 - **Make a call fail.** `fake.failWith(t => t.name === 'push_log' ? { message: 'offline' } : undefined)`.
   `t` is `{ kind: 'table' | 'rpc', name }`. Keep a counter to fail once and then
   succeed (the Retry path): `++reads === 1 ? error : undefined`. Put `status: 0` on
