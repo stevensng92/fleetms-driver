@@ -11,7 +11,7 @@ import { Card } from '../../components/Card';
 import { FeatureCard } from '../../components/FeatureCard';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { RouteLine } from '../../components/JobCard';
-import { TimelineStop, Stop, pinFor } from '../../components/TimelineStop';
+import { RouteCard } from '../../components/RouteCard';
 import { ClientCard } from '../../components/ClientCard';
 import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
 import { SurchargesCard } from '../../components/SurchargesCard';
@@ -21,7 +21,7 @@ import { fontFor, space, type, TABULAR } from '../../theme/tokens';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { formatClock } from '../../lib/timeFormat';
 import { useClockStyle } from '../../lib/clockPref';
-import { routeStops, stopCountLabel } from '../../lib/route';
+import { routeStops } from '../../lib/route';
 import { useCompleteJob } from '../../lib/mutations/jobActions';
 
 // S4 — Active Job. Same shape as Job Detail, with the trip in one dark card at
@@ -54,14 +54,12 @@ export default function ActiveJob() {
     );
   }
 
-  const stopsForUi: Stop[] = routeStops(job.stops, clock).map(r => ({
-    kind: r.label, arrive: r.time, place: r.place, lat: r.lat, lng: r.lng,
-  }));
+  const route = routeStops(job.stops, clock);
 
   // Only an In progress job can be marked done; any other status gets "Back to jobs".
   const isInProgress = jobStatus(job.status).action === 'openTrip';
-  const firstStop = stopsForUi[0];
-  const lastStop = stopsForUi[stopsForUi.length - 1];
+  const firstStop = route[0];
+  const lastStop = route[route.length - 1];
 
   const onMarkDone = async () => {
     try {
@@ -90,10 +88,10 @@ export default function ActiveJob() {
         <FeatureCard style={{ padding: space[5], gap: space[4] }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3] }}>
             <Text style={[type.figure, TABULAR, { color: T.onFeature, flexShrink: 1 }]}>
-              {firstStop.arrive ?? formatClock(job.pickupAt, clock)}
-              {stopsForUi.length > 1 && !!lastStop.arrive && (
+              {firstStop.time ?? formatClock(job.pickupAt, clock)}
+              {route.length > 1 && !!lastStop.time && (
                 <Text style={[type.heading, { fontFamily: fontFor('600'), fontWeight: '600', color: T.onFeature2 }]}>
-                  {' '}to {lastStop.arrive}
+                  {' '}to {lastStop.time}
                 </Text>
               )}
             </Text>
@@ -116,17 +114,7 @@ export default function ActiveJob() {
           <SpecialInstructionsCard text={job.specialInstructions}/>
         )}
 
-        <Card style={{ padding: space[5], gap: space[4] }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space[3] }}>
-            <Text style={[type.title, { color: T.text }]}>Route</Text>
-            <Text style={[type.label, { color: T.text2 }]}>{stopCountLabel(stopsForUi.length)}</Text>
-          </View>
-          <View>
-            {stopsForUi.map((s, i) => (
-              <TimelineStop key={i} stop={s} isLast={i === stopsForUi.length - 1} pin={pinFor(i, stopsForUi.length)}/>
-            ))}
-          </View>
-        </Card>
+        <RouteCard stops={job.stops} clock={clock}/>
 
         {/* Pay breakdown, same order and components as Job Detail: what the
             job includes, then the fare, then what the driver gets out of it. A

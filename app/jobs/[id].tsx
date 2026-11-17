@@ -8,7 +8,7 @@ import { Band } from '../../components/Band';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { TimelineStop, Stop, pinFor } from '../../components/TimelineStop';
+import { RouteCard } from '../../components/RouteCard';
 import { ClientCard } from '../../components/ClientCard';
 import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
 import { SurchargesCard } from '../../components/SurchargesCard';
@@ -16,7 +16,6 @@ import { PayCard } from '../../components/JobAmountCard';
 import { useTokens } from '../../theme/ThemeProvider';
 import { fontFor, space, type } from '../../theme/tokens';
 import { useClockStyle } from '../../lib/clockPref';
-import { routeStops, stopCountLabel } from '../../lib/route';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { jobStatus } from '../../lib/jobStatus';
 import { useStartJob, useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
@@ -52,10 +51,6 @@ export default function JobDetail() {
     );
   }
 
-  const stopsForUi: Stop[] = routeStops(job.stops, clock).map(r => ({
-    kind: r.label, arrive: r.time, place: r.place, lat: r.lat, lng: r.lng,
-  }));
-
   // One rule for which buttons a status allows: lib/jobStatus.ts.
   const { action } = jobStatus(job.status);
   const isPending = action === 'acceptReject';
@@ -84,17 +79,7 @@ export default function JobDetail() {
           <SpecialInstructionsCard text={job.specialInstructions}/>
         )}
 
-        <Card style={{ padding: space[5], gap: space[4] }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space[3] }}>
-            <Text style={[type.title, { color: T.text }]}>Route</Text>
-            <Text style={[type.label, { color: T.text2 }]}>{stopCountLabel(stopsForUi.length)}</Text>
-          </View>
-          <View>
-            {stopsForUi.map((s, i) => (
-              <TimelineStop key={i} stop={s} isLast={i === stopsForUi.length - 1} pin={pinFor(i, stopsForUi.length)}/>
-            ))}
-          </View>
-        </Card>
+        <RouteCard stops={job.stops} clock={clock}/>
 
         <SurchargesCard items={job.surcharges}/>
 
