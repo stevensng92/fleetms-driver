@@ -262,7 +262,8 @@ app/                       file-based routes (expo-router)
     time-off.tsx           Request Time Off (modal sheet)
 
 components/                shared UI building blocks (ported from design handoff)
-test/                      jest setup — globalSetup.js (TZ pin) + setup.ts (mocks)
+test/                      jest setup — globalSetup.js (TZ pin) + setup.ts (mocks) +
+                           fakeDatabase.ts (puts query tests on the demo's fake database)
 __tests__/screens/         screen tests (kept OUT of app/ — see TESTING.md)
 theme/                     design tokens + ThemeProvider
 lib/
