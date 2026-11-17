@@ -93,3 +93,17 @@ describe('Notifications with the Time format setting', () => {
     expect(screen.queryByText('12 Dec, 09:22')).toBeNull();
   });
 });
+
+// Value: protects=Notifications failed load shows the shared error box, hides the empty state, and Retry refetches; fails_when=LoadError wiring or onRetry is dropped; why_new=no test drove the error branch here; seam=none; no_claim=real query errors (hook mocked)
+describe('Notifications: failed load (LoadError)', () => {
+  it('shows the error with Retry, no empty state, and Retry reloads', async () => {
+    const refetch = jest.fn();
+    (useNotifications as jest.Mock).mockReturnValue({ data: undefined, isLoading: false, error: new Error('Failed to fetch'), refetch });
+    await render(<Notifications/>);
+    expect(screen.getByText("Couldn't load notifications")).toBeTruthy();
+    expect(screen.getByText('Failed to fetch')).toBeTruthy();
+    expect(screen.queryByText(/No notifications/i)).toBeNull();
+    await fireEvent.press(screen.getByText('Retry'));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+});

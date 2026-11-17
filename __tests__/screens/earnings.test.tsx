@@ -284,6 +284,15 @@ describe('Earnings — row rendering', () => {
     expect(screen.getByText('boom')).toBeTruthy();
     expect(screen.getByText('Retry')).toBeTruthy();
   });
+
+  // Value: protects=Earnings Retry button refetches; fails_when=onRetry is not wired to refetch in LoadError use; why_new=the test above only checks Retry exists; seam=none; no_claim=real query errors (hook mocked)
+  it('Retry reloads earnings', async () => {
+    const refetch = jest.fn();
+    mockEarnings(undefined, { isError: true, error: new Error('boom'), refetch });
+    await render(<Earnings/>);
+    await fireEvent.press(screen.getByText('Retry'));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('Earnings — period pager', () => {

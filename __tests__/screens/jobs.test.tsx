@@ -256,3 +256,45 @@ describe('Accept from the list (change 35)', () => {
     expect(confirm).toHaveBeenCalledWith('asg-JOB-1');
   });
 });
+
+// Value: protects=Jobs tab failed load shows the shared error box and Retry refetches; fails_when=LoadError wiring or onRetry is dropped; why_new=no test drove isError on this screen; seam=none; no_claim=real query errors (hook mocked)
+describe('Jobs list: failed load (LoadError)', () => {
+  afterEach(() => { delete (globalThis as any).__FLEETMS_DEV_SESSION__; });
+
+  function mockFailed(refetch = jest.fn(), error: Error | null = new Error('Failed to fetch')) {
+    (useTodaysJobs as jest.Mock).mockReturnValue({
+      data: undefined, isLoading: false, isError: true, error, refetch, isRefetching: false,
+    });
+    return refetch;
+  }
+
+  it('shows the error box with the message and no empty state, and Retry reloads', async () => {
+    const refetch = mockFailed();
+    await render(<JobsToday/>);
+    expect(screen.getByText("Couldn't load jobs")).toBeTruthy();
+    expect(screen.getByText('Failed to fetch')).toBeTruthy();
+    expect(screen.queryByText('No jobs scheduled today')).toBeNull();
+    await fireEvent.press(screen.getByText('Retry'));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('says "Unknown error" when the failure has no message', async () => {
+    mockFailed(jest.fn(), null);
+    await render(<JobsToday/>);
+    expect(screen.getByText('Unknown error')).toBeTruthy();
+  });
+
+  it('adds the dev auth status under the message only when the session is not ok', async () => {
+    (globalThis as any).__FLEETMS_DEV_SESSION__ = { kind: 'no-creds' };
+    mockFailed();
+    await render(<JobsToday/>);
+    expect(screen.getByText(/Auth status: no-creds/)).toBeTruthy();
+  });
+
+  it('shows no auth status line when the dev session is ok', async () => {
+    (globalThis as any).__FLEETMS_DEV_SESSION__ = { kind: 'ok' };
+    mockFailed();
+    await render(<JobsToday/>);
+    expect(screen.queryByText(/Auth status/)).toBeNull();
+  });
+});
