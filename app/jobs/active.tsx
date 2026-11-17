@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, Pressable, Alert, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppFrame } from '../../components/AppFrame';
 import { AppHeader } from '../../components/AppHeader';
 import { StatusPill } from '../../components/StatusPill';
 import { jobStatus } from '../../lib/jobStatus';
-import { Band } from '../../components/Band';
 import { Button } from '../../components/Button';
-import { Card } from '../../components/Card';
 import { FeatureCard } from '../../components/FeatureCard';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { RouteLine } from '../../components/JobCard';
 import { RouteCard } from '../../components/RouteCard';
+import { RecordState, JOB_NOT_FOUND } from '../../components/RecordState';
 import { ClientCard } from '../../components/ClientCard';
 import { SpecialInstructionsCard } from '../../components/SpecialInstructionsCard';
 import { SurchargesCard } from '../../components/SurchargesCard';
@@ -31,26 +30,20 @@ import { useCompleteJob } from '../../lib/mutations/jobActions';
 export default function ActiveJob() {
   const T = useTokens();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: job, isLoading, isError, error, refetch } = useJobDetailByNumber(id);
+  const { data: job, isError, error, refetch } = useJobDetailByNumber(id);
   const clock = useClockStyle();
   const completeJob = useCompleteJob();
   // Mark as done asks first. Nothing is sent until the driver confirms.
   const [askingDone, setAskingDone] = useState(false);
 
-  if (isLoading || !job) {
+  if (!job) {
     return (
-      <AppFrame>
-        <AppHeader title={String(id ?? '—')} onBack={() => router.back()}/>
-        {isError ? (
-          <ErrorBox message={(error as Error)?.message ?? 'Unknown error'} onRetry={() => refetch()}/>
-        ) : job === null ? (
-          <NotFound/>
-        ) : (
-          <View style={{ paddingTop: 60, alignItems: 'center' }}>
-            <ActivityIndicator color={T.text2}/>
-          </View>
-        )}
-      </AppFrame>
+      <RecordState
+        title={String(id ?? '—')}
+        errorTitle="Couldn't load job"
+        notFound={JOB_NOT_FOUND}
+        query={{ data: job, isError, error, refetch }}
+      />
     );
   }
 
@@ -162,33 +155,5 @@ export default function ActiveJob() {
         onConfirm={() => { setAskingDone(false); onMarkDone(); }}
       />
     </AppFrame>
-  );
-}
-
-function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) {
-  const T = useTokens();
-  return (
-    <Band tone="red" style={{ marginHorizontal: space[4] }}>
-      <Text style={[type.body, { fontFamily: fontFor('600'), fontWeight: '600', color: T.redText }]}>Couldn't load active job</Text>
-      <Text style={[type.body, { color: T.redText, marginTop: 4 }]}>{message}</Text>
-      <View style={{ marginTop: space[3], alignSelf: 'flex-start' }}>
-        <Button variant="secondary" onPress={onRetry}>Retry</Button>
-      </View>
-    </Band>
-  );
-}
-
-// The job is no longer this driver's: cancelled, reassigned or hidden. Not a
-// failure, so there is no Retry. Words are the design mock's.
-function NotFound() {
-  const T = useTokens();
-  return (
-    <Card style={{ marginHorizontal: space[4], padding: space[5], gap: space[3] }}>
-      <Text style={[type.heading, { color: T.text }]}>This job is no longer on your list</Text>
-      <Text style={[type.body, { color: T.text2 }]}>Dispatch may have cancelled or reassigned it.</Text>
-      <View style={{ marginTop: space[2], alignSelf: 'flex-start' }}>
-        <Button variant="secondary" onPress={() => router.replace('/(tabs)')}>Back to jobs</Button>
-      </View>
-    </Card>
   );
 }
