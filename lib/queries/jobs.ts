@@ -3,7 +3,6 @@ import { supabase } from '../supabase';
 import { resolveSpecialCommission } from '../commissionRate';
 import { fetchCommissionBaseline } from './driverProfile';
 import { formatClock, formatDate, myDateKey, myStartOfDay, type ClockStyle } from '../timeFormat';
-import { useClockStyle } from '../clockPref';
 import type { Job } from '../../components/JobCard';
 import { FINISHED_STATUSES } from '../jobStatus';
 
@@ -199,11 +198,11 @@ export async function fetchJobs(clock: ClockStyle = '24h'): Promise<FetchedJobs>
 }
 
 export function useTodaysJobs() {
-  // Card times are built inside fetchJobs, so the Time format setting is part
-  // of the key: a change runs the query again. Invalidating ['jobs'] still hits it.
-  const clock = useClockStyle();
+  // The Time format setting is not part of the key: the screen formats card
+  // times itself, so switching it never downloads the list again.
+  // Invalidating ['jobs'] still hits this key.
   return useQuery({
-    queryKey: ['jobs', 'today', clock],
-    queryFn: () => fetchJobs(clock),
+    queryKey: ['jobs', 'today'],
+    queryFn: () => fetchJobs(),
   });
 }

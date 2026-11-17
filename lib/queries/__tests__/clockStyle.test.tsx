@@ -45,16 +45,21 @@ describe('fetchJobs', () => {
 });
 
 describe('useTodaysJobs', () => {
-  it('shows the new time on the cards after the setting changes', async () => {
+  // The cards format their own time, so the setting is a display choice only:
+  // switching it keeps the cached list and downloads nothing.
+  it('does not download the jobs again when the setting changes', async () => {
     const pickup = new Date().toISOString();
     mockResult.mockReturnValue({ data: [{
       id: 'asg-1', vehicle: { plate_number: 'WXY 1234' },
       jobs: { id: 'u1', job_number: 'J1', pickup_datetime: pickup, pickup_location: 'A', dropoff_location: 'B', client_name: 'C', pax: 1, status: 'pending', commission_rate_override: null, commission_fixed_amount: null },
     }], error: null });
     const { result } = await renderHook(() => useTodaysJobs(), { wrapper: wrapper() });
-    await waitFor(() => expect(result.current.data?.today[0].time).toBe(formatClock(pickup, '24h')));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const before = result.current.data;
+    const calls = mockResult.mock.calls.length;
     await act(async () => { setClockStyle('12h'); });
-    await waitFor(() => expect(result.current.data?.today[0].time).toBe(formatClock(pickup, '12h')));
+    expect(result.current.data).toBe(before);
+    expect(mockResult.mock.calls.length).toBe(calls);
   });
 });
 

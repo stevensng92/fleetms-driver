@@ -14,7 +14,8 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { EASE_OUT, fontFor, motionFor, radius, space, type } from '../../theme/tokens';
-import { formatDayLong } from '../../lib/timeFormat';
+import { formatClock, formatDayLong } from '../../lib/timeFormat';
+import { useClockStyle } from '../../lib/clockPref';
 import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 import { useUnreadCount } from '../../lib/queries/notifications';
@@ -30,6 +31,7 @@ const CURVE = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
 
 export default function JobsToday() {
   const T = useTokens();
+  const clock = useClockStyle();
   const { data, isLoading, isError, error, refetch, isRefetching } = useTodaysJobs();
   const { data: profile } = useDriverProfile();
   const confirmAsg = useConfirmAssignment();
@@ -69,7 +71,7 @@ export default function JobsToday() {
     return (
       <JobCard
         key={j.id}
-        job={j}
+        job={j.pickupAt ? { ...j, time: formatClock(j.pickupAt, clock) } : j}
         dim={opts.dim}
         overdue={opts.overdue}
         onPress={() => router.push(open as Parameters<typeof router.push>[0])}
