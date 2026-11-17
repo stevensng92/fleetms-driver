@@ -18,8 +18,9 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
   Mark as done fails because dispatch changed the job, the job and the Jobs
   list reload straight away, so the message is true.
 - **A signed-out driver goes back to the sign-in screen.** When the session
-  ends, from anywhere or because it expired and could not renew, the app opens
-  Sign in instead of leaving the driver on a screen that can't load.
+  ends, from anywhere, because it expired and could not renew, or because the
+  server stopped accepting it (a wrong phone clock, say), the app opens Sign in
+  instead of leaving the driver on a screen that can't load.
 - **Switching between 12-hour and 24-hour time is instant.** The Jobs list
   and Notifications now redraw in the new format straight away. Before, both
   downloaded everything again, with a spinner, and with no signal the Jobs tab

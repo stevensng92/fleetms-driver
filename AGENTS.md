@@ -78,7 +78,8 @@ screen in the README's screen table (`__tests__/screens/`), `fetchClientPhone` i
 (`handlePushTap` in `lib/push.ts`), sign-out (`signOut` in `lib/auth.ts`), clearing
 and resetting the push address (`clearPushNotifications`, `resetPushRegistration`
 in `lib/push.ts`), the `useSignedIn` hook (`lib/useSignedIn.ts`), the return to
-sign-in on sign-out (`lib/useReturnToSignInOnSignOut.ts`), the four job
+sign-in on sign-out (`lib/useReturnToSignInOnSignOut.ts`, and `endSessionIfSignedOut`
+in `lib/queryClient.ts` for a session the server rejects), the four job
 actions and `refreshJobs` (`lib/mutations/jobActions.ts`) and live updates
 (`useLiveUpdates` in `lib/realtime/jobsRealtime.ts`). NOT covered: the session
 gate (`app/index.tsx`), the remaining React Query data hooks, the rest of auth
