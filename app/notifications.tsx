@@ -14,7 +14,7 @@ import {
   type NotificationItem,
 } from '../lib/queries/notifications';
 import { useClockStyle } from '../lib/clockPref';
-import { sentAt } from '../lib/notification';
+import { notificationWords, sentAt } from '../lib/notification';
 
 // Notifications inbox. Opens from the bell button on the Jobs tab.
 //
@@ -110,6 +110,9 @@ function NotificationRow({ item, isLast }: { item: NotificationItem; isLast: boo
   const unread = item.readAt === null;
   const clock = useClockStyle();
   const time = sentAt(item.enqueuedAt, clock);
+  // Worded here, not in the download, so the Time format setting redraws the
+  // row without downloading anything.
+  const { title, body } = notificationWords(item, clock);
   // A row opens its job only when it has an allowed link, already checked by
   // lib/notification.ts. Otherwise it is plain text: not pressable, no chevron.
   const { link } = item;
@@ -119,16 +122,16 @@ function NotificationRow({ item, isLast }: { item: NotificationItem; isLast: boo
       <View style={{ flex: 1, minWidth: 0, gap: space[1] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
           <Text style={[type.title, { color: T.text, flexShrink: 1 }]} numberOfLines={1}>
-            {item.title}
+            {title}
           </Text>
           {!!item.jobNumber && (
             <Text style={[type.caption, TABULAR, { color: T.text3 }]}>{item.jobNumber}</Text>
           )}
           {unread && <Pill tone="blue">New</Pill>}
         </View>
-        {!!item.body && (
+        {!!body && (
           <Text style={[type.label, { color: T.text2 }]} numberOfLines={2}>
-            {item.body}
+            {body}
           </Text>
         )}
         <Text style={[type.caption, TABULAR, { color: T.text3 }]}>

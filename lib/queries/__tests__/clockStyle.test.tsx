@@ -2,9 +2,8 @@ import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// Change 33, revised: job cards format their own times, so a change to the Time
-// format setting must NOT run the jobs query again. Notification rows still
-// build their text inside the query, so that one runs again.
+// Change 33, revised: job cards and notification rows format their own times on
+// screen, so a change to the Time format setting must NOT run either query again.
 // supabase is mocked so importing them builds no live client (AGENTS.md).
 const mockResult = jest.fn();
 jest.mock('../../supabase', () => {
@@ -18,7 +17,6 @@ jest.mock('../driverProfile', () => ({ fetchCommissionBaseline: () => Promise.re
 import { useTodaysJobs } from '../jobs';
 import { useNotifications } from '../notifications';
 import { resetClockStyleForTests, setClockStyle } from '../../clockPref';
-import { formatDateTime } from '../../timeFormat';
 
 function wrapper() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -51,16 +49,20 @@ describe('useTodaysJobs', () => {
 });
 
 describe('useNotifications', () => {
-  it('shows the new time in the notification text after the setting changes', async () => {
+  // Rows are worded on screen, so the setting is a display choice only:
+  // switching it keeps the cached list and downloads nothing.
+  it('does not download the notifications again when the setting changes', async () => {
     const when = '2026-12-12T01:22:00Z';
     mockResult.mockReturnValue({ data: [{
       id: 'n1', kind: 'pickup_reminder', enqueued_at: when, sent_at: null, read_at: null,
       payload: { job_number: 'JOB-1', pickup_location: 'KLIA', pickup_datetime: when },
     }], error: null });
     const { result } = await renderHook(() => useNotifications(), { wrapper: wrapper() });
-    await waitFor(() => expect(result.current.data?.[0].body).toBe('KLIA, 12 Dec, 09:22'));
+    await waitFor(() => expect(result.current.data?.[0].pickupAt).toBe(when));
+    const before = result.current.data;
+    const calls = mockResult.mock.calls.length;
     await act(async () => { setClockStyle('12h'); });
-    await waitFor(() => expect(result.current.data?.[0].body).toBe('KLIA, 12 Dec, 9:22 am'));
-    expect(formatDateTime(when, { weekday: false }, '12h')).toBe('12 Dec, 9:22 am');
+    expect(result.current.data).toBe(before);
+    expect(mockResult.mock.calls.length).toBe(calls);
   });
 });
