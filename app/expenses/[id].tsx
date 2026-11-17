@@ -7,11 +7,19 @@ import { AppHeader } from '../../components/AppHeader';
 import { Icon, IconName } from '../../components/Icon';
 import { Card } from '../../components/Card';
 import { Band } from '../../components/Band';
+import { RecordState, type NotFoundWords } from '../../components/RecordState';
 import { useTokens } from '../../theme/ThemeProvider';
 import { fontFor, radius, space, TABULAR, type } from '../../theme/tokens';
 import { formatDateKey } from '../../lib/timeFormat';
 import { supabase } from '../../lib/supabase';
 import { getSignedReceiptUrl, type ExpenseCategory, type ExpenseStatus } from '../../lib/queries/expenses';
+
+const EXPENSE_NOT_FOUND: NotFoundWords = {
+  title: 'This expense is no longer on your list',
+  body: 'It may have been removed.',
+  actionLabel: 'Back to expenses',
+  to: '/(tabs)/expenses',
+};
 
 const CAT_LABEL: Record<ExpenseCategory, string> = { fuel: 'Fuel', toll: 'Toll', other: 'Other' };
 const CAT_ICON: Record<ExpenseCategory, IconName> = { fuel: 'fuel', toll: 'toll', other: 'dots' };
@@ -28,7 +36,9 @@ type ExpenseDetail = {
   vehiclePlate: string;
 };
 
-async function fetchExpenseDetail(id: string): Promise<ExpenseDetail> {
+// null when no row comes back: the expense was removed or is no longer this
+// driver's. The screen says so plainly instead of showing a database error.
+async function fetchExpenseDetail(id: string): Promise<ExpenseDetail | null> {
   const { data, error } = await supabase
     .from('expenses')
     .select(`
@@ -36,8 +46,9 @@ async function fetchExpenseDetail(id: string): Promise<ExpenseDetail> {
       vehicle:vehicles!expenses_org_vehicle_fkey ( plate_number )
     `)
     .eq('id', id)
-    .single();
+    .maybeSingle();
   if (error) throw error;
+  if (!data) return null;
   return {
     id: data.id,
     category: data.category,
@@ -57,7 +68,7 @@ export default function Receipt() {
   const T = useTokens();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const { data: e, isLoading, isError, error } = useQuery({
+  const { data: e, isError, error, refetch } = useQuery({
     queryKey: ['expense', id],
     queryFn: () => fetchExpenseDetail(id!),
     enabled: Boolean(id),
@@ -74,20 +85,15 @@ export default function Receipt() {
     return () => { alive = false; };
   }, [e?.receiptPath]);
 
-  if (isLoading || !e) {
+  if (!e) {
     return (
-      <AppFrame bg={T.ground}>
-        <AppHeader title="Receipt" onBack={() => router.back()}/>
-        {isError ? (
-          <Text style={[type.body, { marginHorizontal: space[5], color: T.redText }]}>
-            {(error as Error)?.message ?? 'Couldn’t load expense'}
-          </Text>
-        ) : (
-          <View style={{ paddingTop: 40, alignItems: 'center' }}>
-            <ActivityIndicator color={T.text2}/>
-          </View>
-        )}
-      </AppFrame>
+      <RecordState
+        bg={T.ground}
+        title="Receipt"
+        errorTitle="Couldn't load expense"
+        notFound={EXPENSE_NOT_FOUND}
+        query={{ data: e, isError, error, refetch }}
+      />
     );
   }
 

@@ -71,14 +71,16 @@ Run with `npm test`. Full guide, including the sharp edges that will bite you
 
 Currently covered: pure helpers (`lib/timeFormat.ts`, `lib/commissionRate.ts`,
 `lib/semver.ts`, `lib/earningsPeriod.ts`, `lib/jobContact.ts`, `lib/jobStatus.ts`, `lib/notification.ts`) and shared
-components, plus the Earnings screen, `fetchClientPhone` in
+components (including `RouteCard`, `LoadError` and `RecordState`), plus every
+screen in the README's screen table (`__tests__/screens/`), `fetchClientPhone` in
 `lib/queries/jobDetail.ts`, `fetchNotifications` and the push tap handler
 (`handlePushTap` in `lib/push.ts`), sign-out (`signOut` in `lib/auth.ts`), clearing
 and resetting the push address (`clearPushNotifications`, `resetPushRegistration`
 in `lib/push.ts`), the `useSignedIn` hook (`lib/useSignedIn.ts`), the four job
 actions and `refreshJobs` (`lib/mutations/jobActions.ts`) and live updates
-(`useLiveUpdates` in `lib/realtime/jobsRealtime.ts`). NOT covered: the other
-screens, the remaining React Query data hooks, the rest of auth (PIN sign-in).
+(`useLiveUpdates` in `lib/realtime/jobsRealtime.ts`). NOT covered: the session
+gate (`app/index.tsx`), the remaining React Query data hooks, the rest of auth
+(PIN sign-in).
 
 A job status is read ONLY through `lib/jobStatus.ts` (words, pill, open or
 finished, the allowed action, which screen opens). Never compare status

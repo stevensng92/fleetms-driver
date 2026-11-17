@@ -4,8 +4,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '../components/Icon';
 import { Card } from '../components/Card';
-import { Band } from '../components/Band';
-import { Button } from '../components/Button';
+import { LoadError } from '../components/LoadError';
 import { Pill } from '../components/Pill';
 import { useTokens } from '../theme/ThemeProvider';
 import { TABULAR, space, type } from '../theme/tokens';
@@ -65,19 +64,11 @@ export default function Notifications() {
       )}
 
       {error && (
-        <View style={{ paddingHorizontal: space[4] }}>
-          <Band
-            tone="red"
-            action={<Button variant="secondary" onPress={() => refetch()}>Retry</Button>}
-          >
-            <Text style={[type.title, { color: T.redText, marginBottom: space[1] }]}>
-              Couldn&apos;t load notifications
-            </Text>
-            <Text style={[type.label, { color: T.redText }]}>
-              {(error as Error).message}
-            </Text>
-          </Band>
-        </View>
+        <LoadError
+          title="Couldn't load notifications"
+          message={(error as Error).message}
+          onRetry={() => refetch()}
+        />
       )}
 
       {!isLoading && !error && data && data.length === 0 && (

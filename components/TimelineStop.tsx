@@ -5,6 +5,7 @@ import { GoFill } from './GoFill';
 import { Icon } from './Icon';
 import { useTokens } from '../theme/ThemeProvider';
 import { fontFor, space, type, TABULAR } from '../theme/tokens';
+import type { RouteStop } from '../lib/route';
 
 // Build navigation deeplinks for a stop. When we have coords we use them
 // (most accurate); falling back to the place text means the user lands at a
@@ -27,20 +28,8 @@ async function openUrl(url: string) {
   catch { Alert.alert('Could not open', `No app available to handle:\n${url}`); }
 }
 
-export type Stop = {
-  /** The name the driver reads: "Pickup", "Stop 1", "Drop-off" (see lib/route.ts stopLabel). */
-  kind: string;
-  /** The stop's time, already formatted. Null or missing: no time shows. */
-  arrive?: string | null;
-  /** Not drawn any more (the time now stands alone beside the name). Kept so data/mock.ts still type-checks. */
-  arriveLabel?: string;
-  place: string;
-  depart?: string | null;
-  /** Optional coords for accurate nav. When absent, Waze/Maps fall back to
-   *  searching `place` as a text query. */
-  lat?: number | null;
-  lng?: number | null;
-};
+/** A stop as the route draws it: one shape, made by routeStops in lib/route.ts. */
+export type Stop = RouteStop;
 
 type State = 'upcoming' | 'current' | 'done';
 /** Which pin a stop wears: the ink ring (first), the green pin (last), or a grey square between. */
@@ -111,13 +100,13 @@ export function TimelineStop({ stop, isLast, state = 'upcoming', pin }: {
           gap: 2,
         }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space[2] }}>
-            <Text style={[type.label, strong, { color: done ? T.text3 : T.text2 }]}>{stop.kind}</Text>
-            {!!stop.arrive && (
+            <Text style={[type.label, strong, { color: done ? T.text3 : T.text2 }]}>{stop.label}</Text>
+            {!!stop.time && (
               <Text style={[
                 type.body, strong, TABULAR,
                 { color: labelColor, textDecorationLine: done ? 'line-through' : 'none' },
               ]}>
-                {stop.arrive}
+                {stop.time}
               </Text>
             )}
           </View>
@@ -126,15 +115,6 @@ export function TimelineStop({ stop, isLast, state = 'upcoming', pin }: {
             type.title,
             { color: labelColor, textDecorationLine: done ? 'line-through' : 'none' },
           ]}>{stop.place}</Text>
-
-          {(stop.depart === null || !!stop.depart) && (
-            <Text style={[
-              type.label, TABULAR,
-              { color: done ? T.text3 : T.text2, fontStyle: stop.depart === null ? 'italic' : 'normal' },
-            ]}>
-              {stop.depart === null ? 'Depart on arrival' : `Depart: ${stop.depart}`}
-            </Text>
-          )}
 
           {!done && (
             <View style={{ flexDirection: 'row', gap: space[2], marginTop: space[2] }}>

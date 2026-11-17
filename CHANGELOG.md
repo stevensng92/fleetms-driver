@@ -6,6 +6,12 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
 
 ### Fixed
 
+- **A receipt that fails to load can be retried.** The receipt screen now
+  shows Retry when it can't load, so a moment without signal no longer forces
+  the driver to leave and come back.
+- **A removed expense says so plainly.** Opening an expense that no longer
+  exists shows "This expense is no longer on your list" with a Back to
+  expenses button, instead of a raw database error.
 - **An open job updates the moment dispatch changes it.** If the dispatcher
   cancels a job, moves its pickup time or changes its address, the Jobs list,
   the job screen and the Trip screen all update without the driver leaving the
@@ -56,6 +62,11 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
 - The buttons a job offers (Accept and Reject, On my way, Open active job, Back
   to jobs) follow one rule on the Jobs list, the job screen and the trip
   screen.
+- **Every "Couldn't load" box looks the same.** The Jobs list, Expenses,
+  Earnings, Notifications, the job screen, the Trip screen and the receipt
+  screen now show the same red box, with Retry in the same place on the right.
+- The job screen and the Trip screen draw the route from one shared card, so
+  the stop names (Pickup, Stop 1, Drop-off), times and count always match.
 
 ## [Hotfix] - 2026-09-24
 
