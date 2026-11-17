@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import Profile from '../../app/(tabs)/profile';
@@ -122,5 +123,33 @@ describe('Time off list', () => {
     const d = entryDays(entry.startsAt, entry.endsAt);
     expect(screen.getByText(rangeLabel(d.start, d.end))).toBeTruthy();
     expect(screen.getByText('3 days, Leave')).toBeTruthy();
+  });
+});
+
+// A failed Withdraw shows the plain sentence, never the server's own text.
+describe('Withdraw a time-off request: a failure shows plain words', () => {
+  it("keeps the title and replaces the server's text", async () => {
+    const startsAt = new Date(Date.now() + 10 * 86400000).toISOString();
+    const entry = {
+      id: 't1', startsAt, endsAt: new Date(Date.now() + 12 * 86400000).toISOString(),
+      reason: 'leave', notes: null, status: 'pending', createdAt: startsAt,
+    };
+    (useDriverTimeOff as jest.Mock).mockReturnValue({ data: [entry], isLoading: false, error: null });
+    (useCancelTimeOff as jest.Mock).mockReturnValue({
+      mutateAsync: jest.fn().mockRejectedValue({ message: 'Not authorized', code: 'P0001' }),
+      isPending: false, variables: undefined,
+    });
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      await render(<Profile/>);
+      await fireEvent.press(screen.getByText('Withdraw'));
+      // The first pop-up asks "Withdraw request?"; press its Withdraw button.
+      const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => unknown }[];
+      await buttons.find(b => b.text === 'Withdraw')!.onPress!();
+      expect(alertSpy).toHaveBeenLastCalledWith('Could not withdraw', "This isn't available to you. Call dispatch if you think it should be.");
+      expect(alertSpy).not.toHaveBeenCalledWith('Could not withdraw', 'Not authorized');
+    } finally {
+      alertSpy.mockRestore();
+    }
   });
 });

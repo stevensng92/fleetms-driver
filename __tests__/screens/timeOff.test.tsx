@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import TimeOff from '../../app/profile/time-off';
@@ -94,5 +95,23 @@ describe('Request time off (change 24)', () => {
     expect(screen.getByText('Pick the first day off.')).toBeTruthy();
     await tap('2030-03-10');
     expect(screen.queryByText('Pick the first day off.')).toBeNull();
+  });
+});
+
+// A failed request shows the plain sentence, never the server's own text.
+describe('Request time off: a failed request shows plain words', () => {
+  it("keeps the title and replaces the server's text", async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      mutateAsync.mockRejectedValue(new Error('end_date before start_date'));
+      await render(<TimeOff/>);
+      await tap('2030-03-10');
+      await submit();
+      await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Request failed', 'Something went wrong. Try again, or call dispatch if it keeps happening.'));
+      expect(alertSpy).not.toHaveBeenCalledWith('Request failed', 'end_date before start_date');
+      expect(router.back).not.toHaveBeenCalled();
+    } finally {
+      alertSpy.mockRestore();
+    }
   });
 });

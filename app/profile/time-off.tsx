@@ -13,6 +13,7 @@ import { FONT, fontFor, radius, space, type } from '../../theme/tokens';
 import { useRequestTimeOff } from '../../lib/mutations/timeOff';
 import type { TimeOffReason } from '../../lib/queries/timeOff';
 import { formatDate, myDateKey, myStartOfDay } from '../../lib/timeFormat';
+import { errorWords } from '../../lib/errorWords';
 import { dayCount, MISSING_DAY_MESSAGE, pickDay, requestNote, type DayRange } from '../../lib/timeOff';
 
 // S8b — Request Time Off. Inline calendar picker → reason → notes → submit.
@@ -94,8 +95,7 @@ export default function TimeOff() {
       await mutate.mutateAsync({ startDate, endDate, reason, notes });
       router.back();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Could not submit request.';
-      Alert.alert('Request failed', msg);
+      Alert.alert('Request failed', errorWords(err));
     }
   }
 

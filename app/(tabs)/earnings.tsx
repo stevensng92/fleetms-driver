@@ -289,7 +289,7 @@ export default function Earnings() {
         {isError && (
           <LoadError
             title="Couldn't load earnings"
-            message={(error as Error)?.message ?? 'Unknown error'}
+            error={error}
             onRetry={() => refetch()}
           />
         )}

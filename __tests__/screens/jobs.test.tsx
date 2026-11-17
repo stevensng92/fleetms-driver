@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
-import { AppState } from 'react-native';
+import { AppState, Alert } from 'react-native';
 import { router } from 'expo-router';
 import * as Reanimated from 'react-native-reanimated';
 import JobsToday from '../../app/(tabs)/index';
@@ -374,20 +374,21 @@ describe('Jobs list: failed load (LoadError)', () => {
     return refetch;
   }
 
-  it('shows the error box with the message and no empty state, and Retry reloads', async () => {
+  it('shows the error box with the plain sentence and no empty state, and Retry reloads', async () => {
     const refetch = mockFailed();
     await render(<JobsToday/>);
     expect(screen.getByText("Couldn't load jobs")).toBeTruthy();
-    expect(screen.getByText('Failed to fetch')).toBeTruthy();
+    expect(screen.getByText('No signal. Check your connection and try again.')).toBeTruthy();
+    expect(screen.queryByText('Failed to fetch')).toBeNull();
     expect(screen.queryByText('No jobs scheduled today')).toBeNull();
     await fireEvent.press(screen.getByText('Retry'));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('says "Unknown error" when the failure has no message', async () => {
+  it('says something went wrong when the failure has no message', async () => {
     mockFailed(jest.fn(), null);
     await render(<JobsToday/>);
-    expect(screen.getByText('Unknown error')).toBeTruthy();
+    expect(screen.getByText('Something went wrong. Try again, or call dispatch if it keeps happening.')).toBeTruthy();
   });
 
   it('adds the dev auth status under the message only when the session is not ok', async () => {
@@ -402,5 +403,31 @@ describe('Jobs list: failed load (LoadError)', () => {
     mockFailed();
     await render(<JobsToday/>);
     expect(screen.queryByText(/Auth status/)).toBeNull();
+  });
+});
+
+// A failed Accept or Reject shows the plain sentence, never the server's own text.
+describe('Jobs list: a failed Accept or Reject shows plain words', () => {
+  let alertSpy: jest.SpyInstance;
+  beforeEach(() => { alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {}); });
+  afterEach(() => alertSpy.mockRestore());
+
+  it('Accept: no signal', async () => {
+    confirm.mockRejectedValue(new TypeError('Network request failed'));
+    mockJobs([PENDING]);
+    await render(<JobsToday/>);
+    await fireEvent.press(screen.getByText('Accept'));
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Could not accept', 'No signal. Check your connection and try again.'), { timeout: 2000 });
+    expect(alertSpy).not.toHaveBeenCalledWith('Could not accept', 'Network request failed');
+  });
+
+  it('Reject: dispatch changed the job', async () => {
+    reject.mockRejectedValue({ message: 'Assignment not found or no longer current', code: 'P0001' });
+    mockJobs([PENDING]);
+    await render(<JobsToday/>);
+    await fireEvent.press(screen.getByText('Reject'));
+    await fireEvent.press(screen.getByText('Reject job'));
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Could not reject', "Dispatch has changed this job. It's been updated on your screen."));
+    expect(alertSpy).not.toHaveBeenCalledWith('Could not reject', 'Assignment not found or no longer current');
   });
 });

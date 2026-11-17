@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { resetClockStyleForTests, setClockStyle } from '../../lib/clockPref';
@@ -85,7 +86,8 @@ describe('Job detail: not found and failed (change 20)', () => {
     const refetch = jest.fn();
     mockJob(undefined, { isError: true, error: new Error('Network request failed'), refetch });
     await render(<JobDetail/>);
-    expect(screen.getByText('Network request failed')).toBeTruthy();
+    expect(screen.getByText('No signal. Check your connection and try again.')).toBeTruthy();
+    expect(screen.queryByText('Network request failed')).toBeNull();
     expect(screen.queryByText('This job is no longer on your list')).toBeNull();
     await fireEvent.press(screen.getByText('Retry'));
     await waitFor(() => expect(refetch).toHaveBeenCalled());
@@ -182,5 +184,43 @@ describe('Job detail: Pending with no assignment', () => {
     for (const w of ['Accept', 'Reject', 'On my way', 'Open active job', 'Back to jobs']) {
       expect(screen.queryByText(w)).toBeNull();
     }
+  });
+});
+
+// A failed button press shows the plain sentence under the same title, never the server's own text.
+describe('Job detail: a failed action shows plain words', () => {
+  const RAW = 'Cannot start a pending job (must be confirmed)';
+  let alertSpy: jest.SpyInstance;
+  beforeEach(() => { alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {}); });
+  afterEach(() => alertSpy.mockRestore());
+
+  it('Accept: dispatch changed the job', async () => {
+    const confirmFail = jest.fn().mockRejectedValue({ message: RAW, code: 'P0001' });
+    (useConfirmAssignment as jest.Mock).mockReturnValue({ mutateAsync: confirmFail, isPending: false });
+    mockJob(job({ status: 'pending' }));
+    await render(<JobDetail/>);
+    await fireEvent.press(screen.getByText('Accept'));
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Could not confirm', "Dispatch has changed this job. It's been updated on your screen."));
+    expect(alertSpy).not.toHaveBeenCalledWith('Could not confirm', RAW);
+  });
+
+  it('On my way: no signal', async () => {
+    const startFail = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
+    (useStartJob as jest.Mock).mockReturnValue({ mutateAsync: startFail, isPending: false });
+    await render(<JobDetail/>);
+    await fireEvent.press(screen.getByText('On my way'));
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Could not start', 'No signal. Check your connection and try again.'));
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('Reject: something unrecognised', async () => {
+    const rejectFail = jest.fn().mockRejectedValue(new Error('boom'));
+    (useRejectAssignment as jest.Mock).mockReturnValue({ mutateAsync: rejectFail, isPending: false });
+    mockJob(job({ status: 'pending' }));
+    await render(<JobDetail/>);
+    await fireEvent.press(screen.getByText('Reject'));
+    await fireEvent.press(await screen.findByText('Reject job'));
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Could not reject', 'Something went wrong. Try again, or call dispatch if it keeps happening.'));
+    expect(alertSpy).not.toHaveBeenCalledWith('Could not reject', 'boom');
   });
 });

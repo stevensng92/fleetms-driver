@@ -118,7 +118,9 @@ describe('Log expense: errors sit at the field (28a)', () => {
     await fireEvent.changeText(screen.getByPlaceholderText('0.00'), '5');
     await fireEvent.press(screen.getByText('Save expense'));
 
-    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Could not save', 'boom'));
+    // The title says what failed; the message is the plain sentence, never the raw text.
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Could not save', 'Something went wrong. Try again, or call dispatch if it keeps happening.'));
+    expect(alertSpy).not.toHaveBeenCalledWith('Could not save', 'boom');
   });
 });
 

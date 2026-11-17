@@ -42,15 +42,16 @@ describe('RecordState', () => {
     const refetch = jest.fn();
     await show({ data: undefined, isError: true, error: new Error('Failed to fetch'), refetch });
     expect(screen.getByText("Couldn't load expense")).toBeTruthy();
-    expect(screen.getByText('Failed to fetch')).toBeTruthy();
+    expect(screen.getByText('No signal. Check your connection and try again.')).toBeTruthy();
+    expect(screen.queryByText('Failed to fetch')).toBeNull();
     expect(screen.queryByTestId('record-loading')).toBeNull();
     await fireEvent.press(screen.getByText('Retry'));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('says "Unknown error" when the failure has no message', async () => {
+  it('says something went wrong when the failure has no message', async () => {
     await show({ data: undefined, isError: true, error: null });
-    expect(screen.getByText('Unknown error')).toBeTruthy();
+    expect(screen.getByText('Something went wrong. Try again, or call dispatch if it keeps happening.')).toBeTruthy();
   });
 
   it('says the record is gone when the load found nothing, with a way back', async () => {

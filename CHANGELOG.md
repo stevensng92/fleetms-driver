@@ -6,6 +6,20 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
 
 ### Fixed
 
+- **Errors now say what to do, in plain words.** When a screen can't load or a
+  button press fails, the driver sees one short sentence ("No signal. Check
+  your connection and try again.", "You've been signed out. Please sign in
+  again.", "Dispatch has changed this job. It's been updated on your screen.",
+  "This isn't available to you. Call dispatch if you think it should be.", or
+  "Something went wrong. Try again, or call dispatch if it keeps happening.")
+  instead of database wording, error codes or "Unknown error". The box and
+  pop-up titles are unchanged. The raw error goes to Sentry, once per kind.
+- **A job dispatch just changed refreshes itself.** If Accept, Reject, Start or
+  Mark as done fails because dispatch changed the job, the job and the Jobs
+  list reload straight away, so the message is true.
+- **A signed-out driver goes back to the sign-in screen.** When the session
+  ends, from anywhere or because it expired and could not renew, the app opens
+  Sign in instead of leaving the driver on a screen that can't load.
 - **Switching between 12-hour and 24-hour time is instant.** The Jobs list
   and Notifications now redraw in the new format straight away. Before, both
   downloaded everything again, with a spinner, and with no signal the Jobs tab

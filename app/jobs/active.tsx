@@ -5,6 +5,7 @@ import { AppFrame } from '../../components/AppFrame';
 import { AppHeader } from '../../components/AppHeader';
 import { StatusPill } from '../../components/StatusPill';
 import { jobStatus } from '../../lib/jobStatus';
+import { errorWords } from '../../lib/errorWords';
 import { Button } from '../../components/Button';
 import { FeatureCard } from '../../components/FeatureCard';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -64,7 +65,7 @@ export default function ActiveJob() {
       // FLEETMS-DRIVER-1 (IllegalStateException at SurfaceMountingManager.addViewAt).
       setTimeout(() => router.replace('/(tabs)'), 0);
     } catch (e: any) {
-      Alert.alert('Could not mark done', e?.message ?? 'Unknown error');
+      Alert.alert('Could not mark done', errorWords(e));
     }
   };
 

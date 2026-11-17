@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '../supabase';
+import { errorKind } from '../errorWords';
 
 // The four job actions (Accept, Reject, Start, Complete) and the one list of
 // what refreshes after any job change. The live listener
@@ -42,9 +43,17 @@ function useJobAction<TArg>(call: (arg: TArg) => PromiseLike<{ data: unknown; er
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (arg: TArg) => {
-      const { data, error } = await call(arg);
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await call(arg);
+        if (error) throw error;
+        return data;
+      } catch (e) {
+        // Dispatch changed the job under the driver. The pop-up will say it has
+        // been updated on screen, so make that true: reload every job screen
+        // (bounded like success), then let the screen show the pop-up.
+        if (errorKind(e) === 'jobChanged') await waitAtMost(refreshJobs(qc), REFRESH_WAIT_MS);
+        throw e;
+      }
     },
     // Wait for the screens to reload, so the next screen (the Trip screen after
     // On my way) shows the new status, but never longer than REFRESH_WAIT_MS:

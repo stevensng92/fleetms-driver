@@ -17,6 +17,7 @@ import { fontFor, space, type } from '../../theme/tokens';
 import { useClockStyle } from '../../lib/clockPref';
 import { useJobDetailByNumber } from '../../lib/queries/jobDetail';
 import { jobStatus } from '../../lib/jobStatus';
+import { errorWords } from '../../lib/errorWords';
 import { useStartJob, useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 
 // S3 — Job Detail. Reads the real job by job_number; the route param is the
@@ -104,7 +105,7 @@ export default function JobDetail() {
                 full size="lg" style={{ flex: 1 }}
                 onPress={async () => {
                   try { await confirmAsg.mutateAsync(job.assignmentId!); }
-                  catch (e: any) { Alert.alert('Could not confirm', e?.message ?? 'Unknown error'); }
+                  catch (e: any) { Alert.alert('Could not confirm', errorWords(e)); }
                 }}
               >
                 {confirmAsg.isPending ? 'Confirming…' : 'Accept'}
@@ -121,7 +122,7 @@ export default function JobDetail() {
                 await startJob.mutateAsync(job.jobUuid);
                 router.replace({ pathname: '/jobs/active', params: { id: job.jobNumber } });
               } catch (e: any) {
-                Alert.alert('Could not start', e?.message ?? 'Unknown error');
+                Alert.alert('Could not start', errorWords(e));
               }
             }}
           >
@@ -164,7 +165,7 @@ export default function JobDetail() {
           setAskingReject(false);
           rejectAsg.mutateAsync({ assignmentId: job.assignmentId!, reason: reason || undefined })
             .then(() => router.back())
-            .catch((e: any) => Alert.alert('Could not reject', e?.message ?? 'Unknown error'));
+            .catch((e: any) => Alert.alert('Could not reject', errorWords(e)));
         }}
       />
     </AppFrame>

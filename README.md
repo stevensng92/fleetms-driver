@@ -165,7 +165,8 @@ for a driver:
 Pure rules behind these live in their own tested files: `lib/jobGroups.ts`,
 `lib/route.ts`, `lib/money.ts`, `lib/earningsPeriod.ts`, `lib/timeOff.ts`,
 `lib/profile.ts`, `lib/clockPref.ts`, `lib/phone.ts`, `lib/notification.ts`,
-`lib/amount.ts`, `lib/expenses.ts`, `lib/statusTone.ts`, `lib/jobStatus.ts`.
+`lib/amount.ts`, `lib/expenses.ts`, `lib/statusTone.ts`, `lib/jobStatus.ts`,
+`lib/errorWords.ts`.
 
 **Job status** is read in one place, `lib/jobStatus.ts`. Every screen shows the
 dispatcher's word (Pending, Confirmed, In Progress, Done, Rejected, Cancelled)

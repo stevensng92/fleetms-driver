@@ -18,6 +18,7 @@ import { useCancelTimeOff } from '../../lib/mutations/timeOff';
 import { useAppVersionGate } from '../../lib/queries/appVersionConfig';
 import { signOut } from '../../lib/auth';
 import { myDateKey } from '../../lib/timeFormat';
+import { errorWords } from '../../lib/errorWords';
 import { availabilityPill, formatVehicleLine, initials } from '../../lib/profile';
 import { entryDays, rangeLabel, timeOffMeta, upcomingTimeOff } from '../../lib/timeOff';
 import { setClockStyle, useClockStyle } from '../../lib/clockPref';
@@ -240,8 +241,7 @@ function TimeOffList() {
           onPress: async () => {
             try { await cancel.mutateAsync(id); }
             catch (err) {
-              const msg = err instanceof Error ? err.message : 'Cancel failed.';
-              Alert.alert('Could not withdraw', msg);
+              Alert.alert('Could not withdraw', errorWords(err));
             }
           },
         },

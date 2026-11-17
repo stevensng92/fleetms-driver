@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, ViewStyle, StyleProp } from 'react-native';
 import { Band } from './Band';
 import { Button } from './Button';
+import { errorWords } from '../lib/errorWords';
 import { useTokens } from '../theme/ThemeProvider';
 import { space, type } from '../theme/tokens';
 
@@ -10,9 +11,10 @@ import { space, type } from '../theme/tokens';
  * technical message under it, and Retry in the band's own action slot.
  * Anything passed as children shows under the message.
  */
-export function LoadError({ title, message, onRetry, children, style }: {
+export function LoadError({ title, error, onRetry, children, style }: {
   title: string;
-  message: string;
+  /** Whatever was thrown. Shown only through errorWords, never as its own text. */
+  error: unknown;
   onRetry: () => void;
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
@@ -25,7 +27,7 @@ export function LoadError({ title, message, onRetry, children, style }: {
       action={<Button variant="secondary" onPress={onRetry}>Retry</Button>}
     >
       <Text style={[type.title, { color: T.redText, marginBottom: space[1] }]}>{title}</Text>
-      <Text style={[type.label, { color: T.redText }]}>{message}</Text>
+      <Text style={[type.label, { color: T.redText }]}>{errorWords(error)}</Text>
       {children}
     </Band>
   );
