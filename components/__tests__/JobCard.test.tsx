@@ -2,11 +2,12 @@ import React from 'react';
 import { fireEvent, render, screen, act } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { JobCard, type Job } from '../JobCard';
+import { resetClockStyleForTests, setClockStyle } from '../../lib/clockPref';
 
 // expo-haptics is stubbed globally in test/setup.ts.
 
 const job = (over: Partial<Job> = {}): Job => ({
-  id: 'JOB-101', assignmentId: 'asg-1', time: '14:30', pickupAt: '2026-12-12T06:30:00Z', vehicle: 'WXY 1234',
+  id: 'JOB-101', assignmentId: 'asg-1', pickupAt: '2026-12-12T06:30:00Z', vehicle: 'WXY 1234',
   from: 'KLIA', to: 'Bukit Bintang', client: 'Acme Sdn Bhd', pax: 2, status: 'pending', ...over,
 });
 
@@ -14,6 +15,29 @@ const job = (over: Partial<Job> = {}): Job => ({
 const advance = (ms: number) => act(async () => { jest.advanceTimersByTime(ms); });
 
 beforeEach(() => jest.clearAllMocks());
+
+// The card formats its own pickup time from the raw time and the driver's
+// Time format, so no screen can forget the setting. 06:30Z is 14:30 on
+// Sat 12 Dec in Malaysia.
+describe('JobCard: pickup time and the Time format', () => {
+  afterEach(() => resetClockStyleForTests());
+  it('shows the same raw time as 14:30 in 24-hour and 2:30 pm in 12-hour', async () => {
+    await render(<JobCard job={job()}/>);
+    expect(screen.getByText('14:30')).toBeTruthy();
+    await act(async () => { setClockStyle('12h'); });
+    expect(screen.getByText('2:30 pm')).toBeTruthy();
+    expect(screen.queryByText('14:30')).toBeNull();
+  });
+  it('an overdue card says Missed with the pickup date', async () => {
+    await render(<JobCard job={job()} overdue/>);
+    expect(screen.getByText('Missed, Sat, 12 Dec')).toBeTruthy();
+    expect(screen.getByLabelText('JOB-101, Acme Sdn Bhd, pickup 14:30, missed on Sat, 12 Dec')).toBeTruthy();
+  });
+  it('a card that is not overdue shows no missed date', async () => {
+    await render(<JobCard job={job()}/>);
+    expect(screen.queryByText(/Missed/)).toBeNull();
+  });
+});
 
 describe('JobCard: lines folded into the card (change 19)', () => {
   it('a confirmed card has no View details button', async () => {

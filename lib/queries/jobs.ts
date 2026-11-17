@@ -10,10 +10,6 @@ import { FINISHED_STATUSES } from '../jobStatus';
 // is the one place that reads it (words, actions, open or finished) and
 // reports a status this app does not know yet to Sentry.
 
-/** One job as downloaded: raw pickup time, no time text. The Jobs screen
- *  splits the list by day (lib/jobGroups.ts) and the card formats the time. */
-export type FetchedJob = Omit<Job, 'time' | 'pickupDate'>;
-
 /** How many days past tomorrow we surface on the Jobs tab.
  *  14 days = "next two weeks" — past that, drivers should rely on the dispatcher. */
 const UPCOMING_DAYS = 14;
@@ -26,10 +22,12 @@ const OVERDUE_LOOKBACK_DAYS = 30;
 
 // Pulls the current driver's jobs as one flat list ordered by pickup time:
 // open jobs from up to 30 days back, then today + tomorrow + the next 14 days.
+// Raw pickup times only, no time text: the Jobs screen splits the list by day
+// (lib/jobGroups.ts) and each card formats its own time.
 // RLS scopes results via private.is_driver_self(driver_id) so the anon JWT
 // only sees its own. PostgREST embedding handles the FK join automatically.
 // Exported for lib/queries/__tests__/jobs.test.ts; the screen goes through useTodaysJobs.
-export async function fetchJobs(): Promise<FetchedJob[]> {
+export async function fetchJobs(): Promise<Job[]> {
   // Every boundary derived independently from the same MY day, rather than by
   // walking forward from startToday with setDate(). setDate() operates in the
   // DEVICE's local terms, so on a phone that observes DST it would add 23 or 25
@@ -113,7 +111,7 @@ export async function fetchJobs(): Promise<FetchedJob[]> {
       };
     });
 
-  const toUi = (r: Row): FetchedJob => ({
+  const toUi = (r: Row): Job => ({
     id: r.job.job_number,
     jobUuid: r.job.id,
     assignmentId: r.assignment_id,

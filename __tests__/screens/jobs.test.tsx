@@ -6,7 +6,7 @@ import JobsToday from '../../app/(tabs)/index';
 import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 import { resetFinishedSeen, setFinishedSeen } from '../../lib/jobGroups';
-import type { FetchedJob } from '../../lib/queries/jobs';
+import type { Job } from '../../components/JobCard';
 import { myStartOfDay } from '../../lib/timeFormat';
 
 // Screen test for the Jobs tab. Queries and mutations are mocked, so no
@@ -32,13 +32,13 @@ const R = Reanimated as unknown as { withSequence: jest.Mock };
 const at = (days: number, hh: number, mm: number) =>
   new Date(myStartOfDay(new Date(), days).getTime() + (hh * 60 + mm) * 60_000).toISOString();
 
-const job = (id: string, status: string, at: string, over: Partial<FetchedJob> = {}): FetchedJob => ({
+const job = (id: string, status: string, at: string, over: Partial<Job> = {}): Job => ({
   id, assignmentId: `asg-${id}`, jobUuid: `uuid-${id}`, pickupAt: at,
   vehicle: 'WXY 1234', from: 'KLIA', to: 'Bukit Bintang', client: `Client ${id}`, pax: 2, status, ...over,
 });
 
 // The download is one flat list; the screen splits it by day itself.
-function mockJobs(jobs: FetchedJob[]) {
+function mockJobs(jobs: Job[]) {
   (useTodaysJobs as jest.Mock).mockReturnValue({
     data: jobs,
     isLoading: false, isError: false, error: null, refetch: jest.fn(), isRefetching: false,

@@ -6,7 +6,7 @@ import Animated, {
   Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming,
 } from 'react-native-reanimated';
 import { AppHeader, SectionLabel } from '../../components/AppHeader';
-import { JobCard } from '../../components/JobCard';
+import { JobCard, type Job } from '../../components/JobCard';
 import { LoadError } from '../../components/LoadError';
 import { Band } from '../../components/Band';
 import { Card } from '../../components/Card';
@@ -14,9 +14,8 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { EASE_OUT, fontFor, motionFor, radius, space, type } from '../../theme/tokens';
-import { formatClock, formatDate, formatDayLong } from '../../lib/timeFormat';
-import { useClockStyle } from '../../lib/clockPref';
-import { useTodaysJobs, type FetchedJob } from '../../lib/queries/jobs';
+import { formatDate, formatDayLong } from '../../lib/timeFormat';
+import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 import { useUnreadCount } from '../../lib/queries/notifications';
 import { useDriverProfile } from '../../lib/queries/driverProfile';
@@ -31,7 +30,6 @@ const CURVE = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
 
 export default function JobsToday() {
   const T = useTokens();
-  const clock = useClockStyle();
   const { data, isLoading, isError, error, refetch, isRefetching } = useTodaysJobs();
   const { data: profile } = useDriverProfile();
   const confirmAsg = useConfirmAssignment();
@@ -43,7 +41,7 @@ export default function JobsToday() {
   // banner is just a soft nudge.
   const [bannerDismissed, setBannerDismissed] = useState(false);
   // The job the driver tapped Reject on. Nothing is sent until the dialog is confirmed.
-  const [rejecting, setRejecting] = useState<FetchedJob | null>(null);
+  const [rejecting, setRejecting] = useState<Job | null>(null);
 
   const groups = groupJobs(data ?? [], new Date());
   const { overdue, today, todayFinished, tomorrow, upcoming } = groups;
@@ -59,14 +57,14 @@ export default function JobsToday() {
 
   // One job card. An in-progress job opens the trip screen from every group;
   // anything else opens the job screen.
-  const card = (j: FetchedJob, opts: { dim?: boolean; overdue?: boolean } = {}) => {
+  const card = (j: Job, opts: { dim?: boolean; overdue?: boolean } = {}) => {
     const open = jobScreen(j) === 'trip'
       ? { pathname: '/jobs/active' as const, params: { id: j.id } }
       : `/jobs/${j.id}`;
     return (
       <JobCard
         key={j.id}
-        job={{ ...j, time: formatClock(j.pickupAt, clock), pickupDate: formatDate(j.pickupAt, { weekday: true }) }}
+        job={j}
         dim={opts.dim}
         overdue={opts.overdue}
         onPress={() => router.push(open as Parameters<typeof router.push>[0])}
