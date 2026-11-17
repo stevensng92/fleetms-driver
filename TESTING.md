@@ -5,7 +5,7 @@ trust your instincts, and ship with confidence — without them, vibe coding is
 just yolo coding. With tests, it's a superpower.
 
 This app went a long time with no tests at all. That is now fixed for the pure
-logic and the shared components; screens and data hooks are still uncovered.
+logic, the shared components and the screens; most data hooks are still uncovered.
 Add to this as you touch things.
 
 ## Stack
@@ -178,7 +178,7 @@ against genuine period values rather than a mock's idea of them.
 
 ## Not covered yet
 
-The screens other than Earnings, the React Query data hooks (`lib/queries/`,
+The session gate (`app/index.tsx`), the React Query data hooks (`lib/queries/`,
 `lib/mutations/`) other than the job actions
 (`lib/mutations/__tests__/jobActions.test.tsx`), and auth other than sign-out
 (`lib/__tests__/auth.signOut.test.ts`). Live updates are covered by

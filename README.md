@@ -133,9 +133,6 @@ after noon by strict notation; it is retained deliberately, so don't
 | Request Time Off  | `/profile/time-off` (modal)   | real |
 | Notifications     | `/notifications`              | real |
 
-`data/mock.ts` still exists in the repo but nothing under `app/` reads from
-it anymore — safe to treat as legacy fixtures, not current wiring.
-
 ### Redesign (on `master`, not yet released)
 
 The 2026 redesign from the design-systems mock (`design-systems/fleetms/src/driver/`)
@@ -263,7 +260,6 @@ components/                shared UI building blocks (ported from design handoff
 test/                      jest setup — globalSetup.js (TZ pin) + setup.ts (mocks)
 __tests__/screens/         screen tests (kept OUT of app/ — see TESTING.md)
 theme/                     design tokens + ThemeProvider
-data/mock.ts               legacy fixtures — unused by app/ now, kept for reference
 lib/
   supabase.ts              Supabase client
   auth.ts                  PIN sign-in / sign-out / profile fetch
