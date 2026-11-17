@@ -6,7 +6,7 @@ import { JobCard, type Job } from '../JobCard';
 // expo-haptics is stubbed globally in test/setup.ts.
 
 const job = (over: Partial<Job> = {}): Job => ({
-  id: 'JOB-101', assignmentId: 'asg-1', time: '14:30', vehicle: 'WXY 1234',
+  id: 'JOB-101', assignmentId: 'asg-1', time: '14:30', pickupAt: '2026-12-12T06:30:00Z', vehicle: 'WXY 1234',
   from: 'KLIA', to: 'Bukit Bintang', client: 'Acme Sdn Bhd', pax: 2, status: 'pending', ...over,
 });
 

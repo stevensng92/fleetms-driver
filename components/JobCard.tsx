@@ -31,8 +31,8 @@ export type Job = {
   pax: number;
   /** The job status as the dispatcher sends it ("in_progress"). Read it through lib/jobStatus.ts. */
   status: string;
-  /** The real pickup time (ISO). Orders today's jobs on the Jobs tab. */
-  pickupAt?: string;
+  /** The real pickup time (ISO). Decides the job's day and orders today's jobs on the Jobs tab. */
+  pickupAt: string;
   /** What this job pays when it isn't the driver's normal cut — a rate
    *  (20 → "20% comm") or a flat fee (80 → "RM 80 flat"). null = pays the
    *  standard rate, so no badge renders. Resolved in lib/commissionRate.ts —

@@ -1,56 +1,89 @@
 // Pure decisions for the Jobs tab, ported from the design source's rules.ts
 // (jobGroups, jobScreen, jobCount, countRose, greeting). No Supabase import, so
-// tests load it alone. The query already splits jobs by Malaysia day; this adds
-// what the screen needs on top: today's order, the Finished today fold, and
-// whether the whole list is empty. Open or finished, and which screen a job
-// opens on, come from lib/jobStatus.ts.
+// tests load it alone. The download is one flat list of raw jobs; this splits
+// it by Malaysian day against a "now" the screen passes in (so the split moves
+// at midnight without a download), then adds today's order, the Finished
+// today fold, and whether the whole list is empty. Open or finished, and which
+// screen a job opens on, come from lib/jobStatus.ts.
 import { jobStatus } from './jobStatus';
+import { myDateKey, myStartOfDay } from './timeFormat';
 
 /** What the grouping needs from a job. The real `Job` card type fits. */
 export type GroupableJob = {
   /** The job status as the dispatcher sends it ("in_progress"). */
   status: string;
-  /** The real pickup time (ISO). Orders today's jobs. */
-  pickupAt?: string;
+  /** The real pickup time (ISO). Decides the job's day and orders today's jobs. */
+  pickupAt: string;
 };
 
-export type JobsData<J extends GroupableJob> = {
-  overdue: J[];
-  today: J[];
-  tomorrow: J[];
-  upcoming: { dateKey: string; label: string; jobs: J[] }[];
-};
+/** One later day: its Malaysian date ("2026-12-15") and its jobs in pickup order. */
+export type UpcomingDay<J extends GroupableJob> = { dateKey: string; jobs: J[] };
 
 export type JobGroups<J extends GroupableJob> = {
+  /** Open jobs whose pickup was before the start of today, Malaysian time. */
   overdue: J[];
   /** Today's jobs still to act on: the job under way first, then the rest by pickup time. */
   today: J[];
   /** Today's finished jobs (done, rejected, cancelled), by pickup time. Shown in a closed fold. */
   todayFinished: J[];
   tomorrow: J[];
-  upcoming: JobsData<J>['upcoming'];
+  /** The days after tomorrow, in date order. */
+  upcoming: UpcomingDay<J>[];
   /** Nothing in any group. The "No jobs scheduled today" card shows only then. */
   empty: boolean;
 };
 
-/** Oldest pickup first. Array.sort is stable, so equal or missing times keep their order. */
-const byPickup = (a: GroupableJob, b: GroupableJob) => (a.pickupAt ?? '').localeCompare(b.pickupAt ?? '');
+/** Oldest pickup first. Array.sort is stable, so equal times keep their order. */
+const byPickup = (a: GroupableJob, b: GroupableJob) => new Date(a.pickupAt).getTime() - new Date(b.pickupAt).getTime();
 
-export function groupJobs<J extends GroupableJob>(d: JobsData<J>): JobGroups<J> {
-  const sorted = [...d.today].sort(byPickup);
-  const open = sorted.filter((j) => jobStatus(j.status).phase === 'open');
+/**
+ * Splits the flat jobs list by Malaysian day against `now`, then applies the
+ * Today rules. Day boundaries come from lib/timeFormat.ts, never the phone's
+ * own clock zone, so a phone set to another zone shows the same days.
+ */
+export function groupJobs<J extends GroupableJob>(jobs: J[], now: Date = new Date()): JobGroups<J> {
+  const startToday = myStartOfDay(now).getTime();
+  const startTomorrow = myStartOfDay(now, 1).getTime();
+  const startDayAfter = myStartOfDay(now, 2).getTime();
+
+  const overdue: J[] = [];
+  const todayAll: J[] = [];
+  const tomorrow: J[] = [];
+  const later = new Map<string, J[]>();
+  for (const j of [...jobs].sort(byPickup)) {
+    const t = new Date(j.pickupAt).getTime();
+    if (t < startToday) {
+      // The download only carries past jobs that are still open. A job that
+      // finished and then slipped into the past while the screen stayed open
+      // is not missed, so it leaves the list.
+      if (jobStatus(j.status).phase === 'open') overdue.push(j);
+    } else if (t < startTomorrow) {
+      todayAll.push(j);
+    } else if (t < startDayAfter) {
+      tomorrow.push(j);
+    } else {
+      const key = myDateKey(j.pickupAt);
+      const day = later.get(key);
+      if (day) day.push(j); else later.set(key, [j]);
+    }
+  }
+  const upcoming = [...later.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dateKey, js]) => ({ dateKey, jobs: js }));
+
+  const open = todayAll.filter((j) => jobStatus(j.status).phase === 'open');
   const today = [
     ...open.filter((j) => jobStatus(j.status).live),
     ...open.filter((j) => !jobStatus(j.status).live),
   ];
-  const todayFinished = sorted.filter((j) => jobStatus(j.status).phase === 'finished');
+  const todayFinished = todayAll.filter((j) => jobStatus(j.status).phase === 'finished');
   return {
-    overdue: d.overdue,
+    overdue,
     today,
     todayFinished,
-    tomorrow: d.tomorrow,
-    upcoming: d.upcoming,
-    empty: !d.overdue.length && !sorted.length && !d.tomorrow.length && !d.upcoming.length,
+    tomorrow,
+    upcoming,
+    empty: !overdue.length && !todayAll.length && !tomorrow.length && !upcoming.length,
   };
 }
 

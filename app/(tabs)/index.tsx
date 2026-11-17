@@ -14,7 +14,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { EASE_OUT, fontFor, motionFor, radius, space, type } from '../../theme/tokens';
-import { formatClock, formatDayLong } from '../../lib/timeFormat';
+import { formatClock, formatDate, formatDayLong } from '../../lib/timeFormat';
 import { useClockStyle } from '../../lib/clockPref';
 import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
@@ -45,12 +45,10 @@ export default function JobsToday() {
   // The job the driver tapped Reject on. Nothing is sent until the dialog is confirmed.
   const [rejecting, setRejecting] = useState<Job | null>(null);
 
-  const groups = groupJobs({
-    overdue: data?.overdue ?? [],
-    today: data?.today ?? [],
-    tomorrow: data?.tomorrow ?? [],
-    upcoming: data?.upcoming ?? [],
-  });
+  const groups = groupJobs(
+    data ? [...data.overdue, ...data.today, ...data.tomorrow, ...data.upcoming.flatMap((g) => g.jobs)] : [],
+    new Date(),
+  );
   const { overdue, today, todayFinished, tomorrow, upcoming } = groups;
   const upcomingTotal = upcoming.reduce((sum, g) => sum + g.jobs.length, 0);
 
@@ -71,7 +69,7 @@ export default function JobsToday() {
     return (
       <JobCard
         key={j.id}
-        job={j.pickupAt ? { ...j, time: formatClock(j.pickupAt, clock) } : j}
+        job={{ ...j, time: formatClock(j.pickupAt, clock) }}
         dim={opts.dim}
         overdue={opts.overdue}
         onPress={() => router.push(open as Parameters<typeof router.push>[0])}
@@ -170,7 +168,7 @@ export default function JobsToday() {
               <React.Fragment key={group.dateKey}>
                 <View style={{ paddingHorizontal: space[5], paddingTop: 6, paddingBottom: space[2] }}>
                   <Text style={[type.label, { fontFamily: fontFor('600'), fontWeight: '600', color: T.text2 }]}>
-                    {group.label}
+                    {formatDate(group.jobs[0].pickupAt, { weekday: true })}
                   </Text>
                 </View>
                 {group.jobs.map(j => card(j, { dim: true }))}

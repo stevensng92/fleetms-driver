@@ -7,6 +7,7 @@ import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 import { resetFinishedSeen, setFinishedSeen } from '../../lib/jobGroups';
 import type { Job } from '../../components/JobCard';
+import { myDateKey, myStartOfDay } from '../../lib/timeFormat';
 
 // Screen test for the Jobs tab. Queries and mutations are mocked, so no
 // Supabase client is built (see earnings.test.tsx for the same approach).
@@ -25,6 +26,11 @@ jest.mock('react-native-reanimated', () => {
   return { __esModule: true, ...actual, withSequence: jest.fn(actual.withSequence) };
 });
 const R = Reanimated as unknown as { withSequence: jest.Mock };
+
+// Pickup times from the real clock (TESTING.md: never freeze Date to pin a day):
+// `days` Malaysian days from today, at hh:mm Malaysian time.
+const at = (days: number, hh: number, mm: number) =>
+  new Date(myStartOfDay(new Date(), days).getTime() + (hh * 60 + mm) * 60_000).toISOString();
 
 const job = (id: string, status: Job['status'], at: string, over: Partial<Job> = {}): Job => ({
   id, assignmentId: `asg-${id}`, jobUuid: `uuid-${id}`, time: at.slice(11, 16), pickupAt: at,
@@ -57,10 +63,10 @@ beforeEach(() => {
   (useRejectAssignment as jest.Mock).mockReturnValue({ mutateAsync: reject });
 });
 
-const PENDING = job('JOB-1', 'pending', '2026-07-29T06:30:00Z');
-const UNDER_WAY = job('JOB-2', 'in_progress', '2026-07-29T01:15:00Z');
-const DONE = job('JOB-3', 'done', '2026-07-29T00:00:00Z');
-const CANCELLED = job('JOB-4', 'cancelled', '2026-07-29T09:00:00Z');
+const PENDING = job('JOB-1', 'pending', at(0, 14, 30));
+const UNDER_WAY = job('JOB-2', 'in_progress', at(0, 9, 15));
+const DONE = job('JOB-3', 'done', at(0, 8, 0));
+const CANCELLED = job('JOB-4', 'cancelled', at(0, 17, 0));
 
 describe('Today heading (change 10)', () => {
   it('counts the jobs still to do and shows no money', async () => {
@@ -83,7 +89,7 @@ describe('Empty state (change 15)', () => {
     expect(screen.getByText('No jobs scheduled today')).toBeTruthy();
   });
   it('does not show it when only an upcoming day has a job', async () => {
-    mockJobs({ upcoming: [{ dateKey: '2026-08-01', label: 'Sat, 1 Aug', jobs: [job('JOB-9', 'confirmed', '2026-08-01T02:00:00Z')] }] });
+    mockJobs({ upcoming: [{ dateKey: myDateKey(at(3, 10, 0)), label: '', jobs: [job('JOB-9', 'confirmed', at(3, 10, 0))] }] });
     await render(<JobsToday/>);
     expect(screen.queryByText('No jobs scheduled today')).toBeNull();
     expect(screen.getByText('Client JOB-9')).toBeTruthy();
@@ -169,14 +175,14 @@ describe('Finished today fold (changes 32, 36)', () => {
 describe('Statuses on the Jobs list (lib/jobStatus.ts)', () => {
   fakeTimers();
   it('a rejected job sits in the Finished today fold and reads Rejected', async () => {
-    mockJobs({ today: [PENDING, job('JOB-5', 'rejected', '2026-07-29T10:00:00Z')] });
+    mockJobs({ today: [PENDING, job('JOB-5', 'rejected', at(0, 18, 0))] });
     await render(<JobsToday/>);
     expect(screen.queryByText('Client JOB-5')).toBeNull();
     await fireEvent.press(screen.getByText('Finished today'));
     expect(screen.getByText('Rejected')).toBeTruthy();
   });
   it("an unknown status stays among the open jobs, shows the dispatcher's word and offers no Accept", async () => {
-    mockJobs({ today: [job('JOB-6', 'on_hold', '2026-07-29T10:00:00Z')] });
+    mockJobs({ today: [job('JOB-6', 'on_hold', at(0, 18, 0))] });
     await render(<JobsToday/>);
     expect(screen.getByText('Client JOB-6')).toBeTruthy();
     expect(screen.getByText('On hold')).toBeTruthy();
@@ -194,7 +200,7 @@ describe('Opening a job (change 14)', () => {
     expect(router.push).toHaveBeenCalledWith({ pathname: '/jobs/active', params: { id: 'JOB-2' } });
   });
   it('opens an in-progress job on the trip screen from Upcoming too', async () => {
-    mockJobs({ upcoming: [{ dateKey: '2026-08-01', label: 'Sat, 1 Aug', jobs: [job('JOB-9', 'in_progress', '2026-08-01T02:00:00Z')] }] });
+    mockJobs({ upcoming: [{ dateKey: myDateKey(at(3, 10, 0)), label: '', jobs: [job('JOB-9', 'in_progress', at(3, 10, 0))] }] });
     await render(<JobsToday/>);
     await fireEvent.press(screen.getByText('Client JOB-9'));
     expect(router.push).toHaveBeenCalledWith({ pathname: '/jobs/active', params: { id: 'JOB-9' } });
