@@ -25,6 +25,10 @@ describe('no signal', () => {
     ['an error object with status 0', { message: 'TypeError: Network request failed', code: '', status: 0 }],
     ['an aborted request', Object.assign(new Error('The operation was aborted'), { name: 'AbortError' })],
     ['a timeout', Object.assign(new Error('timed out'), { name: 'TimeoutError' })],
+    // Value: protects=a dead-signal failure thrown as text or worded differently still reads No signal; fails_when=string input or a wording alternative is dropped from the offline check; why_new=only Error and status 0 shapes were covered; seam=none; no_claim=other wordings
+    ['a thrown string', 'Network request failed'],
+    ['a network error wording', new Error('Network Error')],
+    ['a request timeout wording', new Error('Request timed out')],
   ])('%s', (_n, e) => {
     expect(errorKind(e)).toBe('offline');
     expect(errorWords(e)).toBe(OFFLINE);
@@ -38,6 +42,8 @@ describe('signed out', () => {
     ['expired wording alone', new Error('JWT expired')],
     ['PGRST303', pg('JWT issued at future', 'PGRST303')],
     ['a missing refresh token', new Error('Invalid Refresh Token: Refresh Token Not Found')],
+    // Value: protects=a session that cannot renew says signed out; fails_when=the refresh-token invalid wording stops matching; why_new=only the not-found wording was covered; seam=none; no_claim=other auth errors
+    ['an invalid refresh token', new Error('Refresh Token is invalid')],
   ])('%s', (_n, e) => {
     expect(errorKind(e)).toBe('signedOut');
     expect(errorWords(e)).toBe(SIGNED_OUT);
@@ -115,6 +121,12 @@ describe('Sentry', () => {
     errorWords(new TypeError('Network request failed'));
     errorWords(new TypeError('Failed to fetch'));
     expect(capture).toHaveBeenCalledTimes(1);
+  });
+
+  // Value: protects=Sentry can filter by the kind the driver was told; fails_when=the errorKind tag is dropped or wrong; why_new=existing tests only check the raw error; seam=none; no_claim=other tags
+  it('tags the report with the kind the driver saw', () => {
+    errorWords(pg('Not authorized'));
+    expect(capture.mock.calls[0][1]).toEqual({ tags: { errorKind: 'notAllowed' } });
   });
 
   it('hears about each kind separately', () => {
