@@ -63,6 +63,15 @@ export function msToWaitPastMidnight(now: Date): number {
   return untilMidnight <= MIDNIGHT_MARGIN_MS ? untilMidnight + 1 : 0;
 }
 
+/** Sleeps until just past Malaysian midnight when `now` is inside the margin; resolves at once otherwise. */
+export async function waitPastMidnight(
+  now: Date = new Date(),
+  sleep: (ms: number) => Promise<unknown> = ms => new Promise(resolve => setTimeout(resolve, ms)),
+): Promise<void> {
+  const wait = msToWaitPastMidnight(now);
+  if (wait > 0) await sleep(wait);
+}
+
 export interface FakeDatabase {
   /** The plain story data of the current test. Edit rows here before the code under test runs. */
   readonly db: Db;
@@ -80,10 +89,7 @@ export function installFakeDatabase(opts: { now?: Date } = {}): FakeDatabase {
   let db: Db;
   let rule: FailRule | undefined;
   beforeEach(async () => {
-    if (!opts.now) {
-      const wait = msToWaitPastMidnight(new Date());
-      if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
-    }
+    if (!opts.now) await waitPastMidnight();
     const now = opts.now ?? new Date();
     db = buildDb(now);
     rule = undefined;
