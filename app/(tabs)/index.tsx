@@ -14,7 +14,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Icon } from '../../components/Icon';
 import { useTokens } from '../../theme/ThemeProvider';
 import { EASE_OUT, fontFor, motionFor, radius, space, type } from '../../theme/tokens';
-import { formatDate, formatDayLong } from '../../lib/timeFormat';
+import { formatDate, formatDayLong, myStartOfDay } from '../../lib/timeFormat';
 import { useTodaysJobs } from '../../lib/queries/jobs';
 import { useConfirmAssignment, useRejectAssignment } from '../../lib/mutations/jobActions';
 import { useUnreadCount } from '../../lib/queries/notifications';
@@ -27,6 +27,26 @@ import {
 const APP_DOWNLOAD_URL = 'https://app.fleetms.my/driver-app';
 
 const CURVE = Easing.bezier(EASE_OUT[0], EASE_OUT[1], EASE_OUT[2], EASE_OUT[3]);
+
+/**
+ * The "now" the Jobs list is split against. It moves at the next Malaysian
+ * midnight (one timer, set again each midnight, cleared on unmount), so with
+ * the app left open tomorrow's jobs move under Today, and an unfinished job
+ * moves under Overdue, without a download.
+ */
+function useNowByMidnight(): Date {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const midnight = myStartOfDay(now, 1).getTime();
+    const timer = setTimeout(() => {
+      // Never land before the midnight the timer waited for, even if the
+      // phone's clock reads a moment behind it.
+      setNow(new Date(Math.max(Date.now(), midnight)));
+    }, Math.max(0, midnight - Date.now()));
+    return () => clearTimeout(timer);
+  }, [now]);
+  return now;
+}
 
 export default function JobsToday() {
   const T = useTokens();
@@ -43,14 +63,15 @@ export default function JobsToday() {
   // The job the driver tapped Reject on. Nothing is sent until the dialog is confirmed.
   const [rejecting, setRejecting] = useState<Job | null>(null);
 
-  const groups = groupJobs(data ?? [], new Date());
+  const now = useNowByMidnight();
+  const groups = groupJobs(data ?? [], now);
   const { overdue, today, todayFinished, tomorrow, upcoming } = groups;
   const upcomingTotal = upcoming.reduce((sum, g) => sum + g.jobs.length, 0);
 
   // MY day, matching the MY day boundaries the Today/Tomorrow groups below use
   // (lib/jobGroups.ts). Device-local would let this header disagree with
   // which jobs are sitting under 'Today'.
-  const headerSubtitle = formatDayLong();
+  const headerSubtitle = formatDayLong(now);
 
   // The group heading's count, on the right of the title.
   const count = { ...type.label, fontFamily: fontFor('600'), fontWeight: '600', color: T.text2 } as const;

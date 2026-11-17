@@ -263,6 +263,29 @@ describe('Accept from the list (change 35)', () => {
   });
 });
 
+// The day split is drawn against a "now" the screen holds, which moves at the
+// next Malaysian midnight. Date stays real (TESTING.md); only the timer is fake.
+describe('Midnight redraw', () => {
+  fakeTimers();
+  it('moves a job from Tomorrow to Today at Malaysian midnight without a download', async () => {
+    mockJobs([job('JOB-7', 'confirmed', at(1, 10, 0))]);
+    await render(<JobsToday/>);
+    expect(screen.getByText('Tomorrow')).toBeTruthy();
+    expect(screen.queryByText('1 job to go')).toBeNull();
+
+    const toMidnight = myStartOfDay(new Date(), 1).getTime() - Date.now();
+    await advance(toMidnight - 1000);
+    expect(screen.getByText('Tomorrow')).toBeTruthy();
+
+    await advance(2000);
+    expect(screen.queryByText('Tomorrow')).toBeNull();
+    expect(screen.getByText('1 job to go')).toBeTruthy();
+    expect(screen.getByText('Client JOB-7')).toBeTruthy();
+    const { refetch } = (useTodaysJobs as jest.Mock).mock.results[0].value;
+    expect(refetch).not.toHaveBeenCalled();
+  });
+});
+
 // Value: protects=Jobs tab failed load shows the shared error box and Retry refetches; fails_when=LoadError wiring or onRetry is dropped; why_new=no test drove isError on this screen; seam=none; no_claim=real query errors (hook mocked)
 describe('Jobs list: failed load (LoadError)', () => {
   afterEach(() => { delete (globalThis as any).__FLEETMS_DEV_SESSION__; });
