@@ -6,6 +6,9 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
 
 ### Fixed
 
+- **Earnings shows the whole average per job.** On a normal-size phone a
+  three-figure average was cut off ("RM 152..."). The Jobs column now gives up
+  some width, and the figure shrinks a little if it still doesn't fit.
 - **A job dispatch just changed refreshes itself.** If Accept, Reject, Start or
   Mark as done fails because dispatch changed the job, the job and the Jobs
   list reload straight away, so the message is true.

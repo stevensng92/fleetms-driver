@@ -374,14 +374,16 @@ function Mini({ label, value, color, first, icon }: {
 }) {
   const T = useTokens();
   return (
+    // Jobs holds one short count, so it gives width to the money column
+    // beside it: equal thirds cut a three-figure average off ("RM 152...").
     <View style={{
-      flex: 1, paddingLeft: first ? 0 : space[3], paddingRight: space[3], gap: space[1],
+      flex: first ? 0.6 : 1, paddingLeft: first ? 0 : space[3], paddingRight: space[3], gap: space[1],
       ...(first ? {} : { borderLeftWidth: 1, borderLeftColor: T.hairline }),
     }}>
       <Text style={[type.caption, { color: T.text2 }]}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>
         {icon && <Icon name={icon} size={14} stroke={2.4} color={color}/>}
-        <Text style={[type.title, TABULAR, { fontFamily: fontFor('700'), fontWeight: '700', color }]} numberOfLines={1}>{value}</Text>
+        <Text style={[type.title, TABULAR, { fontFamily: fontFor('700'), fontWeight: '700', color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{value}</Text>
       </View>
     </View>
   );
