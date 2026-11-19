@@ -206,6 +206,25 @@ describe('Earnings — row rendering', () => {
     expect(screen.getByText('.00')).toBeTruthy();
   });
 
+  // REGRESSION: on a 375px phone the average read "RM 152...". The three stat
+  // columns were equal, so the average got the same width as Jobs (one short
+  // number) and its figure ran 3px past its box. Jest has no layout, so this
+  // pins the two things that stop the cut-off: the Jobs column gives up width,
+  // and the figure may shrink rather than be cut.
+  it('fits a three-figure average in its column instead of cutting it off', async () => {
+    mockEarnings(summary({ avgCommissionPerJob: 152 }));
+    await render(<Earnings/>);
+
+    const average = screen.getByText('RM 152.00');
+    expect(average.props.adjustsFontSizeToFit).toBe(true);
+    expect(average.props.numberOfLines).toBe(1);
+
+    const columnOf = (label: string) => screen.getByText(label).parent!;
+    const flexOf = (label: string) => [columnOf(label).props.style].flat(Infinity)
+      .reduce((f: number | undefined, s: any) => s?.flex ?? f, undefined);
+    expect(flexOf('Jobs')).toBeLessThan(flexOf('Average per job')!);
+  });
+
   it('words each payment status, with no Invoiced and no Pending (change 22)', async () => {
     const base = summary().rows[0];
     mockEarnings(summary({
