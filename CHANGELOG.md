@@ -6,6 +6,14 @@ All notable changes to the FleetMS Driver app. Format follows [Keep a Changelog]
 
 ### Fixed
 
+- **A screen no longer stays on "You've been signed out" after the app
+  renewed the session.** When a load failed because the sign-in had just run
+  out, the app renewed it quietly but the screen kept the message until the
+  driver tapped Retry. Screens on show now reload by themselves once the
+  renewal works (at most once a minute each, so it can never loop).
+- **Failures that arrive together share one renewal.** A screen loading
+  several things at once used to ask the login server for a new session once
+  per failure. Now the first asks and the rest wait for its answer.
 - **Earnings shows the whole average per job.** On a normal-size phone a
   three-figure average was cut off ("RM 152..."). The Jobs column now gives up
   some width, and the figure shrinks a little if it still doesn't fit.
